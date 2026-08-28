@@ -165,7 +165,9 @@
             callback([SCErr errorWithCode: 1]);
         } else {
             NSLog(@"ERROR: Failed to authorize installing selfcontrold with status %d.", status);
-            callback([SCErr errorWithCode: 501]);
+            NSError* err = [SCErr errorWithCode: 501];
+            [SCSentry captureError: err];
+            callback(err);
         }
         return;
     }
@@ -183,14 +185,22 @@
     }
 
     NSError* registerErr = nil;
-    if (![daemonService registerAndReturnError: &registerErr]) {
-        if (daemonService.status == SMAppServiceStatusRequiresApproval) {
-            // the user must enable us in System Settings > General > Login Items
-            NSLog(@"Daemon registration requires approval in System Settings; opening it");
-            [SMAppService openSystemSettingsLoginItems];
-        }
+    BOOL registered = [daemonService registerAndReturnError: &registerErr];
+
+    // register can "succeed" while the service still needs the user's approval
+    // in System Settings > General > Login Items - treat that as not installed
+    if (daemonService.status == SMAppServiceStatusRequiresApproval) {
+        NSLog(@"Daemon registration requires approval in System Settings; opening it");
+        [SMAppService openSystemSettingsLoginItems];
+        callback([SCErr errorWithCode: 500 subDescription: @"SelfControl's helper needs your approval in System Settings > General > Login Items. Enable it, then try again."]);
+        return;
+    }
+
+    if (!registered) {
         NSLog(@"ERROR: Failed to register selfcontrold daemon: %@", registerErr);
-        callback([SCErr errorWithCode: 500 subDescription: registerErr.localizedDescription]);
+        NSError* err = [SCErr errorWithCode: 500 subDescription: registerErr.localizedDescription ?: @"unknown error"];
+        [SCSentry captureError: err];
+        callback(err);
         return;
     }
 
