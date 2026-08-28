@@ -10,6 +10,7 @@
 #import "SCDaemonXPC.h"
 #import"SCDaemonBlockMethods.h"
 #import "SCFileWatcher.h"
+#import <Security/Security.h>
 
 static NSString* serviceName = @"org.eyebeam.selfcontrold";
 float const INACTIVITY_LIMIT_SECS = 60 * 2; // 2 minutes
@@ -143,6 +144,30 @@ float const INACTIVITY_LIMIT_SECS = 60 * 2; // 2 minutes
     }
 }
 
+// Returns the team identifier this daemon binary is signed with, or nil.
+// Used to accept XPC connections only from clients signed by the same team,
+// without hardcoding the fork owner's team ID in source.
++ (NSString*)ownTeamIdentifier {
+    SecCodeRef selfCode = NULL;
+    if (SecCodeCopySelf(kSecCSDefaultFlags, &selfCode) != errSecSuccess || selfCode == NULL) {
+        return nil;
+    }
+    SecStaticCodeRef staticCode = NULL;
+    OSStatus status = SecCodeCopyStaticCode(selfCode, kSecCSDefaultFlags, &staticCode);
+    CFRelease(selfCode);
+    if (status != errSecSuccess || staticCode == NULL) {
+        return nil;
+    }
+    CFDictionaryRef infoDict = NULL;
+    status = SecCodeCopySigningInformation(staticCode, kSecCSSigningInformation, &infoDict);
+    CFRelease(staticCode);
+    if (status != errSecSuccess || infoDict == NULL) {
+        return nil;
+    }
+    NSDictionary* info = CFBridgingRelease(infoDict);
+    return info[(__bridge NSString*)kSecCodeInfoTeamIdentifier];
+}
+
 #pragma mark - NSXPCListenerDelegate
 
 - (BOOL)listener:(NSXPCListener *)listener shouldAcceptNewConnection:(NSXPCConnection *)newConnection {
@@ -156,10 +181,24 @@ float const INACTIVITY_LIMIT_SECS = 60 * 2; // 2 minutes
         return NO;
     }
     
-    SecRequirementRef isSelfControlApp;
-    // versions before 4.0 didn't have hardened code signing, so aren't trustworthy to talk to the daemon
-    // (plus the daemon didn't exist before 4.0 so there's really no reason they should want to run it!)
-    SecRequirementCreateWithString(CFSTR("anchor apple generic and (identifier \"org.eyebeam.SelfControl\" or identifier \"org.eyebeam.selfcontrol-cli\") and info [CFBundleVersion] >= \"407\" and (certificate leaf[field.1.2.840.113635.100.6.1.9] /* exists */ or certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = EG6ZYP3AQH)"), kSecCSDefaultFlags, &isSelfControlApp);
+    NSString* teamID = [SCDaemon ownTeamIdentifier];
+    if (teamID == nil) {
+        NSLog(@"Rejecting XPC connection: daemon has no team identifier (unsigned build?)");
+        CFRelease(guest);
+        return NO;
+    }
+    // Fork: accept only clients signed with OUR team (Apple Development or
+    // Developer ID both carry the team in subject.OU). No version floor -
+    // we control both sides of this connection.
+    NSString* reqString = [NSString stringWithFormat:
+        @"anchor apple generic and (identifier \"org.eyebeam.SelfControl\" or identifier \"org.eyebeam.selfcontrol-cli\") and certificate leaf[subject.OU] = \"%@\"",
+        teamID];
+    SecRequirementRef isSelfControlApp = NULL;
+    if (SecRequirementCreateWithString((__bridge CFStringRef)reqString, kSecCSDefaultFlags, &isSelfControlApp) != errSecSuccess || isSelfControlApp == NULL) {
+        NSLog(@"Rejecting XPC connection: could not create signing requirement");
+        CFRelease(guest);
+        return NO;
+    }
     OSStatus clientValidityStatus = SecCodeCheckValidity(guest, kSecCSDefaultFlags, isSelfControlApp);
     
     CFRelease(guest);
