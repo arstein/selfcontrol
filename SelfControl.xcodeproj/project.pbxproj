@@ -3522,7 +3522,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# buildNumber=$(xcodebuild -project SelfControl.xcodeproj/ -showBuildSettings | grep \"CURRENT_PROJECT_VERSION\" | sed 's/[ ]*CURRENT_PROJECT_VERSION = //')\necho \"#define SELFCONTROL_VERSION_STRING @\\\"${MARKETING_VERSION}\\\"\" > \"${PROJECT_DIR}/version-header.h\"\n";
+			shellScript = "NEW_CONTENT=\"#define SELFCONTROL_VERSION_STRING @\\\"${MARKETING_VERSION}\\\"\"\nHEADER=\"${PROJECT_DIR}/version-header.h\"\n# Only rewrite when changed, so we don't invalidate the precompiled header every build\nif [ \"$(cat \"$HEADER\" 2>/dev/null)\" != \"$NEW_CONTENT\" ]; then\n  echo \"$NEW_CONTENT\" > \"$HEADER\"\nfi\n";
 		};
 		CB5E5FF81C3A5FD10038F331 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -3552,7 +3552,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "echo \"#define SELFCONTROL_VERSION_STRING @\\\"${MARKETING_VERSION}\\\"\" > \"${PROJECT_DIR}/version-header.h\"\n";
+			shellScript = "NEW_CONTENT=\"#define SELFCONTROL_VERSION_STRING @\\\"${MARKETING_VERSION}\\\"\"\nHEADER=\"${PROJECT_DIR}/version-header.h\"\n# Only rewrite when changed, so we don't invalidate the precompiled header every build\nif [ \"$(cat \"$HEADER\" 2>/dev/null)\" != \"$NEW_CONTENT\" ]; then\n  echo \"$NEW_CONTENT\" > \"$HEADER\"\nfi\n";
 		};
 		CB81A92E25B7B4B8006956F7 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -3569,7 +3569,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\necho \"#define SELFCONTROL_VERSION_STRING @\\\"${MARKETING_VERSION}\\\"\" > \"${PROJECT_DIR}/version-header.h\"\n";
+			shellScript = "NEW_CONTENT=\"#define SELFCONTROL_VERSION_STRING @\\\"${MARKETING_VERSION}\\\"\"\nHEADER=\"${PROJECT_DIR}/version-header.h\"\n# Only rewrite when changed, so we don't invalidate the precompiled header every build\nif [ \"$(cat \"$HEADER\" 2>/dev/null)\" != \"$NEW_CONTENT\" ]; then\n  echo \"$NEW_CONTENT\" > \"$HEADER\"\nfi\n";
 		};
 		D9A9036A1A4890539C220C89 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
