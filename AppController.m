@@ -31,7 +31,6 @@
 #import "SCXPCClient.h"
 #import "SCBlockFileReaderWriter.h"
 #import "SCUIUtilities.h"
-#import <TransformerKit/NSValueTransformer+TransformerKit.h>
 
 @interface AppController () {}
 
