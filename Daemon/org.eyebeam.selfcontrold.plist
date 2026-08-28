@@ -4,6 +4,12 @@
 <dict>
 	<key>Label</key>
 	<string>org.eyebeam.selfcontrold</string>
+	<key>BundleProgram</key>
+	<string>Contents/Library/LaunchServices/org.eyebeam.selfcontrold</string>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>org.eyebeam.SelfControl</string>
+	</array>
 	<key>RunAtLoad</key>
 	<true/>
 	<key>MachServices</key>
@@ -12,7 +18,10 @@
 		<true/>
 	</dict>
 	<key>KeepAlive</key>
-	<true/>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
 	<key>Nice</key>
 	<integer>5</integer>
 </dict>

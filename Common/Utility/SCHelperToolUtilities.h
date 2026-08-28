@@ -19,8 +19,8 @@ NS_ASSUME_NONNULL_BEGIN
 // ipfw firewall.
 + (void)installBlockRulesFromSettings;
 
-// calls SMJobRemove to unload the daemon from launchd
-// (which also kills the running process, synchronously)
+// exits the daemon process cleanly once settings are synced; launchd's
+// KeepAlive={SuccessfulExit=false} keeps it dead until relaunched on-demand
 + (void)unloadDaemonJob;
 
 // Checks the settings system to see whether the user wants their web browser

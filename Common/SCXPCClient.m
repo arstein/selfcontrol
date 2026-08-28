@@ -140,85 +140,62 @@
 - (void)installDaemon:(void(^)(NSError*))callback {
     // make sure authorization is set up (if we haven't connected yet)
     [self setupAuthorization];
-    
-    AuthorizationItem blessRight = {
-        kSMRightBlessPrivilegedHelper, 0, NULL, 0
-    };
+
+    // SMJobBless is gone (SMAppService needs no bless right), but we still
+    // require the user to authorize starting a block before registering.
     AuthorizationItem startBlockRight = {
         "org.eyebeam.SelfControl.startBlock", 0, NULL, 0
     };
-    AuthorizationItem rightsArr[] = { blessRight, startBlockRight };
-
     AuthorizationRights authRights;
-    authRights.count = 2;
-    authRights.items = rightsArr;
+    authRights.count = 1;
+    authRights.items = &startBlockRight;
 
     AuthorizationFlags myFlags = kAuthorizationFlagDefaults |
     kAuthorizationFlagExtendRights |
     kAuthorizationFlagInteractionAllowed;
-    OSStatus status;
-    
-    status = AuthorizationCopyRights(
-                                           self->_authRef,
-                                           &authRights,
-                                           kAuthorizationEmptyEnvironment,
-                                           myFlags,
-                                           NULL
-                                       );
-
-    if(status) {
+    OSStatus status = AuthorizationCopyRights(self->_authRef,
+                                              &authRights,
+                                              kAuthorizationEmptyEnvironment,
+                                              myFlags,
+                                              NULL);
+    if (status) {
         // if it's just the user cancelling, make that obvious
         // to any listeners so they can ignore it appropriately
         if (status == AUTH_CANCELLED_STATUS) {
             callback([SCErr errorWithCode: 1]);
         } else {
             NSLog(@"ERROR: Failed to authorize installing selfcontrold with status %d.", status);
-
-            NSError* err = [SCErr errorWithCode: 501];
-            [SCSentry captureError: err];
-            
-            callback(err);
+            callback([SCErr errorWithCode: 501]);
         }
-
         return;
     }
-    
-    CFErrorRef cfError;
 
-    // in some cases, SMJobBless will fail if we don't first remove the currently running daemon
-    // it's not clear why exactly or what the exact cause is, but I can reproduce consistently
-    // by running a 100-site whitelist block, then immediately trying to start another block
-    // I consistently get the error (CFErrorDomainLaunchd error 2)
-    SILENCE_OSX10_10_DEPRECATION(
-    SMJobRemove(kSMDomainSystemLaunchd, CFSTR("org.eyebeam.selfcontrold"), self->_authRef, YES, &cfError);
-                                 );
-    if (cfError) {
-        NSLog(@"WARNING: Failed to remove existing selfcontrold daemon with error %@", cfError);
-        cfError = NULL;
+    SMAppService* daemonService =
+        [SMAppService daemonServiceWithPlistName: @"org.eyebeam.selfcontrold.plist"];
+
+    // Unregister any prior registration so a rebuilt daemon binary is picked up
+    // (mirrors the old SMJobRemove-before-SMJobBless dance). Failure is expected
+    // when nothing was registered — ignore it.
+    NSError* unregisterErr = nil;
+    [daemonService unregisterAndReturnError: &unregisterErr];
+    if (unregisterErr != nil) {
+        NSLog(@"Note: unregister of existing daemon returned %@ (usually harmless)", unregisterErr);
     }
 
-    BOOL result = (BOOL)SMJobBless(
-                                   kSMDomainSystemLaunchd,
-                                   CFSTR("org.eyebeam.selfcontrold"),
-                                   self->_authRef,
-                                   &cfError);
-
-    if(!result) {
-        NSError* error = CFBridgingRelease(cfError);
-        
-        NSLog(@"WARNING: Authorized installation of selfcontrold returned failure status code %d and error %@", (int)status, error);
-
-        NSError* err = [SCErr errorWithCode: 500 subDescription: error.localizedDescription];
-        if (![SCMiscUtilities errorIsAuthCanceled: error]) {
-            [SCSentry captureError: err];
+    NSError* registerErr = nil;
+    if (![daemonService registerAndReturnError: &registerErr]) {
+        if (daemonService.status == SMAppServiceStatusRequiresApproval) {
+            // the user must enable us in System Settings > General > Login Items
+            NSLog(@"Daemon registration requires approval in System Settings; opening it");
+            [SMAppService openSystemSettingsLoginItems];
         }
-
-        callback(err);
+        NSLog(@"ERROR: Failed to register selfcontrold daemon: %@", registerErr);
+        callback([SCErr errorWithCode: 500 subDescription: registerErr.localizedDescription]);
         return;
-    } else {
-        NSLog(@"Daemon installed successfully!");
-        callback(nil);
     }
+
+    NSLog(@"Daemon installed successfully!");
+    callback(nil);
 }
 
 - (BOOL)connectionIsActive {

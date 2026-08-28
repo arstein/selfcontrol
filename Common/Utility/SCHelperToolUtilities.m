@@ -44,15 +44,12 @@
         [SCSentry captureError: syncErr];
     }
     
-    // uh-oh, looks like it's 5 seconds later and the sync hasn't completed yet. Bad news.
-    CFErrorRef cfError;
-    // this should block until the process is dead, so we should never get to the other side if it's successful
-    SILENCE_OSX10_10_DEPRECATION(
-    SMJobRemove(kSMDomainSystemLaunchd, CFSTR("org.eyebeam.selfcontrold"), NULL, YES, &cfError);
-                                 );
-    if (cfError) {
-        NSLog(@"Failed to remove selfcontrold daemon with error %@", cfError);
-    }
+    // SMAppService fork: the daemon can't SMJobRemove itself anymore.
+    // A clean exit(0) plus KeepAlive={SuccessfulExit=false} in the launchd
+    // plist means we stay dead until launchd relaunches us on-demand
+    // (next XPC connection) or at boot (RunAtLoad).
+    NSLog(@"Daemon idle; exiting cleanly.");
+    exit(EXIT_SUCCESS);
 }
 
 + (void)clearCachesIfRequested {
