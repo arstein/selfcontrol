@@ -3004,9 +3004,9 @@
 				LastUpgradeCheck = 0930;
 				TargetAttributes = {
 					8D1107260486CEB800E47090 = {
-						DevelopmentTeam = EG6ZYP3AQH;
+						DevelopmentTeam = 982XP5S38C;
 						LastSwiftMigration = 1150;
-						ProvisioningStyle = Manual;
+						ProvisioningStyle = Automatic;
 						SystemCapabilities = {
 							com.apple.ApplicationGroups.Mac = {
 								enabled = 1;
@@ -3015,26 +3015,26 @@
 					};
 					CB0EEF5C20FD8CE00024D27B = {
 						CreatedOnToolsVersion = 9.4.1;
-						DevelopmentTeam = EG6ZYP3AQH;
+						DevelopmentTeam = 982XP5S38C;
 						ProvisioningStyle = Automatic;
 					};
 					CB74D1052480E506002B2079 = {
-						DevelopmentTeam = EG6ZYP3AQH;
-						ProvisioningStyle = Manual;
+						DevelopmentTeam = 982XP5S38C;
+						ProvisioningStyle = Automatic;
 					};
 					CB9C80F619CFB79700CDCAE1 = {
 						CreatedOnToolsVersion = 6.0.1;
-						DevelopmentTeam = EG6ZYP3AQH;
+						DevelopmentTeam = 982XP5S38C;
 						ProvisioningStyle = Automatic;
 					};
 					CB9C811A19CFBA8500CDCAE1 = {
 						CreatedOnToolsVersion = 6.0.1;
-						DevelopmentTeam = EG6ZYP3AQH;
-						ProvisioningStyle = Manual;
+						DevelopmentTeam = 982XP5S38C;
+						ProvisioningStyle = Automatic;
 					};
 					CBA2AFD10F39EC12005AFEBE = {
-						DevelopmentTeam = EG6ZYP3AQH;
-						ProvisioningStyle = Manual;
+						DevelopmentTeam = 982XP5S38C;
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
