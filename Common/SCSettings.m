@@ -8,10 +8,6 @@
 #import "SCSettings.h"
 #import <AppKit/AppKit.h>
 
-#ifndef TESTING
-#import <Sentry/Sentry.h>
-#endif
-
 float const SYNC_INTERVAL_SECS = 30;
 float const SYNC_LEEWAY_SECS = 30;
 NSString* const SETTINGS_FILE_DIR = @"/usr/local/etc/";
@@ -454,41 +450,6 @@ NSString* const SETTINGS_FILE_DIR = @"/usr/local/etc/";
         dispatch_source_cancel(self.debouncedChangeTimer);
         self.debouncedChangeTimer = nil;
     }
-}
-
-- (void)updateSentryContext {
-    // make sure Sentry has the latest context in the event of a crash
-    
-    NSMutableDictionary* dictCopy = [self.settingsDict mutableCopy];
-    
-    // fill in any gaps with default values (like we did if they called valueForKey:)
-    for (NSString* key in [[self defaultSettingsDict] allKeys]) {
-        if (dictCopy[key] == nil) {
-            dictCopy[key] = [self defaultSettingsDict][key];
-        }
-    }
-    
-    // eliminate privacy-sensitive data (i.e. blocklist)
-    // but store the blocklist length as a useful piece of debug info
-    id activeBlocklist = dictCopy[@"ActiveBlocklist"];
-    NSUInteger blocklistLength = (activeBlocklist == nil) ? 0 : ((NSArray*)activeBlocklist).count;
-    [dictCopy setObject: @(blocklistLength) forKey: @"ActiveBlocklistLength"];
-    [dictCopy removeObjectForKey: @"Blocklist"];
-    [dictCopy removeObjectForKey: @"ActiveBlocklist"];
-
-    // and serialize dates to string, since Sentry has a hard time with that
-    NSArray<NSString*>* dateKeys = @[@"BlockEndDate", @"LastSettingsUpdate"];
-    for (NSString* dateKey in dateKeys) {
-        dictCopy[dateKey] = [NSDateFormatter localizedStringFromDate: dictCopy[dateKey]
-                                                                 dateStyle: NSDateFormatterShortStyle
-                                                                 timeStyle: NSDateFormatterFullStyle];
-    }
-
-#ifndef TESTING
-    [SentrySDK configureScope:^(SentryScope * _Nonnull scope) {
-        [scope setContextValue: dictCopy forKey: @"SCSettings"];
-    }];
-#endif
 }
 
 - (void)onSettingChanged:(NSNotification*)note {

@@ -33,8 +33,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (id)valueForKey:(NSString*)key;
 - (BOOL)boolForKey:(NSString*)key;
 
-- (void)updateSentryContext;
-
 - (void)resetAllSettingsToDefaults;
 
 @end
