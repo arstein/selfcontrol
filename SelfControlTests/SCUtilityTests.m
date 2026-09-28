@@ -138,6 +138,13 @@ NSDictionary* veryLongBlockLegacyDict; // year-long block, one day in
     XCTAssert([cleaned[4] isEqualToString: @"reader.google.com"]);
 }
 
+- (void)testTimeSourcesAreRemovedFromBlocklists {
+    NSArray* filtered = [SCBlockUtilities blocklistByRemovingTimeSources:@[
+        @"example.com", @"time.apple.com", @"TIME.CLOUDFLARE.COM.", @"time.google.com:123"
+    ]];
+    XCTAssertEqualObjects(filtered, (@[@"example.com"]));
+}
+
 - (void) testModernBlockDetection {
     SCSettings* settings = [SCSettings sharedSettings];
 

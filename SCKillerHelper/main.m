@@ -17,6 +17,7 @@
 #import "SCMigrationUtilities.h"
 #import <sysexits.h>
 #import "SCSentry.h"
+#import "SCSNTPClient.h"
 
 #define LOG_FILE @"~/Documents/SelfControl-Killer.log"
 
@@ -121,6 +122,24 @@ int main(int argc, char* argv[]) {
         // and print new secured settings, if they exist
         SCSettings* settings = [SCSettings sharedSettings];
         [log appendFormat: @"Current secured settings:\n\n:%@\n", settings.dictionaryRepresentation];
+
+        // The upstream recovery helper bypasses the daemon and force-clears
+        // rules. In the fork it may only do that after independent network
+        // time confirms that the active block has genuinely ended.
+        if ([settings boolForKey:@"BlockIsRunning"] &&
+            [[settings valueForKey:@"TrustedClockState"] count] > 0) {
+            NSDate* start = [settings valueForKey:@"BlockStartWall"];
+            NSTimeInterval duration = [[settings valueForKey:@"BlockDurationSecs"] doubleValue];
+            if (![settings boolForKey:@"BlockStartIsVerified"] || start == nil || duration <= 0) {
+                NSLog(@"ERROR: Refusing recovery: the active block has no verified start time.");
+                exit(EX_TEMPFAIL);
+            }
+            NSDate* verifiedNow = [SCSNTPClient fetchNetworkTimeWithTimeout:3.0];
+            if (verifiedNow == nil || [verifiedNow timeIntervalSinceDate:start] < duration) {
+                NSLog(@"ERROR: Refusing recovery: network time does not confirm block expiry.");
+                exit(EX_TEMPFAIL);
+            }
+        }
         
         NSString* legacySettingsPath = [SCMigrationUtilities legacySecuredSettingsFilePathForUser: controllingUID];
         NSDictionary* legacySettingsDict = [NSDictionary dictionaryWithContentsOfFile: legacySettingsPath];

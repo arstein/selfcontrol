@@ -26,6 +26,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #import "HostFileBlockerSet.h"
+#import "SCSNTPClient.h"
 
 @implementation BlockManager
 
@@ -136,6 +137,15 @@ BOOL appendMode = NO;
 - (void)addBlockEntry:(SCBlockEntry*)entry {
     // nil entries = something didn't parse right
     if (entry == nil) return;
+
+    NSString* normalizedHostname = entry.hostname.lowercaseString;
+    while ([normalizedHostname hasSuffix:@"."]) {
+        normalizedHostname = [normalizedHostname substringToIndex:normalizedHostname.length - 1];
+    }
+    if ([SCTimeSourceHosts() containsObject:normalizedHostname]) {
+        NSLog(@"WARNING: refusing to block trusted time source %@", entry.hostname);
+        return;
+    }
     
     // NSMutableSet is NOT thread-safe
     @synchronized (addedBlockEntries) {

@@ -24,6 +24,7 @@
 
 #import "TimerWindowController.h"
 #import "SCUIUtilities.h"
+#import <math.h>
 
 @interface TimerWindowController ()
 
@@ -147,8 +148,13 @@
                                          withObject:nil
                                       waitUntilDone:NO];
 
-    NSString* finishingString = NSLocalizedString(@"Finishing", @"String shown when waiting for finished block to clear");
-	int numSeconds = (int) [blockEndingDate_ timeIntervalSinceNow];
+    NSString* finishingString = [SCBlockUtilities modernBlockIsRunning]
+        ? NSLocalizedString(@"Verifying end time…", @"Waiting for network time before ending a block")
+        : NSLocalizedString(@"Finishing", @"String shown when waiting for finished block to clear");
+    NSNumber* trustedRemaining = [SCBlockUtilities trustedRemainingBlockDurationSecs];
+	int numSeconds = (int)ceil(trustedRemaining != nil
+        ? trustedRemaining.doubleValue
+        : [blockEndingDate_ timeIntervalSinceNow]);
 	int numHours;
 	int numMinutes;
 
@@ -162,9 +168,9 @@
 		// manual block removal
 		numStrikes++;
 
-		if(numStrikes >= 7) {
+		if(numStrikes >= 300) {
 			// OK, this is taking longer than it should. Enable manual block removal.
-            if (numStrikes == 7) {
+            if (numStrikes == 300) {
                 NSLog(@"WARNING: Block should have ended! Probable failure to remove.");
                 NSError* err = [SCErr errorWithCode: 105];
                 [SCSentry captureError: err];

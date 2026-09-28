@@ -17,6 +17,8 @@ NS_ASSUME_NONNULL_BEGIN
 + (BOOL)legacyBlockIsRunning;
 
 + (BOOL)currentBlockIsExpired;
++ (nullable NSNumber*)trustedRemainingBlockDurationSecs;
++ (NSArray<NSString*>*)blocklistByRemovingTimeSources:(NSArray<NSString*>*)blocklist;
 
 + (BOOL)blockRulesFoundOnSystem;
 

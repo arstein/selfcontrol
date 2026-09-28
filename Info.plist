@@ -56,7 +56,7 @@
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>SUEnableAutomaticChecks</key>
-	<true/>
+	<false/>
 	<key>SUEnableJavaScript</key>
 	<true/>
 	<key>SUFeedURL</key>
@@ -64,8 +64,8 @@
 	<key>SUPublicDSAKeyFile</key>
 	<string>dsa_pub.pem</string>
 	<key>SUEnableSystemProfiling</key>
-	<true/>
+	<false/>
 	<key>SUSendProfileInfo</key>
-	<true/>
+	<false/>
 </dict>
 </plist>

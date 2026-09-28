@@ -8,6 +8,9 @@
 #import "SCBlockUtilities.h"
 #import "HostFileBlocker.h"
 #import "PacketFilter.h"
+#import "SCBlockEntry.h"
+#import "SCSNTPClient.h"
+#import "SCTrustedClock.h"
 
 @implementation SCBlockUtilities
 
@@ -50,15 +53,46 @@
     return NO;
 }
 
-// returns YES if the block should have expired active based on the specified end time (i.e. the end time is in the past), or NO otherwise
 + (BOOL)currentBlockIsExpired {
-    // the block should be running if the end date hasn't arrived yet
     SCSettings* settings = [SCSettings sharedSettings];
-    if ([[settings valueForKey: @"BlockEndDate"] timeIntervalSinceNow] > 0) {
-        return NO;
-    } else {
-        return YES;
+    NSNumber* remaining = [self trustedRemainingBlockDurationSecs];
+    if (remaining != nil) return remaining.doubleValue <= 0;
+
+    // A block created by the upstream app has no trusted-clock state. Preserve
+    // the legacy comparison so upgrading cannot create a permanent block.
+    NSDate* endDate = [settings valueForKey:@"BlockEndDate"];
+    return endDate == nil || [endDate timeIntervalSinceNow] <= 0;
+}
+
++ (NSNumber*)trustedRemainingBlockDurationSecs {
+    SCSettings* settings = [SCSettings sharedSettings];
+    NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
+    NSNumber* duration = [settings valueForKey:@"BlockDurationSecs"];
+    NSDate* start = [settings valueForKey:@"BlockStartWall"];
+    if (clockState.count == 0 || duration.doubleValue <= 0 || start == nil) return nil;
+
+    NSDictionary* reading = [SCTrustedClock currentReading];
+    if ([settings boolForKey:@"BlockStartIsVerified"]) {
+        NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState reading:reading];
+        NSDate* end = [start dateByAddingTimeInterval:duration.doubleValue];
+        return @([end timeIntervalSinceDate:trustedNow]);
     }
+    return @(duration.doubleValue - [SCTrustedClock elapsedSecsForState:clockState reading:reading]);
+}
+
++ (NSArray<NSString*>*)blocklistByRemovingTimeSources:(NSArray<NSString*>*)blocklist {
+    NSSet<NSString*>* timeSources = [NSSet setWithArray:SCTimeSourceHosts()];
+    NSMutableArray<NSString*>* filtered = [NSMutableArray arrayWithCapacity:blocklist.count];
+    for (NSString* rawEntry in blocklist) {
+        SCBlockEntry* entry = [SCBlockEntry entryFromString:rawEntry];
+        NSString* hostname = entry.hostname.lowercaseString;
+        while ([hostname hasSuffix:@"."]) {
+            hostname = [hostname substringToIndex:hostname.length - 1];
+        }
+        if (hostname != nil && [timeSources containsObject:hostname]) continue;
+        [filtered addObject:rawEntry];
+    }
+    return filtered;
 }
 
 + (BOOL)blockRulesFoundOnSystem {
@@ -71,6 +105,11 @@
     [settings setValue: nil forKey: @"BlockEndDate"];
     [settings setValue: nil forKey: @"ActiveBlocklist"];
     [settings setValue: nil forKey: @"ActiveBlockAsWhitelist"];
+    [settings setValue: nil forKey: @"BlockStartWall"];
+    [settings setValue: @NO forKey: @"BlockStartIsVerified"];
+    [settings setValue: nil forKey: @"BlockDurationSecs"];
+    [settings setValue: nil forKey: @"TrustedClockState"];
+    [settings setValue: @NO forKey: @"TrustedClockNeedsVerification"];
 }
 
 @end

@@ -79,6 +79,13 @@ NSString* const SETTINGS_FILE_DIR = @"/usr/local/etc/";
         @"ActiveBlocklist": @[],
         @"ActiveBlockAsWhitelist": @NO,
 
+        // fork: daemon-owned trusted-clock state
+        @"BlockStartWall": [NSDate distantPast],
+        @"BlockStartIsVerified": @NO,
+        @"BlockDurationSecs": @0,
+        @"TrustedClockState": @{},
+        @"TrustedClockNeedsVerification": @NO,
+
         @"BlockIsRunning": @NO, // tells us whether a block is actually running on the system (to the best of our knowledge)
         @"TamperingDetected": @NO,
         

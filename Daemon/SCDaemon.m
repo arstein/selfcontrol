@@ -10,6 +10,7 @@
 #import "SCDaemonXPC.h"
 #import"SCDaemonBlockMethods.h"
 #import "SCFileWatcher.h"
+#import "SCTrustedClock.h"
 #import <Security/Security.h>
 
 static NSString* serviceName = @"org.eyebeam.selfcontrold";
@@ -45,14 +46,30 @@ float const INACTIVITY_LIMIT_SECS = 60 * 2; // 2 minutes
 }
 
 - (id) init {
-    _listener = [[NSXPCListener alloc] initWithMachServiceName: serviceName];
-    _listener.delegate = self;
+    self = [super init];
+    if (self) {
+        _listener = [[NSXPCListener alloc] initWithMachServiceName: serviceName];
+        _listener.delegate = self;
+    }
     
     return self;
 }
 
 - (void)start {
     [self.listener resume];
+
+    if ([SCBlockUtilities modernBlockIsRunning]) {
+        SCSettings* settings = [SCSettings sharedSettings];
+        NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
+        NSDictionary* reading = [SCTrustedClock currentReading];
+        if (clockState.count > 0 &&
+            ![clockState[@"bootSessionID"] isEqualToString:reading[@"boot"]]) {
+            [settings setValue:[SCTrustedClock reanchoredStateAfterBootChange:clockState reading:reading]
+                        forKey:@"TrustedClockState"];
+            [settings setValue:@YES forKey:@"TrustedClockNeedsVerification"];
+            [settings syncSettingsAndWait:5];
+        }
+    }
 
     // if there's any evidence of a block (i.e. an official one running,
     // OR just block remnants remaining in hosts), we should start
@@ -98,6 +115,12 @@ float const INACTIVITY_LIMIT_SECS = 60 * 2; // 2 minutes
     [SCDaemonBlockMethods checkupBlock];
 }
 - (void)stopCheckupTimer {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self stopCheckupTimer];
+        });
+        return;
+    }
     if (self.checkupTimer == nil) {
         return;
     }
