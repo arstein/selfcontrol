@@ -40,8 +40,13 @@
 
 @end
 
+// Distinct KVO context pointer so our observer callback never gets confused
+// with any other object's observation of the same NSUserDefaultsController.
+static void* AppControllerMaxBlockLengthContext = &AppControllerMaxBlockLengthContext;
+
 @implementation AppController {
 	NSWindowController* getStartedWindowController;
+	BOOL maxBlockLengthKVORegistered_;
 }
 
 @synthesize addingBlock;
@@ -415,7 +420,16 @@
     blockDurationSlider_.maxDuration = [defaults_ integerForKey: @"MaxBlockLength"];
     [blockDurationSlider_ bindDurationToObject: [NSUserDefaultsController sharedUserDefaultsController]
                                        keyPath: @"values.BlockDuration"];
-    
+
+    // Live-update the slider's max duration (and re-clamp its displayed value)
+    // whenever MaxBlockLength changes in Preferences, as long as no block is
+    // currently running.
+    [[NSUserDefaultsController sharedUserDefaultsController] addObserver: self
+                                                                forKeyPath: @"values.MaxBlockLength"
+                                                                   options: 0
+                                                                   context: AppControllerMaxBlockLengthContext];
+    maxBlockLengthKVORegistered_ = YES;
+
     blocklistTeaserLabel_.stringValue = [SCUIUtilities blockTeaserStringWithMaxLength: 60];
 
     [self setUpTediumMenuItem];
@@ -562,6 +576,23 @@
 //                                                                                                    }];
 }
 
+- (void)observeValueForKeyPath:(NSString*)keyPath
+					   ofObject:(id)object
+						 change:(NSDictionary<NSKeyValueChangeKey, id>*)change
+						context:(void*)context {
+	if (context == AppControllerMaxBlockLengthContext) {
+		dispatch_async(dispatch_get_main_queue(), ^{
+			if (![SCUIUtilities blockIsRunning]) {
+				self->blockDurationSlider_.maxDuration = [self->defaults_ integerForKey: @"MaxBlockLength"];
+				[self updateTimeSliderDisplay: self->blockDurationSlider_];
+			}
+		});
+		return;
+	}
+
+	[super observeValueForKeyPath: keyPath ofObject: object change: change context: context];
+}
+
 - (void)dealloc {
 	[[NSNotificationCenter defaultCenter] removeObserver: self
 													name: @"SCConfigurationChangedNotification"
@@ -569,6 +600,16 @@
 	[[NSDistributedNotificationCenter defaultCenter] removeObserver: self
 															   name: @"SCConfigurationChangedNotification"
 															 object: nil];
+	if (maxBlockLengthKVORegistered_) {
+		@try {
+			[[NSUserDefaultsController sharedUserDefaultsController] removeObserver: self
+																		   forKeyPath: @"values.MaxBlockLength"
+																			  context: AppControllerMaxBlockLengthContext];
+		} @catch (NSException* e) {
+			NSLog(@"WARNING: Failed to remove MaxBlockLength observer: %@", e);
+		}
+		maxBlockLengthKVORegistered_ = NO;
+	}
 }
 
 - (id)initialWindow {
