@@ -17,6 +17,10 @@ NSString* const SETTINGS_FILE_DIR = @"/usr/local/etc/";
 // Private vars
 @property (readonly) NSMutableDictionary* settingsDict;
 @property NSDate* lastSynchronizedWithDisk;
+// the SettingsVersionNumber that was true as of our last successful write to (or read from) disk
+// this only ever increases, so (unlike lastSynchronizedWithDisk) it can't be fooled by the wall clock
+// moving backwards - it's what we use to decide whether disk needs a fresh write
+@property int lastSyncedSettingsVersion;
 @property dispatch_source_t syncTimer;
 @property dispatch_source_t debouncedChangeTimer;
 
@@ -41,12 +45,17 @@ NSString* const SETTINGS_FILE_DIR = @"/usr/local/etc/";
         _readOnly = (geteuid() != 0);
         
         _settingsDict = nil;
-        
-        [[NSDistributedNotificationCenter defaultCenter] addObserver: self
-                                                            selector: @selector(onSettingChanged:)
-                                                                name: @"org.eyebeam.SelfControl.SCSettingsValueChanged"
-                                                              object: nil
-                                                  suspensionBehavior: NSNotificationSuspensionBehaviorDeliverImmediately];
+
+        // only readOnly (non-root) instances should ever mirror settings changes in from notifications -
+        // root is the settings authority and writes are only ever trusted from disk/in-process, never from
+        // a distributed notification, which is untrusted input any process on the system could forge
+        if (self.readOnly) {
+            [[NSDistributedNotificationCenter defaultCenter] addObserver: self
+                                                                selector: @selector(onSettingChanged:)
+                                                                    name: @"org.eyebeam.SelfControl.SCSettingsValueChanged"
+                                                                  object: nil
+                                                      suspensionBehavior: NSNotificationSuspensionBehaviorDeliverImmediately];
+        }
     }
     return self;
 }
@@ -130,6 +139,7 @@ NSString* const SETTINGS_FILE_DIR = @"/usr/local/etc/";
             
             // we're now current with disk!
             self->lastSynchronizedWithDisk = [NSDate date];
+            self->lastSyncedSettingsVersion = [self->_settingsDict[@"SettingsVersionNumber"] intValue];
 
             [self startSyncTimer];
         }
@@ -201,6 +211,8 @@ NSString* const SETTINGS_FILE_DIR = @"/usr/local/etc/";
         if (diskMoreRecentThanMemory) {
             _settingsDict = [settingsFromDisk mutableCopy];
             self.lastSynchronizedWithDisk = [NSDate date];
+            // we just adopted disk's contents verbatim, so as far as writing goes we're fully caught up to it
+            self.lastSyncedSettingsVersion = diskSettingsVersion;
             NSLog(@"Newer SCSettings found on disk (version %d vs %d with time interval %f), updating...", diskSettingsVersion, memorySettingsVersion, [diskSettingsLastUpdated timeIntervalSinceDate: memorySettingsLastUpdated]);
             [SCSentry addBreadcrumb: @"Updated SCSettings to newer settings found on disk" category: @"settings"];
         }
@@ -283,6 +295,9 @@ NSString* const SETTINGS_FILE_DIR = @"/usr/local/etc/";
 
             if (writeSuccessful) {
                 self.lastSynchronizedWithDisk = [NSDate date];
+                // we're still inside the outer @synchronized(self) block from writeSettingsWithCompletion,
+                // so settingsDict can't have changed since we serialized it above - safe to read its version now
+                self.lastSyncedSettingsVersion = [self.settingsDict[@"SettingsVersionNumber"] intValue];
             }
 
             if (!writeSuccessful) {
@@ -320,7 +335,20 @@ NSString* const SETTINGS_FILE_DIR = @"/usr/local/etc/";
         [self setValue: [NSDate date] forKey: @"LastSettingsUpdate"];
     }
     
-    if ([lastSettingsUpdate timeIntervalSinceDate: self.lastSynchronizedWithDisk] > 0 && !self.readOnly) {
+    // decide whether disk is stale and needs a fresh write. we compare by SettingsVersionNumber first -
+    // it's a monotonically-increasing int that can't be fooled by the wall clock moving backwards (e.g. a
+    // clock rollback), unlike a plain date comparison, which would silently skip a needed write in that case.
+    // only tiebreak by date when versions are equal (which shouldn't really diverge from the version check,
+    // but keeps behavior sane if it ever does)
+    int currentSettingsVersion = [[self valueForKey: @"SettingsVersionNumber"] intValue];
+    BOOL needsWrite;
+    if (currentSettingsVersion == self.lastSyncedSettingsVersion) {
+        needsWrite = ([lastSettingsUpdate timeIntervalSinceDate: self.lastSynchronizedWithDisk] > 0);
+    } else {
+        needsWrite = (currentSettingsVersion > self.lastSyncedSettingsVersion);
+    }
+
+    if (needsWrite && !self.readOnly) {
         NSLog(@" --> Writing settings to disk (haven't been written since %@)", self.lastSynchronizedWithDisk);
         [self writeSettingsWithCompletion: completionBlock];
     } else {
@@ -460,6 +488,13 @@ NSString* const SETTINGS_FILE_DIR = @"/usr/local/etc/";
 }
 
 - (void)onSettingChanged:(NSNotification*)note {
+    // root is the settings authority - it never trusts mirrored values coming in from a
+    // distributed notification, since that's untrusted input any process on the system could forge
+    // to bypass the readOnly write-block (see setValue:forKey:stopPropagation:). Only readOnly
+    // (non-root) instances should ever get here; the observer isn't even registered otherwise,
+    // but we double-check here for defense in depth.
+    if (!self.readOnly) return;
+
     // note.object is a string, so we can't just do a simple == to see if the object is self
     // but if we check our description against it, that will do the same thing because description
     // includes the memory address. Don't override description or this logic will break!!
@@ -531,6 +566,6 @@ NSString* const SETTINGS_FILE_DIR = @"/usr/local/etc/";
     [self cancelSyncTimers];
 }
 
-@synthesize settingsDict = _settingsDict, lastSynchronizedWithDisk;
+@synthesize settingsDict = _settingsDict, lastSynchronizedWithDisk, lastSyncedSettingsVersion;
 
 @end
