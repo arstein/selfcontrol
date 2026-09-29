@@ -26,12 +26,16 @@
 		8D11072D0486CEB800E47090 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 29B97316FDCFA39411CA2CEA /* main.m */; settings = {ATTRIBUTES = (); }; };
 		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
 		8FCE76A275EF0E41D798B362 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
+		959FF31ED90D48B5701E9F7B /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
 		9B15BF4E00EECEB86DBF2FC5 /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
 		A13A7863D1143B206C8C25F1 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		A3B447F125E29CD23431B170 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
+		A3B89EC02E9A644AAA9C581F /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
 		B1AF949839F9E22BE3E5903D /* SCTediumChallengeTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 29E44D5F5FCD376C118031D1 /* SCTediumChallengeTests.m */; };
+		B64189553CF928AD8540FEEC /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
 		B821A91801D5240FC20CDE2E /* SCTrustedClockTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 2CB195EBF6CA0498C15AA308 /* SCTrustedClockTests.m */; };
 		BC46BB551807FC1DC7EABD25 /* org.eyebeam.selfcontrold.plist in Copy Daemon Launchd Plist */ = {isa = PBXBuildFile; fileRef = CB8086D524837734004B88BD /* org.eyebeam.selfcontrold.plist */; };
+		C6FBB989ECD3EAFF5046741D /* SCEnforcementDecisionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3BC40DCB86D4ECF8D096D80B /* SCEnforcementDecisionTests.m */; };
 		CB0385E119D77051004614B6 /* PreferencesAdvancedViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = CB0385DD19D77051004614B6 /* PreferencesAdvancedViewController.xib */; };
 		CB0385E219D77051004614B6 /* PreferencesGeneralViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = CB0385DF19D77051004614B6 /* PreferencesGeneralViewController.xib */; };
 		CB066F6C2652037E0076964D /* HostFileBlocker.m in Sources */ = {isa = PBXBuildFile; fileRef = CBB0AE290FA74566006229B3 /* HostFileBlocker.m */; };
@@ -226,8 +230,10 @@
 		CBED7D9925ABB911003080D6 /* selfcontrol-cli in Copy Executable Helper Tools */ = {isa = PBXBuildFile; fileRef = CBA2AFD20F39EC12005AFEBE /* selfcontrol-cli */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		CBEE50C10F48C21F00F5DF1C /* TimerWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = CBEE50C00F48C21F00F5DF1C /* TimerWindowController.m */; };
 		CBF3B574217BADD7006D5F52 /* SCSettings.m in Sources */ = {isa = PBXBuildFile; fileRef = CBF3B573217BADD7006D5F52 /* SCSettings.m */; };
+		DBCFF19180FC5BDFC625F9C3 /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
 		E68F98CB917A5EED6A2F9104 /* SCBlockEndVerifier.m in Sources */ = {isa = PBXBuildFile; fileRef = D5E8B4627CAD0BF0737808C7 /* SCBlockEndVerifier.m */; };
 		F5B8CBEE19EE21C30026F3A5 /* SCTimeIntervalFormatter.m in Sources */ = {isa = PBXBuildFile; fileRef = F5B8CBED19EE21C30026F3A5 /* SCTimeIntervalFormatter.m */; };
+		F8731D3D3C341D85079D588B /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
 		FBD197ACC2128CE56EC19D51 /* SCTediumWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 37A83A9B47C16C99D97DF41C /* SCTediumWindowController.m */; };
 /* End PBXBuildFile section */
 
@@ -553,6 +559,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		059062A034C96FE43805638D /* SCEnforcementDecision.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCEnforcementDecision.h; sourceTree = "<group>"; };
 		1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = /System/Library/Frameworks/Cocoa.framework; sourceTree = "<absolute>"; };
 		174D6F8397D738597F061C4B /* SCTrustedClock.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTrustedClock.m; sourceTree = "<group>"; };
 		1A6B721D82C89E70F4BBAE29 /* SCTediumChallenge.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTediumChallenge.h; sourceTree = "<group>"; };
@@ -566,12 +573,15 @@
 		37A83A9B47C16C99D97DF41C /* SCTediumWindowController.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTediumWindowController.m; sourceTree = "<group>"; };
 		3A97FA0F4A3962A08CFEBC17 /* SCBlockEndVerifierTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCBlockEndVerifierTests.m; sourceTree = "<group>"; };
 		3AFADA24FA5D01009672B151 /* SCBlockEndVerifier.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCBlockEndVerifier.h; sourceTree = "<group>"; };
+		3BC40DCB86D4ECF8D096D80B /* SCEnforcementDecisionTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCEnforcementDecisionTests.m; sourceTree = "<group>"; };
 		3EF418F71CC7F7FA002D99E8 /* nl */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/Localizable.strings; sourceTree = "<group>"; };
 		3EF418F81CC7F7FA002D99E8 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		4FEF264D9F935C2C026D2013 /* SCTediumWindowController.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTediumWindowController.h; sourceTree = "<group>"; };
 		640D40CB16D6E962003034B3 /* it */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/Localizable.strings; sourceTree = "<group>"; };
 		640D40CC16D6E962003034B3 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		677AFCACBB571EC535202ABD /* SCEnforcementConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCEnforcementConfig.h; sourceTree = "<group>"; };
 		753FA509E7CA7437599F493B /* SCSNTPClient.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCSNTPClient.m; sourceTree = "<group>"; };
+		78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCEnforcementDecision.m; sourceTree = "<group>"; };
 		79957742827112D9CEEDAC30 /* SCTediumChallenge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTediumChallenge.m; sourceTree = "<group>"; };
 		7D7C81EC1475727A3CDDDEC2 /* SCMinutesValueTransformer.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCMinutesValueTransformer.h; sourceTree = "<group>"; };
 		895BEE3423889EBCCFFD10F9 /* SCMinutesValueTransformerTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCMinutesValueTransformerTests.m; sourceTree = "<group>"; };
@@ -1691,6 +1701,7 @@
 				3A97FA0F4A3962A08CFEBC17 /* SCBlockEndVerifierTests.m */,
 				29E44D5F5FCD376C118031D1 /* SCTediumChallengeTests.m */,
 				895BEE3423889EBCCFFD10F9 /* SCMinutesValueTransformerTests.m */,
+				3BC40DCB86D4ECF8D096D80B /* SCEnforcementDecisionTests.m */,
 			);
 			path = SelfControlTests;
 			sourceTree = "<group>";
@@ -1715,6 +1726,7 @@
 				CB62FC3A24B124B900ADBC40 /* SCXPCClient.m */,
 				CB81AAB625B7E6C7006956F7 /* DeprecationSilencers.h */,
 				F5A71400B896E293C975CD07 /* SCTediumConfig.h */,
+				677AFCACBB571EC535202ABD /* SCEnforcementConfig.h */,
 			);
 			path = Common;
 			sourceTree = "<group>";
@@ -1804,6 +1816,8 @@
 				79957742827112D9CEEDAC30 /* SCTediumChallenge.m */,
 				7D7C81EC1475727A3CDDDEC2 /* SCMinutesValueTransformer.h */,
 				AB08B8166109BB41FB60297D /* SCMinutesValueTransformer.m */,
+				059062A034C96FE43805638D /* SCEnforcementDecision.h */,
+				78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */,
 			);
 			path = Utility;
 			sourceTree = "<group>";
@@ -3755,6 +3769,7 @@
 				A13A7863D1143B206C8C25F1 /* SCTrustedClock.m in Sources */,
 				FBD197ACC2128CE56EC19D51 /* SCTediumWindowController.m in Sources */,
 				02B493DE881C5AF9B7D27D29 /* SCMinutesValueTransformer.m in Sources */,
+				B64189553CF928AD8540FEEC /* SCEnforcementDecision.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3789,6 +3804,8 @@
 				B1AF949839F9E22BE3E5903D /* SCTediumChallengeTests.m in Sources */,
 				1B2E23F29C9745ECE6481B58 /* SCMinutesValueTransformer.m in Sources */,
 				43BFC7D307281885BF4CEF00 /* SCMinutesValueTransformerTests.m in Sources */,
+				DBCFF19180FC5BDFC625F9C3 /* SCEnforcementDecision.m in Sources */,
+				C6FBB989ECD3EAFF5046741D /* SCEnforcementDecisionTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3826,6 +3843,7 @@
 				8FCE76A275EF0E41D798B362 /* SCTrustedClock.m in Sources */,
 				7B22F65F8C9AF39C7B2AA7F0 /* SCBlockEndVerifier.m in Sources */,
 				1D6F3A5DF697E575B95E6389 /* SCTediumChallenge.m in Sources */,
+				F8731D3D3C341D85079D588B /* SCEnforcementDecision.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3879,6 +3897,7 @@
 				CB5888E425F60DC500B5C64D /* HostFileBlockerSet.m in Sources */,
 				71520F6318ABCCA392060E63 /* SCSNTPClient.m in Sources */,
 				6454DA2A7A6335132C3D719E /* SCTrustedClock.m in Sources */,
+				959FF31ED90D48B5701E9F7B /* SCEnforcementDecision.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3923,6 +3942,7 @@
 				CBB1731520F041F4007FCAE9 /* SCMiscUtilities.m in Sources */,
 				9B15BF4E00EECEB86DBF2FC5 /* SCSNTPClient.m in Sources */,
 				852E43B3F649D630AA026647 /* SCTrustedClock.m in Sources */,
+				A3B89EC02E9A644AAA9C581F /* SCEnforcementDecision.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
