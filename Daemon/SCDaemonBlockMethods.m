@@ -32,12 +32,6 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
                         generation:(NSUInteger)generation;
 @end
 
-// Set around every removeBlock call so a racing checkup never mistakes a
-// legitimate teardown for tampering (and thus never self-heals over it). All
-// removeBlock sites run under daemonMethodLock, so this needs no separate
-// synchronization.
-static BOOL gBlockTeardownInProgress = NO;
-
 // Single daemon-held tedium override challenge instance. All access is
 // serialized under daemonMethodLock (see startTediumChallengeWithReply: and
 // submitTediumEntry:reply:).
@@ -396,9 +390,7 @@ static SCTediumChallenge* tediumChallenge = nil;
             // (anti-permablock for old blocks). Otherwise leave checkups running.
             if ([SCBlockUtilities currentBlockIsExpired]) {
                 NSLog(@"INFO: Legacy block expired; preserving upstream removal behavior.");
-                gBlockTeardownInProgress = YES;
                 [SCHelperToolUtilities removeBlock];
-                gBlockTeardownInProgress = NO;
                 [SCDaemonBlockMethods invalidateTediumChallenge];
                 [[SCDaemon sharedDaemon] stopCheckupTimer];
             }
@@ -510,9 +502,7 @@ static SCTediumChallenge* tediumChallenge = nil;
 
     if ([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
         NSLog(@"INFO: Block expiry verified against network time; removing block.");
-        gBlockTeardownInProgress = YES;
         [SCHelperToolUtilities removeBlock];
-        gBlockTeardownInProgress = NO;
         [SCDaemonBlockMethods invalidateTediumChallenge];
         [[SCBlockEndVerifier sharedVerifier] reset];
         [[SCDaemon sharedDaemon] stopCheckupTimer];
@@ -672,11 +662,7 @@ static SCTediumChallenge* tediumChallenge = nil;
     if (outcome == SCTediumSubmitComplete) {
         NSLog(@"INFO: Tedium override completed (%ld entries); removing block.", (long)progress);
         [SCSentry addBreadcrumb: @"Block removed via tedium override" category: @"daemon"];
-        // M3: guard the removeBlock so a racing checkup treats this as an
-        // intentional teardown, not tampering (consistent with the other sites).
-        gBlockTeardownInProgress = YES;
         [SCHelperToolUtilities removeBlock];
-        gBlockTeardownInProgress = NO;
         [[SCBlockEndVerifier sharedVerifier] reset];
         [[SCDaemon sharedDaemon] stopCheckupTimer];
         tediumChallenge = nil;
