@@ -33,6 +33,10 @@
 "309" = "SelfControl won't extend the block by more than 24 hours at a time.";
 "310" = "There was an error switching alert sounds because that sound name is unknown.";
 "310" = "There was an error switching alert sounds because the system couldn't find that sound.";
+"320" = "SelfControl is busy — try again in a moment.";
+"321" = "No block is running.";
+"322" = "The block is no longer running.";
+"323" = "The override challenge was reset because SelfControl restarted. Open Tedious Override again to start over.";
 
 // 400-499 = errors generated in the killer
 "400" = "SelfControl couldn't manually clear the block, because there was an error running the helper tool.";

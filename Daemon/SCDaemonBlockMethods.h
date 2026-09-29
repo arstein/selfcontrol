@@ -39,6 +39,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 // Invalidates any in-progress tedium challenge (called from every teardown
 // path in this file so a stale challenge can't outlive its block).
+// Caller must hold daemonMethodLock; performs no locking itself.
 + (void)invalidateTediumChallenge;
 
 @end

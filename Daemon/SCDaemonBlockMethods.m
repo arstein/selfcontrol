@@ -83,7 +83,11 @@ static SCTediumChallenge* tediumChallenge = nil;
         [self.daemonMethodLock unlock];
         return;
     }
-    
+
+    // A new block starting means any tedium override progress against the
+    // old block (if any) can never carry forward.
+    [SCDaemonBlockMethods invalidateTediumChallenge];
+
     // clear any legacy block information - no longer useful and could potentially confuse things
     // but first, copy it over one more time (this should've already happened once in the app, but you never know)
     if ([SCMigrationUtilities legacySettingsFoundForUser: controllingUID]) {
@@ -355,6 +359,7 @@ static SCTediumChallenge* tediumChallenge = nil;
             [SCHelperToolUtilities sendConfigurationChangedNotification];
         } else {
             NSLog(@"INFO: No block rules found on system either; stopping checkups.");
+            [SCDaemonBlockMethods invalidateTediumChallenge];
         }
         
         // Temporarily disabled the TamperingDetection flag because it was sometimes causing false positives
@@ -514,7 +519,9 @@ static SCTediumChallenge* tediumChallenge = nil;
 }
 
 + (void)startTediumChallengeWithReply:(void(^)(NSInteger digit, NSInteger progress, NSInteger requiredEntries, NSError* _Nullable error))reply {
-    if (![SCDaemonBlockMethods lockOrTimeout: nil timeout: CHECKUP_LOCK_TIMEOUT]) {
+    // A user just typed an admin password to get here; don't fail this on a
+    // busy half-second the way we would a routine checkup.
+    if (![SCDaemonBlockMethods lockOrTimeout: nil timeout: METHOD_LOCK_TIMEOUT]) {
         reply(0, 0, 0, [SCErr errorWithCode: 320]); // busy; app may retry
         return;
     }
@@ -528,7 +535,7 @@ static SCTediumChallenge* tediumChallenge = nil;
         NSLog(@"INFO: Tedium override challenge started (%d entries required)", SC_TEDIUM_REQUIRED_ENTRIES);
         [SCSentry addBreadcrumb: @"Tedium override challenge started" category: @"daemon"];
     }
-    [tediumChallenge beginAtUptime: [NSProcessInfo processInfo].systemUptime];
+    [tediumChallenge beginAtUptime: [SCTrustedClock continuousUptimeSecs]];
     reply(tediumChallenge.expectedDigit, tediumChallenge.progress, tediumChallenge.requiredEntries, nil);
     [self.daemonMethodLock unlock];
 }
@@ -538,15 +545,24 @@ static SCTediumChallenge* tediumChallenge = nil;
         reply(0, 0, 0, NO, [SCErr errorWithCode: 320]);
         return;
     }
-    if (tediumChallenge == nil || ![SCBlockUtilities modernBlockIsRunning]) {
+    if (![SCBlockUtilities modernBlockIsRunning]) {
+        // The block is actually gone (removed, expired, or never modern).
         tediumChallenge = nil;
         [self.daemonMethodLock unlock];
         reply(0, 0, 0, NO, [SCErr errorWithCode: 322]); // no active challenge/block
         return;
     }
+    if (tediumChallenge == nil) {
+        // The daemon (and thus the in-memory challenge) restarted mid-challenge,
+        // but a block is still running - distinguish this from "block is gone"
+        // so the app doesn't tell the user their block was removed.
+        [self.daemonMethodLock unlock];
+        reply(0, 0, 0, NO, [SCErr errorWithCode: 323]); // challenge lost; block still running
+        return;
+    }
 
     SCTediumSubmitOutcome outcome = [tediumChallenge submitDigit: digit
-                                                        atUptime: [NSProcessInfo processInfo].systemUptime];
+                                                        atUptime: [SCTrustedClock continuousUptimeSecs]];
     NSInteger progress = tediumChallenge.progress;
     NSInteger nextDigit = tediumChallenge.expectedDigit;
     BOOL removed = NO;

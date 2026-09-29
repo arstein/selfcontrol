@@ -79,15 +79,26 @@
         -[self elapsedSecsForState:state reading:reading]];
 }
 
-+ (NSDictionary*)currentReading {
+// mach_continuous_time ticks in platform-specific units; convert to seconds
+// using the cached timebase. Continuous (unlike mach_absolute_time) keeps
+// advancing across sleep, so this is a sleep-inclusive monotonic clock.
+static NSTimeInterval SCContinuousMachSeconds(void) {
     static mach_timebase_info_data_t timebase;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         mach_timebase_info(&timebase);
     });
-    NSTimeInterval machSeconds = (NSTimeInterval)mach_continuous_time() *
-                                 (NSTimeInterval)timebase.numer /
-                                 (NSTimeInterval)timebase.denom / 1e9;
+    return (NSTimeInterval)mach_continuous_time() *
+           (NSTimeInterval)timebase.numer /
+           (NSTimeInterval)timebase.denom / 1e9;
+}
+
++ (NSTimeInterval)continuousUptimeSecs {
+    return SCContinuousMachSeconds();
+}
+
++ (NSDictionary*)currentReading {
+    NSTimeInterval machSeconds = SCContinuousMachSeconds();
 
     // kern.bootsessionuuid is stable for the life of a boot. kern.boottime is
     // only a fallback: it shifts when the calendar clock is stepped, which

@@ -22,16 +22,23 @@
     return self;
 }
 
-- (void)applyIdleExpiryAtUptime:(NSTimeInterval)uptime {
+- (BOOL)applyIdleExpiryAtUptime:(NSTimeInterval)uptime {
     if (self.hasCountedEntry && (uptime - self.lastCountedUptime) > SC_TEDIUM_IDLE_EXPIRY_SECS) {
         self.progress = 0;
+        return YES;
     }
+    return NO;
 }
 
 - (void)beginAtUptime:(NSTimeInterval)uptime {
-    [self applyIdleExpiryAtUptime: uptime];
+    BOOL idleExpired = [self applyIdleExpiryAtUptime: uptime];
     self.expectedDigit = self.digitProvider();
-    if (!self.hasCountedEntry) {
+    // On a fresh session, or when idle expiry just fired, re-anchor the rate
+    // floor to this begin so the first digit after an idle-expired reopen is
+    // rate-floored just like every other first digit. A submit-triggered idle
+    // reset intentionally does NOT re-anchor here (see submitDigit:atUptime:) -
+    // an in-panel post-idle entry must still count immediately.
+    if (!self.hasCountedEntry || idleExpired) {
         self.hasCountedEntry = YES;
         self.lastCountedUptime = uptime;
     }

@@ -839,7 +839,9 @@
 
 - (BOOL)validateMenuItem:(NSMenuItem*)menuItem {
     if (menuItem.action == @selector(openTediumOverride:)) {
-        return [SCUIUtilities blockIsRunning];
+        // Match the daemon's own gate (SCDaemonBlockMethods rejects the
+        // challenge with error 321 unless a modern block is running).
+        return [SCBlockUtilities modernBlockIsRunning];
     }
     return YES;
 }

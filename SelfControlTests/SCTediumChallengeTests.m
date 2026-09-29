@@ -102,6 +102,25 @@
     XCTAssertEqual(c.progress, 0); // idle-expired
 }
 
+- (void)testIdleExpiryOnBeginRateFloorsFirstDigitAfterReopen {
+    SCTediumChallenge* c = [self challengeWithRequired: 300];
+    NSTimeInterval t = 1000.0;
+    for (NSInteger i = 0; i < 3; i++) { t += 2.0; [c submitDigit: c.expectedDigit atUptime: t]; }
+    XCTAssertEqual(c.progress, 3);
+
+    // Reopen long after the idle expiry window - begin should reset progress
+    // AND re-anchor the rate floor to this begin, just like a fresh session.
+    NSTimeInterval t2 = t + SC_TEDIUM_IDLE_EXPIRY_SECS + 1.0;
+    [c beginAtUptime: t2];
+    XCTAssertEqual(c.progress, 0);
+
+    XCTAssertEqual([c submitDigit: c.expectedDigit atUptime: t2 + 0.5], SCTediumSubmitIgnoredTooFast);
+    XCTAssertEqual(c.progress, 0);
+
+    XCTAssertEqual([c submitDigit: c.expectedDigit atUptime: t2 + 1.0], SCTediumSubmitAccepted);
+    XCTAssertEqual(c.progress, 1);
+}
+
 - (void)testDefaultDigitProviderStaysInRange {
     SCTediumChallenge* c = [[SCTediumChallenge alloc] initWithRequiredEntries: 5];
     [c beginAtUptime: 0];

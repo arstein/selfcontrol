@@ -10,6 +10,7 @@
 #import "AppController.h"
 #import "SCXPCClient.h"
 #import "SCTediumChallenge.h"
+#import "SCTediumConfig.h"
 #import "SCUIUtilities.h"
 #import "SCMiscUtilities.h"
 #import "SCSentry.h"
@@ -46,6 +47,9 @@ static const NSTimeInterval kTediumStatusFlashDuration = 1.5;
     // Keep the window object alive across hide/show cycles - we reuse a single
     // controller (and thus a single window) for the lifetime of the app.
     panel.releasedWhenClosed = NO;
+    // The whole point of the challenge is that it takes sustained, deliberate
+    // effort - don't let it vanish just because the user clicked another app.
+    panel.hidesOnDeactivate = NO;
     [panel center];
 
     if (self = [super initWithWindow: panel]) {
@@ -93,6 +97,7 @@ static const NSTimeInterval kTediumStatusFlashDuration = 1.5;
     self.cancelButton = [[NSButton alloc] initWithFrame: NSMakeRect(width - 96, 10, 80, 24)];
     self.cancelButton.title = NSLocalizedString(@"Cancel", @"Cancel button");
     self.cancelButton.bezelStyle = NSBezelStyleRounded;
+    self.cancelButton.keyEquivalent = @"\033"; // Escape
     self.cancelButton.target = self;
     self.cancelButton.action = @selector(cancelChallenge:);
     [contentView addSubview: self.cancelButton];
@@ -167,9 +172,14 @@ static const NSTimeInterval kTediumStatusFlashDuration = 1.5;
 
             if (error != nil) {
                 if (error.code == 322) {
-                    // the challenge (or its block) is already gone - nothing left to do here
+                    // the block is actually gone - nothing left to do here
                     [self.window close];
                     [self showPlainAlert: NSLocalizedString(@"Block removed.", @"tedium override: block already removed message")];
+                } else if (error.code == 323) {
+                    // the daemon (and its in-memory challenge) restarted, but the
+                    // block is still running - don't claim the block is gone.
+                    [self.window close];
+                    [self showPlainAlert: NSLocalizedString(@"The challenge was lost (SelfControl restarted). Reopen Tedious Override to start again.", @"tedium override: challenge lost message")];
                 } else {
                     [SCUIUtilities presentError: error];
                 }
@@ -180,7 +190,7 @@ static const NSTimeInterval kTediumStatusFlashDuration = 1.5;
 
             switch ((SCTediumSubmitOutcome)outcome) {
                 case SCTediumSubmitWrongDigit:
-                    [self flashStatus: NSLocalizedString(@"Wrong — −20", @"tedium override: wrong digit penalty message")
+                    [self flashStatus: [NSString stringWithFormat: NSLocalizedString(@"Wrong — −%d", @"tedium override: wrong digit penalty message"), SC_TEDIUM_WRONG_ENTRY_PENALTY]
                                  color: [NSColor systemRedColor]];
                     break;
                 case SCTediumSubmitIgnoredTooFast:
