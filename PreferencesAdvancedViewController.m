@@ -32,17 +32,34 @@ static void* PreferencesAdvancedMaxBlockLengthContext = &PreferencesAdvancedMaxB
 - (void)viewDidLoad {
 	[super viewDidLoad];
 
-	// The Advanced pane's view is a fixed-frame (no Auto Layout), unflipped
-	// 480x226 customView loaded from the xib, with the six existing checkboxes
-	// occupying y=18...190. We grow the view to 480x286 here (60px of new
-	// headroom at the top, y=226...286) and add the new controls there so none
-	// of the existing controls need to move.
+	// The Advanced pane's view is an unflipped 480x226 customView loaded from
+	// the xib. It uses springs-and-struts autoresizing (NOT Auto Layout), and
+	// every existing checkbox carries the flexibleMinY mask (pinned to the top
+	// edge). That means simply growing the view's height drags all six checkboxes
+	// *upward* by the same amount into any headroom we try to open, so they
+	// collide with anything we add there (the overlap bug Adam hit).
+	//
+	// To add a clean new row at the BOTTOM: (1) suspend subview autoresizing so
+	// the frame change doesn't reposition anything, (2) shift the existing
+	// controls up to free space at the bottom, (3) grow the view, (4) restore
+	// autoresizing, then (5) place our new row in the freed band. MASPreferences
+	// pins this non-resizable pane to exactly this size, so nothing resizes it
+	// again after viewDidLoad.
+	const CGFloat kAddedHeight = 40.0;
+
+	self.view.autoresizesSubviews = NO;
+	for (NSView* existing in [self.view.subviews copy]) {
+		NSRect r = existing.frame;
+		r.origin.y += kAddedHeight;
+		existing.frame = r;
+	}
 	NSRect viewFrame = self.view.frame;
-	viewFrame.size.height = 286;
+	viewFrame.size.height += kAddedHeight; // 226 -> 266
 	self.view.frame = viewFrame;
+	self.view.autoresizesSubviews = YES;
 
 	NSTextField* label = [NSTextField labelWithString: NSLocalizedString(@"Maximum block length (minutes):", @"Label for the maximum block length preference field")];
-	label.frame = NSMakeRect(18, 248, 220, 18);
+	label.frame = NSMakeRect(18, 15, 220, 18);
 	[self.view addSubview: label];
 
 	NSNumberFormatter* maxBlockLengthFormatter = [[NSNumberFormatter alloc] init];
@@ -51,7 +68,7 @@ static void* PreferencesAdvancedMaxBlockLengthContext = &PreferencesAdvancedMaxB
 	maxBlockLengthFormatter.minimum = @1;
 	maxBlockLengthFormatter.maximum = @43200;
 
-	maxBlockLengthField_ = [[NSTextField alloc] initWithFrame: NSMakeRect(242, 244, 70, 22)];
+	maxBlockLengthField_ = [[NSTextField alloc] initWithFrame: NSMakeRect(242, 11, 70, 22)];
 	maxBlockLengthField_.formatter = maxBlockLengthFormatter;
 	[maxBlockLengthField_ bind: @"value"
 					  toObject: [NSUserDefaultsController sharedUserDefaultsController]
@@ -60,7 +77,7 @@ static void* PreferencesAdvancedMaxBlockLengthContext = &PreferencesAdvancedMaxB
 	[self.view addSubview: maxBlockLengthField_];
 
 	maxBlockLengthHelperLabel_ = [NSTextField labelWithString: @""];
-	maxBlockLengthHelperLabel_.frame = NSMakeRect(320, 248, 142, 18);
+	maxBlockLengthHelperLabel_.frame = NSMakeRect(320, 15, 142, 18);
 	[self.view addSubview: maxBlockLengthHelperLabel_];
 
 	[self updateMaxBlockLengthHelperLabel];
