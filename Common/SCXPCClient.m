@@ -338,6 +338,50 @@
     }];
 }
 
+- (void)startTediumChallenge:(void(^)(NSInteger digit, NSInteger progress, NSInteger requiredEntries, NSError* _Nullable error))reply {
+    [self connectAndExecuteCommandBlock:^(NSError * connectError) {
+        if (connectError != nil) {
+            NSLog(@"Start tedium challenge failed with connection error: %@", connectError);
+            [SCSentry captureError: connectError];
+            reply(0, 0, 0, connectError);
+        } else {
+            [[self.daemonConnection remoteObjectProxyWithErrorHandler:^(NSError * proxyError) {
+                NSLog(@"Start tedium challenge failed with remote object proxy error: %@", proxyError);
+                [SCSentry captureError: proxyError];
+                reply(0, 0, 0, proxyError);
+            }] startTediumChallengeWithAuthorization: self.authorization reply:^(NSInteger digit, NSInteger progress, NSInteger requiredEntries, NSError* error) {
+                if (error != nil && ![SCMiscUtilities errorIsAuthCanceled: error]) {
+                    NSLog(@"Start tedium challenge failed with error = %@\n", error);
+                    [SCSentry captureError: error];
+                }
+                reply(digit, progress, requiredEntries, error);
+            }];
+        }
+    }];
+}
+
+- (void)submitTediumEntry:(NSInteger)digit reply:(void(^)(NSInteger outcome, NSInteger progress, NSInteger nextDigit, BOOL blockRemoved, NSError* _Nullable error))reply {
+    [self connectAndExecuteCommandBlock:^(NSError * connectError) {
+        if (connectError != nil) {
+            NSLog(@"Submit tedium entry failed with connection error: %@", connectError);
+            [SCSentry captureError: connectError];
+            reply(0, 0, 0, NO, connectError);
+        } else {
+            [[self.daemonConnection remoteObjectProxyWithErrorHandler:^(NSError * proxyError) {
+                NSLog(@"Submit tedium entry failed with remote object proxy error: %@", proxyError);
+                [SCSentry captureError: proxyError];
+                reply(0, 0, 0, NO, proxyError);
+            }] submitTediumEntry: digit reply:^(NSInteger outcome, NSInteger progress, NSInteger nextDigit, BOOL blockRemoved, NSError* error) {
+                if (error != nil) {
+                    NSLog(@"Submit tedium entry failed with error = %@\n", error);
+                    [SCSentry captureError: error];
+                }
+                reply(outcome, progress, nextDigit, blockRemoved, error);
+            }];
+        }
+    }];
+}
+
 - (NSString*)selfControlHelperToolPath {
     static NSString* path;
 
