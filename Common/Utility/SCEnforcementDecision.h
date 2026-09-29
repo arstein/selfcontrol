@@ -26,5 +26,12 @@ typedef NS_ENUM(NSInteger, SCEnforcementAction) {
                                        expired:(BOOL)expired
                                startIsVerified:(BOOL)startIsVerified
                            needsReVerification:(BOOL)needsReVerification;
+
+/// Duration (seconds) to heal a tamper-recovered block to. Never shorter than
+/// SC_SELFHEAL_BLOCK_SECS, and never shorter than the block's own stored
+/// duration when that is still known — so tampering can only ever extend the
+/// block, never shorten it (fail-closed). `existingDuration` is the stored
+/// BlockDurationSecs (nil/<=0 when unknown).
++ (NSTimeInterval)healDurationSecsForExistingDuration:(nullable NSNumber*)existingDuration;
 @end
 NS_ASSUME_NONNULL_END

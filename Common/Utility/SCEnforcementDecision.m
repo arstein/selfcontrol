@@ -1,4 +1,5 @@
 #import "SCEnforcementDecision.h"
+#import "SCEnforcementConfig.h"
 @implementation SCEnforcementDecision
 + (SCEnforcementAction)actionForRulesInstalled:(BOOL)rulesInstalled
                                  modernRunning:(BOOL)modernRunning
@@ -34,5 +35,13 @@
         return SCEnforcementActionSeekVerifiedStart;
     }
     return SCEnforcementActionSteady;
+}
+
++ (NSTimeInterval)healDurationSecsForExistingDuration:(NSNumber*)existingDuration {
+    NSTimeInterval healSecs = SC_SELFHEAL_BLOCK_SECS;
+    if ([existingDuration isKindOfClass:[NSNumber class]] && existingDuration.doubleValue > healSecs) {
+        healSecs = existingDuration.doubleValue;
+    }
+    return healSecs;
 }
 @end

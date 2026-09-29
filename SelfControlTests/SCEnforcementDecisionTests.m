@@ -161,4 +161,19 @@
     XCTAssertEqual(action, SCEnforcementActionSeekVerifiedExpiry);
 }
 
+// --- heal duration: never shorter than the floor, never shorter than the block's own duration ---
+- (void)testHealDurationUnknownDurationUsesFloor {
+    XCTAssertEqual([SCEnforcementDecision healDurationSecsForExistingDuration:nil], 86400.0);
+}
+- (void)testHealDurationShortDurationUsesFloor {
+    XCTAssertEqual([SCEnforcementDecision healDurationSecsForExistingDuration:@3600], 86400.0);
+}
+- (void)testHealDurationZeroUsesFloor {
+    XCTAssertEqual([SCEnforcementDecision healDurationSecsForExistingDuration:@0], 86400.0);
+}
+- (void)testHealDurationLongerDurationIsPreserved {
+    // a 14-day block whose trusted state was wiped heals to the full 14 days, not 24h
+    XCTAssertEqual([SCEnforcementDecision healDurationSecsForExistingDuration:@(14 * 86400)], 14 * 86400.0);
+}
+
 @end

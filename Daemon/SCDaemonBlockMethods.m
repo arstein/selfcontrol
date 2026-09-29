@@ -530,10 +530,15 @@ static SCTediumChallenge* tediumChallenge = nil;
     }
 
     SCSettings* settings = [SCSettings sharedSettings];
-    NSDate* healedEnd = [verifiedNow dateByAddingTimeInterval:SC_SELFHEAL_BLOCK_SECS];
+    // Heal to at least SC_SELFHEAL_BLOCK_SECS, but never shorter than the block's
+    // own stored duration when it's still known: tampering can only extend the
+    // block, never shorten it (fail-closed).
+    NSTimeInterval healSecs = [SCEnforcementDecision
+        healDurationSecsForExistingDuration:[settings valueForKey:@"BlockDurationSecs"]];
+    NSDate* healedEnd = [verifiedNow dateByAddingTimeInterval:healSecs];
     [settings setValue:@YES forKey:@"BlockIsRunning"];
     [settings setValue:healedEnd forKey:@"BlockEndDate"];
-    [settings setValue:@(SC_SELFHEAL_BLOCK_SECS) forKey:@"BlockDurationSecs"];
+    [settings setValue:@(healSecs) forKey:@"BlockDurationSecs"];
     // BlockStartWall must be set: trustedTimingSettingsSnapshot reads it, and with
     // BlockStartIsVerified=YES a nil start makes trustedTimingDecisionForSettings
     // return nil (keep block) forever - so the healed block would never verify-
@@ -552,7 +557,7 @@ static SCTediumChallenge* tediumChallenge = nil;
     if (syncError != nil) NSLog(@"WARNING: failed to persist self-heal: %@", syncError);
 
     [SCHelperToolUtilities sendConfigurationChangedNotification];
-    NSLog(@"INFO: Self-healed block end to verified now + %.0fs.", SC_SELFHEAL_BLOCK_SECS);
+    NSLog(@"INFO: Self-healed block end to verified now + %.0fs.", healSecs);
 
     [self.daemonMethodLock unlock];
 }
