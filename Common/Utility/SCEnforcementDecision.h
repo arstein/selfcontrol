@@ -1,40 +1,30 @@
-//  SCEnforcementDecision.h
-//  Pure, side-effect-free enforcement decision layer (parallels
-//  SCBlockUtilities.trustedTimingDecisionForSettings:...). Foundation-only so
-//  the app, the daemon, and the tests can all link it.
 #import <Foundation/Foundation.h>
-
 NS_ASSUME_NONNULL_BEGIN
 
-typedef NS_ENUM(NSInteger, SCSelfHealAction) {
-    SCSelfHealActionNone = 0, // nothing to recover
-    SCSelfHealActionHeal,     // write verified-now + SC_SELFHEAL_BLOCK_SECS
-    SCSelfHealActionHold      // keep enforcing, wait for verified time
+typedef NS_ENUM(NSInteger, SCEnforcementAction) {
+    SCEnforcementActionStopNoBlock = 0,     // nothing installed & no block -> stop checkups
+    SCEnforcementActionLegacyExpireCheck,   // genuine pre-fork block -> caller checks LOCAL expiry, remove if expired
+    SCEnforcementActionReArm,               // rules up, trusted end known, but BlockIsRunning off -> re-assert flag (no network)
+    SCEnforcementActionHeal,                // rules up, trusted end NOT determinable -> verified heal (now+N) / hold offline
+    SCEnforcementActionInstall,             // should enforce but rules missing -> install (tighten, no network)
+    SCEnforcementActionSeekVerifiedExpiry,  // trusted-expired -> handleVerifiedTime (sole removal site)
+    SCEnforcementActionSeekVerifiedStart,   // start not yet verified / re-verify flagged -> handleVerifiedTime
+    SCEnforcementActionSteady               // enforced+installed+verified -> integrity only
 };
 
-/// What the daemon should be enforcing this tick. Phase 2 populates only the
-/// base-block term; the reserved fields keep the loop's call site stable for
-/// Phases 3–5 (schedules, overrides, deep blocks).
-@interface SCDesiredEnforcement : NSObject
-@property (nonatomic, readonly) BOOL baseEnforced;      // rules should be installed now
-@property (nonatomic, readonly) BOOL needsVerifiedTime; // a relaxing change is pending verification
-@property (nonatomic, readonly) BOOL recoveryNeeded;    // rules present but end-date undeterminable
-// Reserved (always NO in Phase 2): @property BOOL deepEnforced;  // Phase 5
-@end
-
 @interface SCEnforcementDecision : NSObject
-
-/// `expiryKnown` = the daemon can determine whether the block has ended (it has
-/// a trusted remaining-duration or a parseable BlockEndDate). `expired` is only
-/// meaningful when `expiryKnown`. `rulesInstalled` = SelfControl rules are on
-/// the system right now.
-+ (SCDesiredEnforcement*)decisionForExpiryKnown:(BOOL)expiryKnown
-                                        expired:(BOOL)expired
-                                 rulesInstalled:(BOOL)rulesInstalled;
-
-+ (SCSelfHealAction)selfHealActionForRecoveryNeeded:(BOOL)recoveryNeeded
-                              verifiedTimeAvailable:(BOOL)verifiedTimeAvailable;
-
+/// Pure, side-effect-free. `expired` is trusted-expiry and is only consulted when
+/// `trustedRemainingKnown` is YES. `hasModernPedigree` = the block has any fork-era
+/// trusted-timing footprint (BlockDurationSecs>0, non-empty TrustedClockState, or a
+/// valid BlockStartWall) — it distinguishes a tampered modern block from a genuine
+/// legacy one.
++ (SCEnforcementAction)actionForRulesInstalled:(BOOL)rulesInstalled
+                                 modernRunning:(BOOL)modernRunning
+                                 legacyRunning:(BOOL)legacyRunning
+                             hasModernPedigree:(BOOL)hasModernPedigree
+                         trustedRemainingKnown:(BOOL)trustedRemainingKnown
+                                       expired:(BOOL)expired
+                               startIsVerified:(BOOL)startIsVerified
+                           needsReVerification:(BOOL)needsReVerification;
 @end
-
 NS_ASSUME_NONNULL_END

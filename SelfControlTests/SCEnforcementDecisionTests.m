@@ -6,52 +6,159 @@
 
 @implementation SCEnforcementDecisionTests
 
-// --- desired enforcement ---
-- (void)testEnforcedWhenNotExpired {
-    SCDesiredEnforcement* d = [SCEnforcementDecision decisionForExpiryKnown:YES expired:NO rulesInstalled:YES];
-    XCTAssertTrue(d.baseEnforced);
-    XCTAssertFalse(d.needsVerifiedTime);
-    XCTAssertFalse(d.recoveryNeeded);
-}
-- (void)testRelaxNeedsVerifiedTimeWhenExpiredAndInstalled {
-    SCDesiredEnforcement* d = [SCEnforcementDecision decisionForExpiryKnown:YES expired:YES rulesInstalled:YES];
-    XCTAssertFalse(d.baseEnforced);
-    XCTAssertTrue(d.needsVerifiedTime);
-    XCTAssertFalse(d.recoveryNeeded);
-}
-- (void)testExpiredButNotInstalledIsNoop {
-    SCDesiredEnforcement* d = [SCEnforcementDecision decisionForExpiryKnown:YES expired:YES rulesInstalled:NO];
-    XCTAssertFalse(d.baseEnforced);
-    XCTAssertFalse(d.needsVerifiedTime);
-    XCTAssertFalse(d.recoveryNeeded);
-}
-- (void)testTightenWhenNotExpiredAndNotInstalled {
-    SCDesiredEnforcement* d = [SCEnforcementDecision decisionForExpiryKnown:YES expired:NO rulesInstalled:NO];
-    XCTAssertTrue(d.baseEnforced);      // should be enforcing -> loop installs
-    XCTAssertFalse(d.needsVerifiedTime);
-}
-- (void)testUnknownExpiryWithRulesHoldsAndFlagsRecovery {
-    SCDesiredEnforcement* d = [SCEnforcementDecision decisionForExpiryKnown:NO expired:NO rulesInstalled:YES];
-    XCTAssertTrue(d.baseEnforced);      // hold (fail-closed)
-    XCTAssertTrue(d.recoveryNeeded);    // but state needs healing
-    XCTAssertFalse(d.needsVerifiedTime);// recovery path, not the expiry path
-}
-- (void)testUnknownExpiryWithoutRulesIsNoop {
-    SCDesiredEnforcement* d = [SCEnforcementDecision decisionForExpiryKnown:NO expired:NO rulesInstalled:NO];
-    XCTAssertFalse(d.baseEnforced);
-    XCTAssertFalse(d.recoveryNeeded);
+// stop when nothing installed & no block.
+- (void)testStopWhenNothingInstalledAndNoBlock {
+    SCEnforcementAction action =
+        [SCEnforcementDecision actionForRulesInstalled:NO
+                                         modernRunning:NO
+                                         legacyRunning:NO
+                                     hasModernPedigree:NO
+                                 trustedRemainingKnown:NO
+                                               expired:NO
+                                       startIsVerified:NO
+                                   needsReVerification:NO];
+    XCTAssertEqual(action, SCEnforcementActionStopNoBlock);
 }
 
-// --- self-heal action ---
-- (void)testSelfHealOnlineHeals {
-    XCTAssertEqual([SCEnforcementDecision selfHealActionForRecoveryNeeded:YES verifiedTimeAvailable:YES], SCSelfHealActionHeal);
+// genuine legacy (legacyRunning=YES, modernRunning=NO, hasModernPedigree=NO) -> LegacyExpireCheck.
+- (void)testGenuineLegacyBlockIsLegacyExpireCheck {
+    SCEnforcementAction action =
+        [SCEnforcementDecision actionForRulesInstalled:YES
+                                         modernRunning:NO
+                                         legacyRunning:YES
+                                     hasModernPedigree:NO
+                                 trustedRemainingKnown:NO
+                                               expired:NO
+                                       startIsVerified:NO
+                                   needsReVerification:NO];
+    XCTAssertEqual(action, SCEnforcementActionLegacyExpireCheck);
 }
-- (void)testSelfHealOfflineHolds {
-    XCTAssertEqual([SCEnforcementDecision selfHealActionForRecoveryNeeded:YES verifiedTimeAvailable:NO], SCSelfHealActionHold);
+
+// C1(a): tampered modern block (TrustedClockState wiped) must Heal, NOT be treated as legacy.
+- (void)testC1a_TamperedModernWithNoTrustedEndHeals {
+    SCEnforcementAction action =
+        [SCEnforcementDecision actionForRulesInstalled:YES
+                                         modernRunning:YES
+                                         legacyRunning:NO
+                                     hasModernPedigree:YES
+                                 trustedRemainingKnown:NO
+                                               expired:NO
+                                       startIsVerified:NO
+                                   needsReVerification:NO];
+    XCTAssertEqual(action, SCEnforcementActionHeal);
 }
-- (void)testSelfHealNotNeededIsNone {
-    XCTAssertEqual([SCEnforcementDecision selfHealActionForRecoveryNeeded:NO verifiedTimeAvailable:YES], SCSelfHealActionNone);
-    XCTAssertEqual([SCEnforcementDecision selfHealActionForRecoveryNeeded:NO verifiedTimeAvailable:NO], SCSelfHealActionNone);
+
+// C1(b): rules up, trusted end known, flag off -> ReArm (fixes fail-closed permablock).
+- (void)testC1b_FlagOffButTrustedEndKnownReArms {
+    SCEnforcementAction action =
+        [SCEnforcementDecision actionForRulesInstalled:YES
+                                         modernRunning:NO
+                                         legacyRunning:NO
+                                     hasModernPedigree:YES
+                                 trustedRemainingKnown:YES
+                                               expired:NO
+                                       startIsVerified:YES
+                                   needsReVerification:NO];
+    XCTAssertEqual(action, SCEnforcementActionReArm);
+}
+
+// steady: all-on, verified, not expired -> Steady.
+- (void)testSteadyWhenAllOnVerifiedNotExpired {
+    SCEnforcementAction action =
+        [SCEnforcementDecision actionForRulesInstalled:YES
+                                         modernRunning:YES
+                                         legacyRunning:NO
+                                     hasModernPedigree:YES
+                                 trustedRemainingKnown:YES
+                                               expired:NO
+                                       startIsVerified:YES
+                                   needsReVerification:NO];
+    XCTAssertEqual(action, SCEnforcementActionSteady);
+}
+
+// install: modernRunning=YES, rulesInstalled=NO, trustedRemainingKnown=YES, expired=NO -> Install.
+- (void)testInstallWhenRulesMissingButShouldEnforce {
+    SCEnforcementAction action =
+        [SCEnforcementDecision actionForRulesInstalled:NO
+                                         modernRunning:YES
+                                         legacyRunning:NO
+                                     hasModernPedigree:YES
+                                 trustedRemainingKnown:YES
+                                               expired:NO
+                                       startIsVerified:YES
+                                   needsReVerification:NO];
+    XCTAssertEqual(action, SCEnforcementActionInstall);
+}
+
+// expiry: rulesInstalled=YES, modernRunning=YES, trustedRemainingKnown=YES, expired=YES -> SeekVerifiedExpiry.
+- (void)testSeekVerifiedExpiryWhenTrustedExpired {
+    SCEnforcementAction action =
+        [SCEnforcementDecision actionForRulesInstalled:YES
+                                         modernRunning:YES
+                                         legacyRunning:NO
+                                     hasModernPedigree:YES
+                                 trustedRemainingKnown:YES
+                                               expired:YES
+                                       startIsVerified:YES
+                                   needsReVerification:NO];
+    XCTAssertEqual(action, SCEnforcementActionSeekVerifiedExpiry);
+}
+
+// start-not-verified: enforcing, not expired, startIsVerified=NO -> SeekVerifiedStart.
+- (void)testSeekVerifiedStartWhenStartNotVerified {
+    SCEnforcementAction action =
+        [SCEnforcementDecision actionForRulesInstalled:YES
+                                         modernRunning:YES
+                                         legacyRunning:NO
+                                     hasModernPedigree:YES
+                                 trustedRemainingKnown:YES
+                                               expired:NO
+                                       startIsVerified:NO
+                                   needsReVerification:NO];
+    XCTAssertEqual(action, SCEnforcementActionSeekVerifiedStart);
+}
+
+// start-not-verified: needsReVerification=YES -> SeekVerifiedStart.
+- (void)testSeekVerifiedStartWhenReVerificationFlagged {
+    SCEnforcementAction action =
+        [SCEnforcementDecision actionForRulesInstalled:YES
+                                         modernRunning:YES
+                                         legacyRunning:NO
+                                     hasModernPedigree:YES
+                                 trustedRemainingKnown:YES
+                                               expired:NO
+                                       startIsVerified:YES
+                                   needsReVerification:YES];
+    XCTAssertEqual(action, SCEnforcementActionSeekVerifiedStart);
+}
+
+// heal when no rules but modern flagged & no trusted end -> Install (per rulesInstalled?Heal:Install).
+- (void)testNoRulesModernFlaggedNoTrustedEndInstalls {
+    SCEnforcementAction action =
+        [SCEnforcementDecision actionForRulesInstalled:NO
+                                         modernRunning:YES
+                                         legacyRunning:NO
+                                     hasModernPedigree:YES
+                                 trustedRemainingKnown:NO
+                                               expired:NO
+                                       startIsVerified:NO
+                                   needsReVerification:NO];
+    XCTAssertEqual(action, SCEnforcementActionInstall);
+}
+
+// expired takes precedence over install when rules missing: modernRunning=YES so not ReArm;
+// trustedRemainingKnown=YES, expired=YES -> SeekVerifiedExpiry.
+- (void)testExpiredTakesPrecedenceOverInstallWhenRulesMissing {
+    SCEnforcementAction action =
+        [SCEnforcementDecision actionForRulesInstalled:NO
+                                         modernRunning:YES
+                                         legacyRunning:NO
+                                     hasModernPedigree:YES
+                                 trustedRemainingKnown:YES
+                                               expired:YES
+                                       startIsVerified:YES
+                                   needsReVerification:NO];
+    XCTAssertEqual(action, SCEnforcementActionSeekVerifiedExpiry);
 }
 
 @end

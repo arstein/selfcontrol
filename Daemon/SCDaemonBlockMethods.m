@@ -349,86 +349,118 @@ static SCTediumChallenge* tediumChallenge = nil;
 
     SCSettings* settings = [SCSettings sharedSettings];
 
+    // --- Resolve enforcement inputs (all reads, no side effects). ---
     BOOL rulesInstalled = [SCBlockUtilities blockRulesFoundOnSystem];
-    BOOL anyBlock = [SCBlockUtilities anyBlockIsRunning];
+    BOOL modernRunning = [SCBlockUtilities modernBlockIsRunning];
+    BOOL legacyRunning = [SCBlockUtilities legacyBlockIsRunning];
 
-    // Can we determine when the block ends? (trusted remaining, or a parseable end date)
+    // TRUSTED expiry only. Never the local-clock fallback for modern blocks.
     NSNumber* remaining = [SCBlockUtilities trustedRemainingBlockDurationSecs];
-    NSDate* endDate = [settings valueForKey:@"BlockEndDate"];
-    BOOL expiryKnown = (remaining != nil) || [endDate isKindOfClass:[NSDate class]];
-    BOOL expired = expiryKnown ? [SCBlockUtilities currentBlockIsExpired] : NO;
+    BOOL trustedRemainingKnown = (remaining != nil);
+    BOOL expired = trustedRemainingKnown ? (remaining.doubleValue <= 0) : NO;
 
-    // If neither settings nor rules show any block, there is nothing to enforce.
-    if (!rulesInstalled && !anyBlock) {
-        NSLog(@"INFO: Checkup ran; no block in settings and no rules on system; stopping checkups.");
-        [SCDaemonBlockMethods invalidateTediumChallenge];
-        // once the checkups stop, the daemon will clear itself in a while due to inactivity
-        [[SCDaemon sharedDaemon] stopCheckupTimer];
-        [[SCDaemon sharedDaemon] resetInactivityTimer];
-        [self.daemonMethodLock unlock];
-        return;
-    }
-
-    // A legacy (pre-fork) block has no trusted-clock state; preserve upstream's
-    // remove-on-local-expiry behavior for those only.
+    // Modern pedigree = any fork-era trusted-timing footprint. Distinguishes a
+    // tampered modern block (heal/re-arm) from a genuine legacy one (local removal).
+    NSNumber* durationValue = [settings valueForKey:@"BlockDurationSecs"];
+    BOOL durationPresent = [durationValue isKindOfClass:[NSNumber class]] && durationValue.doubleValue > 0;
     NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
-    NSNumber* duration = [settings valueForKey:@"BlockDurationSecs"];
-    BOOL hasTrustedClock = clockState.count > 0 && duration.doubleValue > 0;
-    if (!hasTrustedClock && anyBlock && expired) {
-        NSLog(@"INFO: Legacy block expired; preserving upstream removal behavior.");
-        gBlockTeardownInProgress = YES;
-        [SCHelperToolUtilities removeBlock];
-        gBlockTeardownInProgress = NO;
-        [SCDaemonBlockMethods invalidateTediumChallenge];
-        [[SCDaemon sharedDaemon] stopCheckupTimer];
-        [[SCDaemon sharedDaemon] resetInactivityTimer];
-        [self.daemonMethodLock unlock];
-        return;
-    }
+    BOOL clockStatePresent = [clockState isKindOfClass:[NSDictionary class]] && clockState.count > 0;
+    BOOL startWallPresent = ([SCBlockUtilities effectiveBlockStartWallFromSettingsValue:[settings valueForKey:@"BlockStartWall"]] != nil);
+    BOOL hasModernPedigree = durationPresent || clockStatePresent || startWallPresent;
 
-    SCDesiredEnforcement* desired =
-        [SCEnforcementDecision decisionForExpiryKnown:expiryKnown
-                                              expired:expired
-                                       rulesInstalled:rulesInstalled];
+    BOOL startIsVerified = [settings boolForKey:@"BlockStartIsVerified"];
+    BOOL needsReVerification = [settings boolForKey:@"TrustedClockNeedsVerification"];
+
+    SCEnforcementAction action =
+        [SCEnforcementDecision actionForRulesInstalled:rulesInstalled
+                                         modernRunning:modernRunning
+                                         legacyRunning:legacyRunning
+                                     hasModernPedigree:hasModernPedigree
+                                 trustedRemainingKnown:trustedRemainingKnown
+                                               expired:expired
+                                       startIsVerified:startIsVerified
+                                   needsReVerification:needsReVerification];
 
     BOOL shouldRunIntegrityCheck = NO;
 
-    if (desired.recoveryNeeded && !gBlockTeardownInProgress) {
-        // Rules are up but we can't determine an end. Heal to verified now + N
-        // (online) or hold (offline); never remove on the local clock. Stay
-        // enforced and keep checkups alive so we retry until online.
-        NSLog(@"WARNING: Block rules present but end-date undeterminable; attempting self-heal.");
-        [[SCBlockEndVerifier sharedVerifier]
-            requestVerificationWithCompletion:^(NSDate* verifiedNow, NSDictionary* reading, NSUInteger generation) {
-                [SCDaemonBlockMethods handleSelfHealVerifiedTime:verifiedNow reading:reading generation:generation];
-            }];
-    } else if (desired.baseEnforced && !rulesInstalled) {
-        // Tightening: rules should be up but aren't. Install immediately (no network).
-        NSLog(@"INFO: Desired enforcement is on but rules are missing; installing.");
-        [SCHelperToolUtilities installBlockRulesFromSettings];
-        [SCHelperToolUtilities sendConfigurationChangedNotification];
-    } else if (desired.needsVerifiedTime ||
-               (desired.baseEnforced &&
-                (![settings boolForKey:@"BlockStartIsVerified"] ||
-                 [settings boolForKey:@"TrustedClockNeedsVerification"]))) {
-        // Relaxing (expired) or start-not-yet-verified: ask for verified time.
-        // handleVerifiedTime remains the ONLY place expiry removes rules.
-        [[SCBlockEndVerifier sharedVerifier]
-            requestVerificationWithCompletion:^(NSDate* verifiedNow, NSDictionary* reading, NSUInteger generation) {
-                [SCDaemonBlockMethods handleVerifiedTime:verifiedNow reading:reading generation:generation];
-            }];
-        if (desired.baseEnforced && [[NSDate date] timeIntervalSinceDate:lastBlockIntegrityCheck] > integrityCheckIntervalSecs) {
-            lastBlockIntegrityCheck = [NSDate date];
-            shouldRunIntegrityCheck = YES;
+    switch (action) {
+        case SCEnforcementActionStopNoBlock: {
+            NSLog(@"INFO: Checkup ran; no block in settings and no rules on system; stopping checkups.");
+            [SCDaemonBlockMethods invalidateTediumChallenge];
+            // once the checkups stop, the daemon will clear itself in a while due to inactivity
+            [[SCDaemon sharedDaemon] stopCheckupTimer];
+            break;
         }
-    } else if (desired.baseEnforced && rulesInstalled) {
-        // Steady state: enforced and installed. Periodic integrity check.
-        if ([[NSDate date] timeIntervalSinceDate:lastBlockIntegrityCheck] > integrityCheckIntervalSecs) {
-            lastBlockIntegrityCheck = [NSDate date];
-            shouldRunIntegrityCheck = YES;
+        case SCEnforcementActionLegacyExpireCheck: {
+            // Genuine pre-fork block only: upstream local-clock removal on expiry
+            // (anti-permablock for old blocks). Otherwise leave checkups running.
+            if ([SCBlockUtilities currentBlockIsExpired]) {
+                NSLog(@"INFO: Legacy block expired; preserving upstream removal behavior.");
+                gBlockTeardownInProgress = YES;
+                [SCHelperToolUtilities removeBlock];
+                gBlockTeardownInProgress = NO;
+                [SCDaemonBlockMethods invalidateTediumChallenge];
+                [[SCDaemon sharedDaemon] stopCheckupTimer];
+            }
+            break;
+        }
+        case SCEnforcementActionReArm: {
+            // Rules present and trusted end known, but the running flag is off
+            // (sudo flip / crash mid-write). Re-assert the flag; keep the end.
+            // Neutral/tightening -> no network needed.
+            NSLog(@"WARNING: Rules present but BlockIsRunning was off; re-asserting.");
+            [settings setValue:@YES forKey:@"BlockIsRunning"];
+            [settings syncSettingsAndWait:5];
+            [SCHelperToolUtilities sendConfigurationChangedNotification];
+            break;
+        }
+        case SCEnforcementActionHeal: {
+            // Rules up but the trusted clock can't yield an end. Heal to verified
+            // now + N (online) or hold (offline); never remove on the local clock.
+            NSLog(@"WARNING: Block rules present but end-date undeterminable; attempting self-heal.");
+            [[SCBlockEndVerifier sharedVerifier]
+                requestVerificationWithCompletion:^(NSDate* verifiedNow, NSDictionary* reading, NSUInteger generation) {
+                    [SCDaemonBlockMethods handleSelfHealVerifiedTime:verifiedNow reading:reading generation:generation];
+                }];
+            break;
+        }
+        case SCEnforcementActionInstall: {
+            // Tightening: rules should be up but aren't. Install immediately (no network).
+            NSLog(@"INFO: Desired enforcement on but rules missing; installing.");
+            [SCHelperToolUtilities installBlockRulesFromSettings];
+            [SCHelperToolUtilities sendConfigurationChangedNotification];
+            break;
+        }
+        case SCEnforcementActionSeekVerifiedExpiry: {
+            // Trusted-expired: ask for verified time. handleVerifiedTime remains
+            // the ONLY place expiry removes rules. No integrity check (about to remove).
+            [[SCBlockEndVerifier sharedVerifier]
+                requestVerificationWithCompletion:^(NSDate* verifiedNow, NSDictionary* reading, NSUInteger generation) {
+                    [SCDaemonBlockMethods handleVerifiedTime:verifiedNow reading:reading generation:generation];
+                }];
+            break;
+        }
+        case SCEnforcementActionSeekVerifiedStart: {
+            // Start not yet verified / re-verification flagged: ask for verified time.
+            [[SCBlockEndVerifier sharedVerifier]
+                requestVerificationWithCompletion:^(NSDate* verifiedNow, NSDictionary* reading, NSUInteger generation) {
+                    [SCDaemonBlockMethods handleVerifiedTime:verifiedNow reading:reading generation:generation];
+                }];
+            if ([[NSDate date] timeIntervalSinceDate:lastBlockIntegrityCheck] > integrityCheckIntervalSecs) {
+                lastBlockIntegrityCheck = [NSDate date];
+                shouldRunIntegrityCheck = YES;
+            }
+            break;
+        }
+        case SCEnforcementActionSteady: {
+            // Enforced, installed, verified. Periodic integrity check only.
+            if ([[NSDate date] timeIntervalSinceDate:lastBlockIntegrityCheck] > integrityCheckIntervalSecs) {
+                lastBlockIntegrityCheck = [NSDate date];
+                shouldRunIntegrityCheck = YES;
+            }
+            break;
         }
     }
-    // (!baseEnforced && !rulesInstalled) already returned above.
 
     [[SCDaemon sharedDaemon] resetInactivityTimer];
     [self.daemonMethodLock unlock];
@@ -517,7 +549,12 @@ static SCTediumChallenge* tediumChallenge = nil;
     // return nil (keep block) forever - so the healed block would never verify-
     // expire. Anchoring the start to verifiedNow makes it self-expire at +N.
     [settings setValue:verifiedNow forKey:@"BlockStartWall"];
-    [settings setValue:[SCTrustedClock freshStateWithReading:reading] forKey:@"TrustedClockState"];
+    // I1: anchor the trusted-clock state to verifiedNow (not the raw reading's
+    // wall), mirroring SCBlockUtilities' verifiedReading construction. Otherwise
+    // the healed state's wall lags the healed start and the countdown is skewed.
+    NSMutableDictionary* verifiedReading = [reading mutableCopy];
+    verifiedReading[@"wall"] = verifiedNow;
+    [settings setValue:[SCTrustedClock freshStateWithReading:verifiedReading] forKey:@"TrustedClockState"];
     [settings setValue:@YES forKey:@"BlockStartIsVerified"];
     [settings setValue:nil forKey:@"TrustedClockNeedsVerification"];
 
@@ -635,7 +672,11 @@ static SCTediumChallenge* tediumChallenge = nil;
     if (outcome == SCTediumSubmitComplete) {
         NSLog(@"INFO: Tedium override completed (%ld entries); removing block.", (long)progress);
         [SCSentry addBreadcrumb: @"Block removed via tedium override" category: @"daemon"];
+        // M3: guard the removeBlock so a racing checkup treats this as an
+        // intentional teardown, not tampering (consistent with the other sites).
+        gBlockTeardownInProgress = YES;
         [SCHelperToolUtilities removeBlock];
+        gBlockTeardownInProgress = NO;
         [[SCBlockEndVerifier sharedVerifier] reset];
         [[SCDaemon sharedDaemon] stopCheckupTimer];
         tediumChallenge = nil;

@@ -1,39 +1,38 @@
 #import "SCEnforcementDecision.h"
-
-@interface SCDesiredEnforcement ()
-@property (nonatomic, readwrite) BOOL baseEnforced;
-@property (nonatomic, readwrite) BOOL needsVerifiedTime;
-@property (nonatomic, readwrite) BOOL recoveryNeeded;
-@end
-@implementation SCDesiredEnforcement
-@end
-
 @implementation SCEnforcementDecision
-
-+ (SCDesiredEnforcement*)decisionForExpiryKnown:(BOOL)expiryKnown
-                                        expired:(BOOL)expired
-                                 rulesInstalled:(BOOL)rulesInstalled {
-    SCDesiredEnforcement* d = [SCDesiredEnforcement new];
-    if (!expiryKnown) {
-        // Can't tell if the block has ended. Fail-closed: hold whatever is
-        // installed, and flag recovery so the loop can heal the state.
-        d.baseEnforced = rulesInstalled;
-        d.recoveryNeeded = rulesInstalled;
-        d.needsVerifiedTime = NO;
-        return d;
++ (SCEnforcementAction)actionForRulesInstalled:(BOOL)rulesInstalled
+                                 modernRunning:(BOOL)modernRunning
+                                 legacyRunning:(BOOL)legacyRunning
+                             hasModernPedigree:(BOOL)hasModernPedigree
+                         trustedRemainingKnown:(BOOL)trustedRemainingKnown
+                                       expired:(BOOL)expired
+                               startIsVerified:(BOOL)startIsVerified
+                           needsReVerification:(BOOL)needsReVerification {
+    if (!rulesInstalled && !modernRunning && !legacyRunning) {
+        return SCEnforcementActionStopNoBlock;
     }
-    d.baseEnforced = !expired;
-    d.recoveryNeeded = NO;
-    // A relaxing transition (rules are up but the block has ended) must be
-    // confirmed by verified network time before anything is removed.
-    d.needsVerifiedTime = rulesInstalled && expired;
-    return d;
+    // Genuine legacy (pre-fork) block only: legacy detection, no modern footprint.
+    if (!modernRunning && legacyRunning && !hasModernPedigree) {
+        return SCEnforcementActionLegacyExpireCheck;
+    }
+    // Modern / rules-present from here: NEVER local-remove.
+    if (!trustedRemainingKnown) {
+        // Trusted clock can't yield an end (wiped/corrupt, or orphaned rules).
+        return rulesInstalled ? SCEnforcementActionHeal : SCEnforcementActionInstall;
+    }
+    // Trusted end is known & trustworthy from here.
+    if (rulesInstalled && !modernRunning) {
+        return SCEnforcementActionReArm;           // flag off but block real -> re-arm
+    }
+    if (expired) {
+        return SCEnforcementActionSeekVerifiedExpiry;  // sole verified removal path
+    }
+    if (!rulesInstalled) {
+        return SCEnforcementActionInstall;         // tighten
+    }
+    if (!startIsVerified || needsReVerification) {
+        return SCEnforcementActionSeekVerifiedStart;
+    }
+    return SCEnforcementActionSteady;
 }
-
-+ (SCSelfHealAction)selfHealActionForRecoveryNeeded:(BOOL)recoveryNeeded
-                              verifiedTimeAvailable:(BOOL)verifiedTimeAvailable {
-    if (!recoveryNeeded) return SCSelfHealActionNone;
-    return verifiedTimeAvailable ? SCSelfHealActionHeal : SCSelfHealActionHold;
-}
-
 @end
