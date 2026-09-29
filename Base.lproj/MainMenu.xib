@@ -28,12 +28,6 @@
                                     <action selector="orderFrontStandardAboutPanel:" target="-2" id="142"/>
                                 </connections>
                             </menuItem>
-                            <menuItem title="Check for Updates..." id="732">
-                                <modifierMask key="keyEquivalentModifierMask"/>
-                                <connections>
-                                    <action selector="checkForUpdates:" target="731" id="733"/>
-                                </connections>
-                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="236">
                                 <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                                 <menu key="submenu" id="504">
@@ -338,6 +332,5 @@ DQ
             </connections>
         </customObject>
         <userDefaultsController representsSharedInstance="YES" id="627"/>
-        <customObject id="731" customClass="SUUpdater"/>
     </objects>
 </document>
