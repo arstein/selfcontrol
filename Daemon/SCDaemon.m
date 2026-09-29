@@ -56,20 +56,26 @@ float const INACTIVITY_LIMIT_SECS = 60 * 2; // 2 minutes
 }
 
 - (void)start {
-    [self.listener resume];
-
+    // Re-anchor the trusted clock after a reboot BEFORE accepting XPC
+    // connections, and under the daemon method lock, so no early request
+    // (startBlock, extend, checkup) can observe or race the stale state.
+    [SCDaemonBlockMethods.daemonMethodLock lock];
     if ([SCBlockUtilities modernBlockIsRunning]) {
         SCSettings* settings = [SCSettings sharedSettings];
         NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
         NSDictionary* reading = [SCTrustedClock currentReading];
-        if (clockState.count > 0 &&
-            ![clockState[@"bootSessionID"] isEqualToString:reading[@"boot"]]) {
+        if ([clockState isKindOfClass:[NSDictionary class]] && clockState.count > 0 &&
+            ![clockState[@"bootSessionID"] isEqual:reading[@"boot"]]) {
             [settings setValue:[SCTrustedClock reanchoredStateAfterBootChange:clockState reading:reading]
                         forKey:@"TrustedClockState"];
             [settings setValue:@YES forKey:@"TrustedClockNeedsVerification"];
-            [settings syncSettingsAndWait:5];
+            NSError* syncErr = [settings syncSettingsAndWait:5];
+            if (syncErr != nil) NSLog(@"WARNING: failed to persist re-anchored trusted clock: %@", syncErr);
         }
     }
+    [SCDaemonBlockMethods.daemonMethodLock unlock];
+
+    [self.listener resume];
 
     // if there's any evidence of a block (i.e. an official one running,
     // OR just block remnants remaining in hosts), we should start

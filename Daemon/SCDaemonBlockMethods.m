@@ -20,7 +20,9 @@ NSTimeInterval METHOD_LOCK_TIMEOUT = 5.0;
 NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for checkups, because we'd prefer not to have tons pile up
 
 @interface SCDaemonBlockMethods ()
-+ (void)handleVerifiedTime:(NSDate*)verifiedNow;
++ (void)handleVerifiedTime:(NSDate*)verifiedNow
+                   reading:(NSDictionary*)reading
+                generation:(NSUInteger)generation;
 @end
 
 @implementation SCDaemonBlockMethods
@@ -119,6 +121,8 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
     if ((filteredBlocklist.count <= 0 && !isAllowlist) || [SCBlockUtilities currentBlockIsExpired]) {
         NSLog(@"ERROR: Blocklist is empty, or block end date is in the past");
         NSLog(@"Block End Date: %@ (%@), vs now is %@", [settings valueForKey: @"BlockEndDate"], [[settings valueForKey: @"BlockEndDate"] class], [NSDate date]);
+        // Don't leave trusted-timing state behind for a block that never started.
+        [SCBlockUtilities clearTrustedTimingSettings];
         NSError* err = [SCErr errorWithCode: 302];
         [SCSentry captureError: err];
         reply(err);
@@ -329,12 +333,21 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
         // we should clear the block now.
         // but let them know that we noticed their (likely) cheating and we're not happy!
         NSLog(@"INFO: Checkup ran, no active block found.");
-        
-        [SCSentry captureMessage: @"Checkup ran and no active block found! Removing block, tampering suspected..."];
-        
-        [SCHelperToolUtilities removeBlock];
 
-        [SCHelperToolUtilities sendConfigurationChangedNotification];
+        // stopCheckupTimer hops to the main queue asynchronously, so one more
+        // tick can land right after a block was legitimately removed. Only
+        // treat this as leftover rules (and possible tampering) if block rules
+        // are actually still on the system; otherwise there is nothing to
+        // remove and we just stop the checkups.
+        if ([SCBlockUtilities blockRulesFoundOnSystem]) {
+            [SCSentry captureMessage: @"Checkup ran and no active block found! Removing block, tampering suspected..."];
+
+            [SCHelperToolUtilities removeBlock];
+
+            [SCHelperToolUtilities sendConfigurationChangedNotification];
+        } else {
+            NSLog(@"INFO: No block rules found on system either; stopping checkups.");
+        }
         
         // Temporarily disabled the TamperingDetection flag because it was sometimes causing false positives
         // (i.e. people having the background set repeatedly despite no attempts to cheat)
@@ -364,8 +377,8 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
                  [settings boolForKey:@"TrustedClockNeedsVerification"]);
             if (verificationNeeded) {
                 [[SCBlockEndVerifier sharedVerifier]
-                    requestVerificationWithCompletion:^(NSDate* verifiedNow) {
-                        if (verifiedNow != nil) [SCDaemonBlockMethods handleVerifiedTime:verifiedNow];
+                    requestVerificationWithCompletion:^(NSDate* verifiedNow, NSDictionary* reading, NSUInteger generation) {
+                        [SCDaemonBlockMethods handleVerifiedTime:verifiedNow reading:reading generation:generation];
                     }];
             }
 
@@ -386,47 +399,43 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
     }
 }
 
-+ (void)handleVerifiedTime:(NSDate*)verifiedNow {
-    if (![SCDaemonBlockMethods lockOrTimeout:nil timeout:CHECKUP_LOCK_TIMEOUT]) return;
++ (void)handleVerifiedTime:(NSDate*)verifiedNow
+                   reading:(NSDictionary*)reading
+                generation:(NSUInteger)generation {
+    if (![SCDaemonBlockMethods lockOrTimeout:nil timeout:CHECKUP_LOCK_TIMEOUT]) {
+        // Safe to drop: the verifier's backoff was already reset by the
+        // successful fetch, so a later checkup will simply fetch again.
+        NSLog(@"WARNING: Dropped verified network time because the daemon lock timed out.");
+        return;
+    }
+
+    // A reset (startBlock, or a removal) between the fetch completing and us
+    // acquiring the lock means this result belongs to a block that is gone.
+    if (![SCBlockUtilities modernBlockIsRunning] ||
+        ![[SCBlockEndVerifier sharedVerifier] isCurrentGeneration:generation]) {
+        [self.daemonMethodLock unlock];
+        return;
+    }
+
+    NSDictionary* decision = [SCBlockUtilities
+        trustedTimingDecisionForSettings:[SCBlockUtilities trustedTimingSettingsSnapshot]
+                             verifiedNow:verifiedNow
+                                 reading:reading];
+    if (decision == nil) {
+        NSLog(@"WARNING: Verified network time received, but trusted-timing state is incomplete; keeping block.");
+        [self.daemonMethodLock unlock];
+        return;
+    }
 
     SCSettings* settings = [SCSettings sharedSettings];
-    if (![SCBlockUtilities modernBlockIsRunning]) {
-        [self.daemonMethodLock unlock];
-        return;
+    NSDictionary* writes = decision[SCTrustedTimingSettingsWritesKey];
+    for (NSString* key in writes) {
+        [settings setValue:writes[key] forKey:key];
     }
+    BOOL correctedStart = [decision[SCTrustedTimingStartWasCorrectedKey] boolValue];
+    if (correctedStart) NSLog(@"INFO: Corrected block start against verified network time.");
 
-    NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
-    NSNumber* duration = [settings valueForKey:@"BlockDurationSecs"];
-    NSDate* effectiveStart = [settings valueForKey:@"BlockStartWall"];
-    if (clockState.count == 0 || duration.doubleValue <= 0 || effectiveStart == nil) {
-        [self.daemonMethodLock unlock];
-        return;
-    }
-
-    NSDictionary* reading = [SCTrustedClock currentReading];
-    BOOL correctedStart = ![settings boolForKey:@"BlockStartIsVerified"];
-    if (correctedStart) {
-        effectiveStart = [SCTrustedClock correctedStartForState:clockState
-                                                    verifiedNow:verifiedNow
-                                                        reading:reading];
-        [settings setValue:effectiveStart forKey:@"BlockStartWall"];
-        [settings setValue:@YES forKey:@"BlockStartIsVerified"];
-        [settings setValue:[effectiveStart dateByAddingTimeInterval:duration.doubleValue]
-                    forKey:@"BlockEndDate"];
-        NSLog(@"INFO: Corrected block start against verified network time.");
-    }
-
-    // Rebase the local estimate on every successful verification. This makes
-    // post-reboot countdowns accurate without ever trusting a wall-clock gap.
-    NSMutableDictionary* verifiedReading = [reading mutableCopy];
-    verifiedReading[@"wall"] = verifiedNow;
-    [settings setValue:[SCTrustedClock freshStateWithReading:verifiedReading]
-                forKey:@"TrustedClockState"];
-    [settings setValue:@NO forKey:@"TrustedClockNeedsVerification"];
-
-    if ([SCBlockEndVerifier verifiedTime:verifiedNow
-                    satisfiesEndForStart:effectiveStart
-                            durationSecs:duration.doubleValue]) {
+    if ([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
         NSLog(@"INFO: Block expiry verified against network time; removing block.");
         [SCHelperToolUtilities removeBlock];
         [[SCBlockEndVerifier sharedVerifier] reset];

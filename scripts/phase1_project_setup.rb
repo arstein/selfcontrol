@@ -1,9 +1,15 @@
 #!/usr/bin/env ruby
+# Phase 1: add the trusted-timing sources (SNTP client, trusted clock, block
+# end verifier) and their unit tests to the right Xcode targets. Idempotent.
+# Run from anywhere: GEM_PATH=/opt/homebrew/opt/cocoapods/libexec ruby scripts/phase1_project_setup.rb
 require 'xcodeproj'
+
+Dir.chdir(File.expand_path('..', __dir__))
 
 project = Xcodeproj::Project.open('SelfControl.xcodeproj')
 
 def group_named(parent, name)
+  return nil if parent.nil?
   parent.children.find { |child| child.respond_to?(:display_name) && child.display_name == name }
 end
 

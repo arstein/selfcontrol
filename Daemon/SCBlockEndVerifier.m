@@ -31,7 +31,11 @@
     return [verifiedNow timeIntervalSinceDate:startWall] >= durationSecs;
 }
 
-- (void)requestVerificationWithCompletion:(void (^)(NSDate* _Nullable))completion {
++ (NSTimeInterval)minimumIntervalAfterSuccess {
+    return 5.0;
+}
+
+- (void)requestVerificationWithCompletion:(void (^)(NSDate*, NSDictionary*, NSUInteger))completion {
     __block NSUInteger requestGeneration;
     @synchronized(self) {
         NSTimeInterval uptime = NSProcessInfo.processInfo.systemUptime;
@@ -41,26 +45,35 @@
     }
 
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-        NSDate* verified = [SCSNTPClient fetchNetworkTimeWithTimeout:3.0];
+        NSDictionary* reading = nil;
+        NSDate* verified = [SCSNTPClient fetchNetworkTimeWithTimeout:3.0 readingAtResponse:&reading];
+        BOOL succeeded = verified != nil && reading != nil;
         @synchronized(self) {
             if (requestGeneration != self.generation) {
                 return;
             }
-            if (verified == nil) {
+            NSTimeInterval uptime = NSProcessInfo.processInfo.systemUptime;
+            if (!succeeded) {
                 NSTimeInterval backoff = [SCBlockEndVerifier
                     retryIntervalForFailureCount:self.consecutiveFailures];
                 self.consecutiveFailures += 1;
-                self.nextAttemptUptime = NSProcessInfo.processInfo.systemUptime + backoff;
+                self.nextAttemptUptime = uptime + backoff;
                 NSLog(@"Time verification failed (%lu consecutive); retrying in %.0fs",
                       (unsigned long)self.consecutiveFailures, backoff);
             } else {
                 self.consecutiveFailures = 0;
-                self.nextAttemptUptime = 0;
+                self.nextAttemptUptime = uptime + [SCBlockEndVerifier minimumIntervalAfterSuccess];
             }
             self.fetchInFlight = NO;
         }
-        completion(verified);
+        if (succeeded) completion(verified, reading, requestGeneration);
     });
+}
+
+- (BOOL)isCurrentGeneration:(NSUInteger)generation {
+    @synchronized(self) {
+        return generation == self.generation;
+    }
 }
 
 - (void)reset {

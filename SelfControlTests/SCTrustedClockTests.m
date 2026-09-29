@@ -52,11 +52,23 @@ static NSDictionary* SCReading(NSTimeInterval wall, NSTimeInterval mach, NSStrin
         4600, 0.001);
 }
 
-- (void)testSingleBootSessionFlag {
-    NSDictionary* state = [SCTrustedClock freshStateWithReading:SCReading(1000, 50, @"A")];
-    XCTAssertTrue([SCTrustedClock stateIsSingleBootSession:state reading:SCReading(2000, 60, @"A")]);
-    state = [SCTrustedClock reanchoredStateAfterBootChange:state reading:SCReading(2000, 5, @"B")];
-    XCTAssertFalse([SCTrustedClock stateIsSingleBootSession:state reading:SCReading(2001, 6, @"B")]);
+- (void)testRebootWithoutCheckpointCreditsNoPriorBootTime {
+    NSMutableDictionary* state = [[SCTrustedClock freshStateWithReading:SCReading(1000, 50, @"A")] mutableCopy];
+    [state removeObjectForKey:@"lastCheckpointMachSecs"];
+    // A forward-rolled wall checkpoint must not be credited either.
+    state[@"lastCheckpointWall"] = [NSDate dateWithTimeIntervalSince1970:999999];
+    NSDictionary* reanchored = [SCTrustedClock reanchoredStateAfterBootChange:state reading:SCReading(5000, 5, @"B")];
+    XCTAssertEqualWithAccuracy([SCTrustedClock elapsedSecsForState:reanchored reading:SCReading(5000, 15, @"B")],
+                               10, 0.001);
+}
+
+- (void)testCurrentReadingHasStableBootID {
+    NSDictionary* first = [SCTrustedClock currentReading];
+    NSDictionary* second = [SCTrustedClock currentReading];
+    XCTAssertNotNil(first[@"boot"]);
+    XCTAssertNotEqualObjects(first[@"boot"], @"unknown");
+    XCTAssertEqualObjects(first[@"boot"], second[@"boot"]);
+    XCTAssertGreaterThanOrEqual([second[@"mach"] doubleValue], [first[@"mach"] doubleValue]);
 }
 
 @end

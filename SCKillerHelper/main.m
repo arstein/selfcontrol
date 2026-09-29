@@ -18,6 +18,7 @@
 #import <sysexits.h>
 #import "SCSentry.h"
 #import "SCSNTPClient.h"
+#import "SCBlockUtilities.h"
 
 #define LOG_FILE @"~/Documents/SelfControl-Killer.log"
 
@@ -125,19 +126,42 @@ int main(int argc, char* argv[]) {
 
         // The upstream recovery helper bypasses the daemon and force-clears
         // rules. In the fork it may only do that after independent network
-        // time confirms that the active block has genuinely ended.
+        // time confirms that the active block has genuinely ended, using the
+        // same decision the daemon makes (an unverified start is corrected to
+        // verifiedNow - monotonic elapsed, so a block started offline becomes
+        // clearable once its full duration has truly elapsed).
         if ([settings boolForKey:@"BlockIsRunning"] &&
             [[settings valueForKey:@"TrustedClockState"] count] > 0) {
-            NSDate* start = [settings valueForKey:@"BlockStartWall"];
-            NSTimeInterval duration = [[settings valueForKey:@"BlockDurationSecs"] doubleValue];
-            if (![settings boolForKey:@"BlockStartIsVerified"] || start == nil || duration <= 0) {
-                NSLog(@"ERROR: Refusing recovery: the active block has no verified start time.");
-                exit(EX_TEMPFAIL);
+            NSString* refusal = nil;
+            NSDictionary* readingAtResponse = nil;
+            NSDate* verifiedNow = [SCSNTPClient fetchNetworkTimeWithTimeout:3.0
+                                                          readingAtResponse:&readingAtResponse];
+            if (verifiedNow == nil) {
+                refusal = @"network time could not be reached";
+            } else {
+                NSDictionary* decision = [SCBlockUtilities
+                    trustedTimingDecisionForSettings:[SCBlockUtilities trustedTimingSettingsSnapshot]
+                                         verifiedNow:verifiedNow
+                                             reading:readingAtResponse];
+                if (decision == nil) {
+                    refusal = @"the active block's trusted-timing state is incomplete";
+                } else if (![decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
+                    refusal = @"network time does not confirm the block has expired";
+                } else {
+                    [log appendFormat:@"Network time %@ confirms the block has expired.\n\n", verifiedNow];
+                }
             }
-            NSDate* verifiedNow = [SCSNTPClient fetchNetworkTimeWithTimeout:3.0];
-            if (verifiedNow == nil || [verifiedNow timeIntervalSinceDate:start] < duration) {
-                NSLog(@"ERROR: Refusing recovery: network time does not confirm block expiry.");
-                exit(EX_TEMPFAIL);
+
+            if (refusal != nil) {
+                NSLog(@"ERROR: Refusing recovery: %@.", refusal);
+                [log appendFormat:@"REFUSED TO CLEAR BLOCK: %@. The block was left in place.\n", refusal];
+                [log appendString:@"\n===SelfControl-Killer complete (block not cleared)==="];
+                [log writeToFile:logFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                // AuthorizationExecuteWithPrivileges doesn't surface our exit
+                // status to the app, so also report the refusal on stdout.
+                printf("%s\n", SCKillerExpiryNotVerifiedMarker.UTF8String);
+                fflush(stdout);
+                exit(SCKillerExitStatusExpiryNotVerified);
             }
         }
         

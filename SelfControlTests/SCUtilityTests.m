@@ -10,6 +10,7 @@
 #import "SCSentry.h"
 #import "SCErr.h"
 #import "SCSettings.h"
+#import "SCTrustedClock.h"
 
 @interface SCUtilityTests : XCTestCase
 
@@ -182,6 +183,177 @@ NSDictionary* veryLongBlockLegacyDict; // year-long block, one day in
     XCTAssert([SCMigrationUtilities blockIsRunningInLegacyDictionary: negativeBlockDurationLegacyDict]); // negative still might be running?
     XCTAssert([SCMigrationUtilities blockIsRunningInLegacyDictionary: veryLongBlockLegacyDict]);
     XCTAssert(![SCMigrationUtilities blockIsRunningInLegacyDictionary: emptyLegacyDict]);
+}
+
+#pragma mark - Trusted timing decision
+
+static NSDictionary* SCTTReading(NSTimeInterval wall, NSTimeInterval mach, NSString* boot) {
+    return @{@"wall": [NSDate dateWithTimeIntervalSince1970:wall], @"mach": @(mach), @"boot": boot};
+}
+
+static NSDate* SCTTDate(NSTimeInterval secs) {
+    return [NSDate dateWithTimeIntervalSince1970:secs];
+}
+
+static NSDictionary* SCTTSnapshot(NSDictionary* clockState, NSTimeInterval startWall, BOOL verified, NSTimeInterval duration) {
+    return @{@"TrustedClockState": clockState,
+             @"BlockStartWall": SCTTDate(startWall),
+             @"BlockStartIsVerified": @(verified),
+             @"BlockDurationSecs": @(duration)};
+}
+
+- (void)testDecisionCorrectsRolledBackUnverifiedStart {
+    // The clock was rolled back ~1h before the block started: wall said 1000
+    // but true time was 5000. Duration is 600s.
+    NSDictionary* state = [SCTrustedClock freshStateWithReading:SCTTReading(1000, 50, @"A")];
+    NSDictionary* decision = [SCBlockUtilities
+        trustedTimingDecisionForSettings:SCTTSnapshot(state, 1000, NO, 600)
+                             verifiedNow:SCTTDate(5100)
+                                 reading:SCTTReading(1100, 150, @"A")];
+    XCTAssertNotNil(decision);
+    NSDictionary* writes = decision[SCTrustedTimingSettingsWritesKey];
+    XCTAssertTrue([decision[SCTrustedTimingStartWasCorrectedKey] boolValue]);
+    XCTAssertEqualWithAccuracy([writes[@"BlockStartWall"] timeIntervalSince1970], 5000, 0.001);
+    XCTAssertEqualWithAccuracy([writes[@"BlockEndDate"] timeIntervalSince1970], 5600, 0.001);
+    XCTAssertEqualObjects(writes[@"BlockStartIsVerified"], @YES);
+    XCTAssertEqualObjects(writes[@"TrustedClockNeedsVerification"], @NO);
+    // The wall-clock end (1600) would already be past; the corrected one is not.
+    XCTAssertFalse([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+    // Rebased state is anchored on the verified time and the response reading.
+    NSDictionary* rebased = writes[@"TrustedClockState"];
+    XCTAssertEqualWithAccuracy([rebased[@"wallAnchor"] timeIntervalSince1970], 5100, 0.001);
+    XCTAssertEqualWithAccuracy([rebased[@"machAnchorSecs"] doubleValue], 150, 0.001);
+}
+
+- (void)testDecisionCorrectionNeverShortensBlock {
+    // A clock rolled FORWARD before start: the correction moves the stored
+    // start earlier, but the block still lasts its full monotonic duration.
+    NSDictionary* state = [SCTrustedClock freshStateWithReading:SCTTReading(9000, 50, @"A")];
+    NSDictionary* decision = [SCBlockUtilities
+        trustedTimingDecisionForSettings:SCTTSnapshot(state, 9000, NO, 600)
+                             verifiedNow:SCTTDate(5599)
+                                 reading:SCTTReading(9599, 649, @"A")];
+    XCTAssertEqualWithAccuracy([decision[SCTrustedTimingSettingsWritesKey][@"BlockStartWall"] timeIntervalSince1970],
+                               5000, 0.001);
+    XCTAssertFalse([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+}
+
+- (void)testDecisionAfterRebootWhileUnverified {
+    // True start 5000. 300s ran before reboot (checkpointed), 200s powered
+    // off, then 50s in the new boot. The gap is uncredited, so the corrected
+    // start is 200s late: fail closed, the block runs longer.
+    NSDictionary* state = [SCTrustedClock freshStateWithReading:SCTTReading(1000, 50, @"A")];
+    state = [SCTrustedClock checkpointState:state reading:SCTTReading(1300, 350, @"A")];
+    state = [SCTrustedClock reanchoredStateAfterBootChange:state reading:SCTTReading(1500, 10, @"B")];
+    NSDictionary* decision = [SCBlockUtilities
+        trustedTimingDecisionForSettings:SCTTSnapshot(state, 1000, NO, 600)
+                             verifiedNow:SCTTDate(5550)
+                                 reading:SCTTReading(1550, 60, @"B")];
+    NSDictionary* writes = decision[SCTrustedTimingSettingsWritesKey];
+    XCTAssertEqualWithAccuracy([writes[@"BlockStartWall"] timeIntervalSince1970], 5200, 0.001);
+    XCTAssertFalse([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+}
+
+- (void)testDecisionReanchorsStateFromEarlierBoot {
+    // A caller that bypasses the daemon (the killer) may see state that was
+    // never re-anchored. Prior-boot time comes only from the checkpoint.
+    NSDictionary* state = [SCTrustedClock freshStateWithReading:SCTTReading(1000, 50, @"A")];
+    state = [SCTrustedClock checkpointState:state reading:SCTTReading(1300, 350, @"A")];
+    NSDictionary* decision = [SCBlockUtilities
+        trustedTimingDecisionForSettings:SCTTSnapshot(state, 1000, NO, 600)
+                             verifiedNow:SCTTDate(9000)
+                                 reading:SCTTReading(1000, 400, @"B")];
+    // elapsed = 300 (prior boot) + 0 (fresh anchor) -> start 8700, not expired
+    XCTAssertEqualWithAccuracy([decision[SCTrustedTimingSettingsWritesKey][@"BlockStartWall"] timeIntervalSince1970],
+                               8700, 0.001);
+    XCTAssertFalse([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+}
+
+- (void)testDecisionAfterRebootWhileVerified {
+    NSDictionary* state = [SCTrustedClock freshStateWithReading:SCTTReading(5000, 50, @"A")];
+    state = [SCTrustedClock reanchoredStateAfterBootChange:state reading:SCTTReading(5000, 5, @"B")];
+    NSDictionary* decision = [SCBlockUtilities
+        trustedTimingDecisionForSettings:SCTTSnapshot(state, 5000, YES, 600)
+                             verifiedNow:SCTTDate(5700)
+                                 reading:SCTTReading(5010, 15, @"B")];
+    NSDictionary* writes = decision[SCTrustedTimingSettingsWritesKey];
+    XCTAssertFalse([decision[SCTrustedTimingStartWasCorrectedKey] boolValue]);
+    XCTAssertNil(writes[@"BlockStartWall"]);
+    XCTAssertNil(writes[@"BlockEndDate"]);
+    XCTAssertTrue([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+}
+
+- (void)testDecisionHonorsExtendedDuration {
+    NSDictionary* state = [SCTrustedClock freshStateWithReading:SCTTReading(5000, 50, @"A")];
+    // Originally 600s, extended to 1200s; verified time is 700s after start.
+    NSDictionary* decision = [SCBlockUtilities
+        trustedTimingDecisionForSettings:SCTTSnapshot(state, 5000, YES, 1200)
+                             verifiedNow:SCTTDate(5700)
+                                 reading:SCTTReading(5700, 750, @"A")];
+    XCTAssertFalse([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+
+    // Unverified start with an extended duration: end date uses the new duration.
+    decision = [SCBlockUtilities
+        trustedTimingDecisionForSettings:SCTTSnapshot(state, 5000, NO, 1200)
+                             verifiedNow:SCTTDate(5700)
+                                 reading:SCTTReading(5700, 750, @"A")];
+    XCTAssertEqualWithAccuracy([decision[SCTrustedTimingSettingsWritesKey][@"BlockEndDate"] timeIntervalSince1970],
+                               6200, 0.001);
+    XCTAssertFalse([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+}
+
+- (void)testDecisionExpiredAndNotExpired {
+    NSDictionary* state = [SCTrustedClock freshStateWithReading:SCTTReading(5000, 50, @"A")];
+    NSDictionary* expired = [SCBlockUtilities
+        trustedTimingDecisionForSettings:SCTTSnapshot(state, 5000, YES, 600)
+                             verifiedNow:SCTTDate(5600)
+                                 reading:SCTTReading(5600, 650, @"A")];
+    XCTAssertTrue([expired[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+
+    NSDictionary* running = [SCBlockUtilities
+        trustedTimingDecisionForSettings:SCTTSnapshot(state, 5000, YES, 600)
+                             verifiedNow:SCTTDate(5599)
+                                 reading:SCTTReading(5599, 649, @"A")];
+    XCTAssertFalse([running[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+
+    // Unverified block started offline: clearable once monotonic elapsed
+    // reaches the duration, regardless of the stored wall start.
+    NSDictionary* offline = [SCBlockUtilities
+        trustedTimingDecisionForSettings:SCTTSnapshot(state, 1, NO, 600)
+                             verifiedNow:SCTTDate(90000)
+                                 reading:SCTTReading(0, 650, @"A")];
+    XCTAssertTrue([offline[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+    offline = [SCBlockUtilities
+        trustedTimingDecisionForSettings:SCTTSnapshot(state, 1, NO, 600)
+                             verifiedNow:SCTTDate(90000)
+                                 reading:SCTTReading(0, 649, @"A")];
+    XCTAssertFalse([offline[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+}
+
+- (void)testDecisionRequiresTrustedState {
+    NSDictionary* state = [SCTrustedClock freshStateWithReading:SCTTReading(5000, 50, @"A")];
+    NSDate* now = SCTTDate(99999);
+    NSDictionary* reading = SCTTReading(99999, 99999, @"A");
+    XCTAssertNil([SCBlockUtilities trustedTimingDecisionForSettings:@{} verifiedNow:now reading:reading]);
+    XCTAssertNil([SCBlockUtilities trustedTimingDecisionForSettings:SCTTSnapshot(@{}, 5000, YES, 600)
+                                                        verifiedNow:now reading:reading]);
+    XCTAssertNil([SCBlockUtilities trustedTimingDecisionForSettings:SCTTSnapshot(state, 5000, YES, 0)
+                                                        verifiedNow:now reading:reading]);
+    // A verified start that reads as the SCSettings default is unusable.
+    NSMutableDictionary* noStart = [SCTTSnapshot(state, 5000, YES, 600) mutableCopy];
+    noStart[@"BlockStartWall"] = [NSDate distantPast];
+    XCTAssertNil([SCBlockUtilities trustedTimingDecisionForSettings:noStart verifiedNow:now reading:reading]);
+    XCTAssertNil([SCBlockUtilities trustedTimingDecisionForSettings:SCTTSnapshot(state, 5000, YES, 600)
+                                                        verifiedNow:now reading:@{}]);
+}
+
+- (void)testEffectiveBlockStartWall {
+    XCTAssertNil([SCBlockUtilities effectiveBlockStartWallFromSettingsValue:nil]);
+    XCTAssertNil([SCBlockUtilities effectiveBlockStartWallFromSettingsValue:[NSDate distantPast]]);
+    XCTAssertNil([SCBlockUtilities effectiveBlockStartWallFromSettingsValue:@"2026-01-01"]);
+    XCTAssertNil([SCBlockUtilities effectiveBlockStartWallFromSettingsValue:@12345]);
+    NSDate* real = SCTTDate(1767225600);
+    XCTAssertEqualObjects([SCBlockUtilities effectiveBlockStartWallFromSettingsValue:real], real);
 }
 
 @end

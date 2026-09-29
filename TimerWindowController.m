@@ -389,11 +389,22 @@
 	}
 
     // read until the pipe finishes so we wait for execution to end before we
-    // show the modal (this also helps make the focus ordering better)
-    for (;;) {
-        ssize_t bytesRead = read(fileno(pipe), NULL, 256);
-        if (bytesRead < 1) break;
+    // show the modal (this also helps make the focus ordering better).
+    // Keep the output: the helper reports a refusal on stdout, since its exit
+    // status isn't available to us through AuthorizationExecuteWithPrivileges.
+    NSMutableData* helperOutput = [NSMutableData data];
+    if (pipe != NULL) {
+        char buffer[256];
+        for (;;) {
+            ssize_t bytesRead = read(fileno(pipe), buffer, sizeof(buffer));
+            if (bytesRead < 0 && errno == EINTR) continue;
+            if (bytesRead < 1) break;
+            [helperOutput appendBytes: buffer length: (NSUInteger)bytesRead];
+        }
+        fclose(pipe);
     }
+    NSString* helperOutputString = [[NSString alloc] initWithData: helperOutput encoding: NSUTF8StringEncoding];
+    BOOL helperRefusedUnverifiedExpiry = [helperOutputString containsString: SCKillerExpiryNotVerifiedMarker];
         
     // reload settings so the timer window knows the block is done
     [[SCSettings sharedSettings] reloadSettings];
@@ -405,6 +416,16 @@
                                          withObject:nil
                                       waitUntilDone:YES];
     
+    if (helperRefusedUnverifiedExpiry) {
+        NSLog(@"WARNING: Killer helper refused to clear the block because network time did not confirm expiry");
+        NSAlert* alert = [[NSAlert alloc] init];
+        [alert setMessageText: NSLocalizedString(@"Block not cleared", @"Title when the killer helper refuses to clear an unexpired block")];
+        [alert setInformativeText: NSLocalizedString(@"SelfControl couldn't verify the block has expired. Network time is required to clear a block, and a block can only be cleared once its full duration has passed. Make sure you're connected to the internet and try again after the timer runs out. You can find the log file, named SelfControl-Killer.log, in your Documents folder.", @"Message when the killer helper refuses to clear a block because network time did not confirm it has expired")];
+        [alert addButtonWithTitle: NSLocalizedString(@"OK", @"OK button")];
+        [alert runModal];
+        return;
+    }
+
     // send some debug info to Sentry to help us track this issue
     // detailed logs disabled for now because the best current method might collect user PII we don't want
     [SCSentry captureMessage: @"User manually cleared SelfControl block from the timer window"];

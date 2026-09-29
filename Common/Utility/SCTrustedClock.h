@@ -15,7 +15,6 @@ NS_ASSUME_NONNULL_BEGIN
 + (NSDate*)correctedStartForState:(NSDictionary*)state
                       verifiedNow:(NSDate*)verifiedNow
                           reading:(NSDictionary*)reading;
-+ (BOOL)stateIsSingleBootSession:(NSDictionary*)state reading:(NSDictionary*)reading;
 + (NSDictionary*)currentReading;
 
 @end

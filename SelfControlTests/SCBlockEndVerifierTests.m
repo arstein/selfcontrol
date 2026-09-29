@@ -28,4 +28,16 @@
         durationSecs:600]);
 }
 
+- (void)testSuccessRateFloor {
+    XCTAssertGreaterThanOrEqual([SCBlockEndVerifier minimumIntervalAfterSuccess], 5.0);
+}
+
+- (void)testResetInvalidatesOutstandingGeneration {
+    SCBlockEndVerifier* verifier = [SCBlockEndVerifier new];
+    XCTAssertTrue([verifier isCurrentGeneration:0]);
+    [verifier reset];
+    XCTAssertFalse([verifier isCurrentGeneration:0]);
+    XCTAssertTrue([verifier isCurrentGeneration:1]);
+}
+
 @end

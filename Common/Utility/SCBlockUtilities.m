@@ -12,6 +12,12 @@
 #import "SCSNTPClient.h"
 #import "SCTrustedClock.h"
 
+NSString* const SCTrustedTimingSettingsWritesKey = @"SettingsWrites";
+NSString* const SCTrustedTimingShouldRemoveBlockKey = @"ShouldRemoveBlock";
+NSString* const SCTrustedTimingStartWasCorrectedKey = @"StartWasCorrected";
+const int SCKillerExitStatusExpiryNotVerified = 75; // EX_TEMPFAIL
+NSString* const SCKillerExpiryNotVerifiedMarker = @"SC_KILLER_REFUSED_EXPIRY_NOT_VERIFIED";
+
 @implementation SCBlockUtilities
 
 + (BOOL)anyBlockIsRunning {
@@ -68,16 +74,94 @@
     SCSettings* settings = [SCSettings sharedSettings];
     NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
     NSNumber* duration = [settings valueForKey:@"BlockDurationSecs"];
-    NSDate* start = [settings valueForKey:@"BlockStartWall"];
-    if (clockState.count == 0 || duration.doubleValue <= 0 || start == nil) return nil;
+    if (![clockState isKindOfClass:[NSDictionary class]] || clockState.count == 0 ||
+        ![duration isKindOfClass:[NSNumber class]] || duration.doubleValue <= 0) {
+        return nil;
+    }
 
     NSDictionary* reading = [SCTrustedClock currentReading];
-    if ([settings boolForKey:@"BlockStartIsVerified"]) {
+    NSDate* start = [self effectiveBlockStartWallFromSettingsValue:[settings valueForKey:@"BlockStartWall"]];
+    if ([settings boolForKey:@"BlockStartIsVerified"] && start != nil) {
         NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState reading:reading];
         NSDate* end = [start dateByAddingTimeInterval:duration.doubleValue];
         return @([end timeIntervalSinceDate:trustedNow]);
     }
+    // Unverified start (or a verified one whose start was lost): elapsed time
+    // since the clock state's anchor never exceeds true time since block start,
+    // so this over-estimates what remains. Never fall back to the wall clock.
     return @(duration.doubleValue - [SCTrustedClock elapsedSecsForState:clockState reading:reading]);
+}
+
++ (NSDate*)effectiveBlockStartWallFromSettingsValue:(id)value {
+    if (![value isKindOfClass:[NSDate class]]) return nil;
+    NSDate* date = value;
+    if ([date timeIntervalSinceDate:[NSDate distantPast]] <= 0) return nil;
+    return date;
+}
+
++ (NSDictionary*)trustedTimingSettingsSnapshot {
+    SCSettings* settings = [SCSettings sharedSettings];
+    NSMutableDictionary* snapshot = [NSMutableDictionary dictionary];
+    for (NSString* key in @[@"BlockStartWall", @"BlockStartIsVerified", @"BlockDurationSecs", @"TrustedClockState"]) {
+        id value = [settings valueForKey:key];
+        if (value != nil) snapshot[key] = value;
+    }
+    return snapshot;
+}
+
++ (NSDictionary*)trustedTimingDecisionForSettings:(NSDictionary*)settingsSnapshot
+                                      verifiedNow:(NSDate*)verifiedNow
+                                          reading:(NSDictionary*)reading {
+    if (![verifiedNow isKindOfClass:[NSDate class]] || reading.count == 0 ||
+        ![reading[@"mach"] isKindOfClass:[NSNumber class]] || reading[@"boot"] == nil) {
+        return nil;
+    }
+    NSDictionary* clockState = settingsSnapshot[@"TrustedClockState"];
+    NSNumber* duration = settingsSnapshot[@"BlockDurationSecs"];
+    if (![clockState isKindOfClass:[NSDictionary class]] || clockState.count == 0 ||
+        ![duration isKindOfClass:[NSNumber class]] || duration.doubleValue <= 0) {
+        return nil;
+    }
+
+    BOOL startIsVerified = [settingsSnapshot[@"BlockStartIsVerified"] boolValue];
+    NSDate* start = [self effectiveBlockStartWallFromSettingsValue:settingsSnapshot[@"BlockStartWall"]];
+    // Once verified, the clock state is rebased on every verification, so the
+    // start can no longer be reconstructed from elapsed time. Without it we
+    // cannot decide; keep the block.
+    if (startIsVerified && start == nil) return nil;
+
+    // The daemon re-anchors at launch after a reboot. A caller that bypasses
+    // the daemon (SCKillerHelper) may hold state from an earlier boot; re-anchor
+    // it the same conservative way so prior-boot time is credited only from the
+    // monotonic checkpoint and the unknown gap counts as zero.
+    if (![clockState[@"bootSessionID"] isEqual:reading[@"boot"]]) {
+        clockState = [SCTrustedClock reanchoredStateAfterBootChange:clockState reading:reading];
+    }
+
+    NSMutableDictionary* writes = [NSMutableDictionary dictionary];
+    BOOL correctStart = !startIsVerified;
+    if (correctStart) {
+        // Monotonic elapsed never exceeds true elapsed, so this start is never
+        // earlier than the true start: correction can only lengthen the block.
+        start = [SCTrustedClock correctedStartForState:clockState verifiedNow:verifiedNow reading:reading];
+        writes[@"BlockStartWall"] = start;
+        writes[@"BlockEndDate"] = [start dateByAddingTimeInterval:duration.doubleValue];
+    }
+    writes[@"BlockStartIsVerified"] = @YES;
+
+    // Rebase the local estimate on every successful verification. This makes
+    // post-reboot countdowns accurate without ever trusting a wall-clock gap.
+    NSMutableDictionary* verifiedReading = [reading mutableCopy];
+    verifiedReading[@"wall"] = verifiedNow;
+    writes[@"TrustedClockState"] = [SCTrustedClock freshStateWithReading:verifiedReading];
+    writes[@"TrustedClockNeedsVerification"] = @NO;
+
+    BOOL shouldRemove = [verifiedNow timeIntervalSinceDate:start] >= duration.doubleValue;
+    return @{
+        SCTrustedTimingSettingsWritesKey: writes,
+        SCTrustedTimingShouldRemoveBlockKey: @(shouldRemove),
+        SCTrustedTimingStartWasCorrectedKey: @(correctStart),
+    };
 }
 
 + (NSArray<NSString*>*)blocklistByRemovingTimeSources:(NSArray<NSString*>*)blocklist {
@@ -105,6 +189,11 @@
     [settings setValue: nil forKey: @"BlockEndDate"];
     [settings setValue: nil forKey: @"ActiveBlocklist"];
     [settings setValue: nil forKey: @"ActiveBlockAsWhitelist"];
+    [self clearTrustedTimingSettings];
+}
+
++ (void)clearTrustedTimingSettings {
+    SCSettings* settings = [SCSettings sharedSettings];
     [settings setValue: nil forKey: @"BlockStartWall"];
     [settings setValue: @NO forKey: @"BlockStartIsVerified"];
     [settings setValue: nil forKey: @"BlockDurationSecs"];

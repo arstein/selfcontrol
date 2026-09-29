@@ -41,15 +41,16 @@
 + (NSDictionary*)reanchoredStateAfterBootChange:(NSDictionary*)state reading:(NSDictionary*)reading {
     if (state.count == 0) return state;
 
+    // Only monotonic time observed in the previous boot is credited. Every state
+    // this fork writes carries lastCheckpointMachSecs; if it is somehow missing
+    // or malformed, credit nothing for the completed boot (fail closed: an
+    // unverified block only gets longer) rather than falling back to the
+    // user-controllable wall clock.
     NSNumber* checkpointMach = state[@"lastCheckpointMachSecs"];
-    NSTimeInterval completedBootSecs;
-    if (checkpointMach != nil) {
-        completedBootSecs = checkpointMach.doubleValue - [state[@"machAnchorSecs"] doubleValue];
-    } else {
-        // Compatibility with an early state schema that did not save mach time.
-        NSDate* estimatedSegmentStart = [state[@"wallAnchor"] dateByAddingTimeInterval:
-            [state[@"accumulatedPriorSecs"] doubleValue]];
-        completedBootSecs = [state[@"lastCheckpointWall"] timeIntervalSinceDate:estimatedSegmentStart];
+    NSNumber* anchorMach = state[@"machAnchorSecs"];
+    NSTimeInterval completedBootSecs = 0;
+    if ([checkpointMach isKindOfClass:[NSNumber class]] && [anchorMach isKindOfClass:[NSNumber class]]) {
+        completedBootSecs = checkpointMach.doubleValue - anchorMach.doubleValue;
     }
     if (completedBootSecs < 0) completedBootSecs = 0;
 
@@ -78,11 +79,6 @@
         -[self elapsedSecsForState:state reading:reading]];
 }
 
-+ (BOOL)stateIsSingleBootSession:(NSDictionary*)state reading:(NSDictionary*)reading {
-    return ![state[@"didCrossBoot"] boolValue] &&
-           [state[@"bootSessionID"] isEqualToString:reading[@"boot"]];
-}
-
 + (NSDictionary*)currentReading {
     static mach_timebase_info_data_t timebase;
     static dispatch_once_t onceToken;
@@ -93,11 +89,20 @@
                                  (NSTimeInterval)timebase.numer /
                                  (NSTimeInterval)timebase.denom / 1e9;
 
-    struct timeval bootTime = {0};
-    size_t size = sizeof(bootTime);
+    // kern.bootsessionuuid is stable for the life of a boot. kern.boottime is
+    // only a fallback: it shifts when the calendar clock is stepped, which
+    // would make a same-boot daemon relaunch look like a reboot.
     NSString* bootID = @"unknown";
-    if (sysctlbyname("kern.boottime", &bootTime, &size, NULL, 0) == 0) {
-        bootID = [NSString stringWithFormat:@"%ld.%d", (long)bootTime.tv_sec, bootTime.tv_usec];
+    char bootUUID[64] = {0};
+    size_t uuidSize = sizeof(bootUUID) - 1;
+    if (sysctlbyname("kern.bootsessionuuid", bootUUID, &uuidSize, NULL, 0) == 0 && bootUUID[0] != '\0') {
+        bootID = [NSString stringWithUTF8String:bootUUID] ?: bootID;
+    } else {
+        struct timeval bootTime = {0};
+        size_t size = sizeof(bootTime);
+        if (sysctlbyname("kern.boottime", &bootTime, &size, NULL, 0) == 0) {
+            bootID = [NSString stringWithFormat:@"%ld.%d", (long)bootTime.tv_sec, bootTime.tv_usec];
+        }
     }
     return @{@"wall": [NSDate date], @"mach": @(machSeconds), @"boot": bootID};
 }
