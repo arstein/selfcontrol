@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0C9F4B971321BEAF47EA415A /* SCTediumChallenge.m in Sources */ = {isa = PBXBuildFile; fileRef = 79957742827112D9CEEDAC30 /* SCTediumChallenge.m */; };
+		1D6F3A5DF697E575B95E6389 /* SCTediumChallenge.m in Sources */ = {isa = PBXBuildFile; fileRef = 79957742827112D9CEEDAC30 /* SCTediumChallenge.m */; };
 		3919D4424655243AEB8401CB /* SCBlockEndVerifierTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3A97FA0F4A3962A08CFEBC17 /* SCBlockEndVerifierTests.m */; };
 		497952EC6659EC7B55CBA02A /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
 		6454DA2A7A6335132C3D719E /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
@@ -24,6 +26,7 @@
 		9B15BF4E00EECEB86DBF2FC5 /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
 		A13A7863D1143B206C8C25F1 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		A3B447F125E29CD23431B170 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
+		B1AF949839F9E22BE3E5903D /* SCTediumChallengeTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 29E44D5F5FCD376C118031D1 /* SCTediumChallengeTests.m */; };
 		B821A91801D5240FC20CDE2E /* SCTrustedClockTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 2CB195EBF6CA0498C15AA308 /* SCTrustedClockTests.m */; };
 		BC46BB551807FC1DC7EABD25 /* org.eyebeam.selfcontrold.plist in Copy Daemon Launchd Plist */ = {isa = PBXBuildFile; fileRef = CB8086D524837734004B88BD /* org.eyebeam.selfcontrold.plist */; };
 		CB0385E119D77051004614B6 /* PreferencesAdvancedViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = CB0385DD19D77051004614B6 /* PreferencesAdvancedViewController.xib */; };
@@ -548,10 +551,12 @@
 /* Begin PBXFileReference section */
 		1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = /System/Library/Frameworks/Cocoa.framework; sourceTree = "<absolute>"; };
 		174D6F8397D738597F061C4B /* SCTrustedClock.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTrustedClock.m; sourceTree = "<group>"; };
+		1A6B721D82C89E70F4BBAE29 /* SCTediumChallenge.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTediumChallenge.h; sourceTree = "<group>"; };
 		22D9F1DE631F3AD0CAFAFD03 /* Pods-SelfControl.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SelfControl.debug.xcconfig"; path = "Pods/Target Support Files/Pods-SelfControl/Pods-SelfControl.debug.xcconfig"; sourceTree = "<group>"; };
 		29B97316FDCFA39411CA2CEA /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		29B97324FDCFA39411CA2CEA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = /System/Library/Frameworks/AppKit.framework; sourceTree = "<absolute>"; };
 		29B97325FDCFA39411CA2CEA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = /System/Library/Frameworks/Foundation.framework; sourceTree = "<absolute>"; };
+		29E44D5F5FCD376C118031D1 /* SCTediumChallengeTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTediumChallengeTests.m; sourceTree = "<group>"; };
 		2CB195EBF6CA0498C15AA308 /* SCTrustedClockTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTrustedClockTests.m; sourceTree = "<group>"; };
 		32CA4F630368D1EE00C91783 /* SelfControl_Prefix.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SelfControl_Prefix.pch; sourceTree = "<group>"; };
 		3A97FA0F4A3962A08CFEBC17 /* SCBlockEndVerifierTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCBlockEndVerifierTests.m; sourceTree = "<group>"; };
@@ -561,6 +566,7 @@
 		640D40CB16D6E962003034B3 /* it */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/Localizable.strings; sourceTree = "<group>"; };
 		640D40CC16D6E962003034B3 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		753FA509E7CA7437599F493B /* SCSNTPClient.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCSNTPClient.m; sourceTree = "<group>"; };
+		79957742827112D9CEEDAC30 /* SCTediumChallenge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTediumChallenge.m; sourceTree = "<group>"; };
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* SelfControl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SelfControl.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		949F9F8815B32EC6007B8B42 /* zh-Hans */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
@@ -1488,6 +1494,7 @@
 		D5E8B4627CAD0BF0737808C7 /* SCBlockEndVerifier.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCBlockEndVerifier.m; sourceTree = "<group>"; };
 		DE940A49BEB89B14CE248C70 /* SCSNTPClient.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCSNTPClient.h; sourceTree = "<group>"; };
 		EF40A558EA4A4D4E9BD3D7E6 /* SCSNTPClientTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCSNTPClientTests.m; sourceTree = "<group>"; };
+		F5A71400B896E293C975CD07 /* SCTediumConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTediumConfig.h; sourceTree = "<group>"; };
 		F5B8CBEC19EE21C30026F3A5 /* SCTimeIntervalFormatter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SCTimeIntervalFormatter.h; sourceTree = "<group>"; };
 		F5B8CBED19EE21C30026F3A5 /* SCTimeIntervalFormatter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SCTimeIntervalFormatter.m; sourceTree = "<group>"; };
 		FE967CA0C67035A80FB3F626 /* Pods-SelfControl-SelfControlTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SelfControl-SelfControlTests.debug.xcconfig"; path = "Pods/Target Support Files/Pods-SelfControl-SelfControlTests/Pods-SelfControl-SelfControlTests.debug.xcconfig"; sourceTree = "<group>"; };
@@ -1673,6 +1680,7 @@
 				EF40A558EA4A4D4E9BD3D7E6 /* SCSNTPClientTests.m */,
 				2CB195EBF6CA0498C15AA308 /* SCTrustedClockTests.m */,
 				3A97FA0F4A3962A08CFEBC17 /* SCBlockEndVerifierTests.m */,
+				29E44D5F5FCD376C118031D1 /* SCTediumChallengeTests.m */,
 			);
 			path = SelfControlTests;
 			sourceTree = "<group>";
@@ -1696,6 +1704,7 @@
 				CB62FC3924B124B900ADBC40 /* SCXPCClient.h */,
 				CB62FC3A24B124B900ADBC40 /* SCXPCClient.m */,
 				CB81AAB625B7E6C7006956F7 /* DeprecationSilencers.h */,
+				F5A71400B896E293C975CD07 /* SCTediumConfig.h */,
 			);
 			path = Common;
 			sourceTree = "<group>";
@@ -1779,6 +1788,8 @@
 				B7BC007A204A20A6EB746A87 /* SCTrustedClock.h */,
 				753FA509E7CA7437599F493B /* SCSNTPClient.m */,
 				174D6F8397D738597F061C4B /* SCTrustedClock.m */,
+				1A6B721D82C89E70F4BBAE29 /* SCTediumChallenge.h */,
+				79957742827112D9CEEDAC30 /* SCTediumChallenge.m */,
 			);
 			path = Utility;
 			sourceTree = "<group>";
@@ -3758,6 +3769,8 @@
 				804B13BC7121D0ED56402698 /* SCSNTPClientTests.m in Sources */,
 				B821A91801D5240FC20CDE2E /* SCTrustedClockTests.m in Sources */,
 				3919D4424655243AEB8401CB /* SCBlockEndVerifierTests.m in Sources */,
+				0C9F4B971321BEAF47EA415A /* SCTediumChallenge.m in Sources */,
+				B1AF949839F9E22BE3E5903D /* SCTediumChallengeTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3794,6 +3807,7 @@
 				6C06F1F2B32371963ACB0211 /* SCSNTPClient.m in Sources */,
 				8FCE76A275EF0E41D798B362 /* SCTrustedClock.m in Sources */,
 				7B22F65F8C9AF39C7B2AA7F0 /* SCBlockEndVerifier.m in Sources */,
+				1D6F3A5DF697E575B95E6389 /* SCTediumChallenge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
