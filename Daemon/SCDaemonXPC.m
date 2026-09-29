@@ -74,4 +74,33 @@
     reply(SELFCONTROL_VERSION_STRING);
 }
 
+- (void)startTediumChallengeWithAuthorization:(NSData*)authData reply:(void(^)(NSInteger digit, NSInteger progress, NSInteger requiredEntries, NSError* _Nullable error))reply {
+    NSLog(@"XPC method called: startTediumChallengeWithAuthorization");
+
+    NSError* error = [SCXPCAuthorization checkAuthorization: authData command: _cmd];
+    if (error != nil) {
+        if (![SCMiscUtilities errorIsAuthCanceled: error]) {
+            NSLog(@"ERROR: XPC authorization failed due to error %@", error);
+            [SCSentry captureError: error];
+        }
+        reply(0, 0, 0, error);
+        return;
+    } else {
+        NSLog(@"AUTHORIZATION ACCEPTED for startTediumChallenge with authData %@ and command %s", authData, sel_getName(_cmd));
+    }
+
+    [SCDaemonBlockMethods startTediumChallengeWithReply: reply];
+}
+
+// Note: no authorization check here, by design (see Authorization decision in
+// docs/superpowers/plans/2026-09-28-tedium-override.md). 300 entries can't
+// each prompt for a password; the XPC connection is already code-signature-
+// gated to our own signed app/CLI, submissions are rate-floored by the
+// daemon, and the challenge itself is the gate.
+- (void)submitTediumEntry:(NSInteger)digit reply:(void(^)(NSInteger outcome, NSInteger progress, NSInteger nextDigit, BOOL blockRemoved, NSError* _Nullable error))reply {
+    NSLog(@"XPC method called: submitTediumEntry");
+
+    [SCDaemonBlockMethods submitTediumEntry: digit reply: reply];
+}
+
 @end

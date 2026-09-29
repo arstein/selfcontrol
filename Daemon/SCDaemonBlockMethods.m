@@ -15,6 +15,8 @@
 #import "HostFileBlockerSet.h"
 #import "SCBlockEndVerifier.h"
 #import "SCTrustedClock.h"
+#import "SCTediumChallenge.h"
+#import "SCTediumConfig.h"
 
 NSTimeInterval METHOD_LOCK_TIMEOUT = 5.0;
 NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for checkups, because we'd prefer not to have tons pile up
@@ -24,6 +26,11 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
                    reading:(NSDictionary*)reading
                 generation:(NSUInteger)generation;
 @end
+
+// Single daemon-held tedium override challenge instance. All access is
+// serialized under daemonMethodLock (see startTediumChallengeWithReply: and
+// submitTediumEntry:reply:).
+static SCTediumChallenge* tediumChallenge = nil;
 
 @implementation SCDaemonBlockMethods
 
@@ -343,6 +350,7 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
             [SCSentry captureMessage: @"Checkup ran and no active block found! Removing block, tampering suspected..."];
 
             [SCHelperToolUtilities removeBlock];
+            [SCDaemonBlockMethods invalidateTediumChallenge];
 
             [SCHelperToolUtilities sendConfigurationChangedNotification];
         } else {
@@ -370,6 +378,7 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
             // A legacy block predating the fork has no trusted-clock state.
             NSLog(@"INFO: Legacy block expired; preserving upstream removal behavior.");
             [SCHelperToolUtilities removeBlock];
+            [SCDaemonBlockMethods invalidateTediumChallenge];
             [[SCDaemon sharedDaemon] stopCheckupTimer];
         } else {
             BOOL verificationNeeded = hasTrustedClock &&
@@ -438,6 +447,7 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
     if ([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
         NSLog(@"INFO: Block expiry verified against network time; removing block.");
         [SCHelperToolUtilities removeBlock];
+        [SCDaemonBlockMethods invalidateTediumChallenge];
         [[SCBlockEndVerifier sharedVerifier] reset];
         [[SCDaemon sharedDaemon] stopCheckupTimer];
         [SCSentry addBreadcrumb:@"Daemon verified and cleared expired block" category:@"daemon"];
@@ -501,6 +511,62 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
     }
     
     [self.daemonMethodLock unlock];
+}
+
++ (void)startTediumChallengeWithReply:(void(^)(NSInteger digit, NSInteger progress, NSInteger requiredEntries, NSError* _Nullable error))reply {
+    if (![SCDaemonBlockMethods lockOrTimeout: nil timeout: CHECKUP_LOCK_TIMEOUT]) {
+        reply(0, 0, 0, [SCErr errorWithCode: 320]); // busy; app may retry
+        return;
+    }
+    if (![SCBlockUtilities modernBlockIsRunning]) {
+        [self.daemonMethodLock unlock];
+        reply(0, 0, 0, [SCErr errorWithCode: 321]); // no block to override
+        return;
+    }
+    if (tediumChallenge == nil) {
+        tediumChallenge = [[SCTediumChallenge alloc] initWithRequiredEntries: SC_TEDIUM_REQUIRED_ENTRIES];
+        NSLog(@"INFO: Tedium override challenge started (%d entries required)", SC_TEDIUM_REQUIRED_ENTRIES);
+        [SCSentry addBreadcrumb: @"Tedium override challenge started" category: @"daemon"];
+    }
+    [tediumChallenge beginAtUptime: [NSProcessInfo processInfo].systemUptime];
+    reply(tediumChallenge.expectedDigit, tediumChallenge.progress, tediumChallenge.requiredEntries, nil);
+    [self.daemonMethodLock unlock];
+}
+
++ (void)submitTediumEntry:(NSInteger)digit reply:(void(^)(NSInteger outcome, NSInteger progress, NSInteger nextDigit, BOOL blockRemoved, NSError* _Nullable error))reply {
+    if (![SCDaemonBlockMethods lockOrTimeout: nil timeout: CHECKUP_LOCK_TIMEOUT]) {
+        reply(0, 0, 0, NO, [SCErr errorWithCode: 320]);
+        return;
+    }
+    if (tediumChallenge == nil || ![SCBlockUtilities modernBlockIsRunning]) {
+        tediumChallenge = nil;
+        [self.daemonMethodLock unlock];
+        reply(0, 0, 0, NO, [SCErr errorWithCode: 322]); // no active challenge/block
+        return;
+    }
+
+    SCTediumSubmitOutcome outcome = [tediumChallenge submitDigit: digit
+                                                        atUptime: [NSProcessInfo processInfo].systemUptime];
+    NSInteger progress = tediumChallenge.progress;
+    NSInteger nextDigit = tediumChallenge.expectedDigit;
+    BOOL removed = NO;
+
+    if (outcome == SCTediumSubmitComplete) {
+        NSLog(@"INFO: Tedium override completed (%ld entries); removing block.", (long)progress);
+        [SCSentry addBreadcrumb: @"Block removed via tedium override" category: @"daemon"];
+        [SCHelperToolUtilities removeBlock];
+        [[SCBlockEndVerifier sharedVerifier] reset];
+        [[SCDaemon sharedDaemon] stopCheckupTimer];
+        tediumChallenge = nil;
+        removed = YES;
+    }
+
+    reply(outcome, progress, nextDigit, removed, nil);
+    [self.daemonMethodLock unlock];
+}
+
++ (void)invalidateTediumChallenge {
+    tediumChallenge = nil;
 }
 
 @end

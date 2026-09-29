@@ -31,6 +31,16 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (void)checkBlockIntegrity;
 
+// Starts (or resumes) the tedium override challenge
++ (void)startTediumChallengeWithReply:(void(^)(NSInteger digit, NSInteger progress, NSInteger requiredEntries, NSError* _Nullable error))reply;
+
+// Submits one tedium override challenge entry
++ (void)submitTediumEntry:(NSInteger)digit reply:(void(^)(NSInteger outcome, NSInteger progress, NSInteger nextDigit, BOOL blockRemoved, NSError* _Nullable error))reply;
+
+// Invalidates any in-progress tedium challenge (called from every teardown
+// path in this file so a stale challenge can't outlive its block).
++ (void)invalidateTediumChallenge;
+
 @end
 
 NS_ASSUME_NONNULL_END
