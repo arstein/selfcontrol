@@ -45,6 +45,21 @@ NSFileHandle* appendFileHandle;
 	 "# org.eyebeam ruleset for SelfControl blocks\n"
 	 "#\n"];
 
+	// Fail-closed trusted timing: the time sources (SNTP) and DNS must always be
+	// reachable, in both blocklist and allowlist mode and no matter what block/pass
+	// rules follow below - otherwise a blocklist entry like a bare "*", a raw IP, or a
+	// wide CIDR range (e.g. an Apple or resolver range) could block UDP 123 and/or DNS,
+	// and an expired block could never be verified and lifted. "quick" makes these
+	// rules terminal: matching traffic is decided right here, and no later rule in
+	// this anchor (which otherwise follows pf's last-match-wins precedence) can
+	// override them. These are intentionally family-agnostic (no inet/inet6 keyword),
+	// matching the style of the other rules generated in this file.
+	[configText appendString: @"# fail-closed trusted timing: time sources and DNS must always be reachable\n"
+	 "pass out quick proto udp from any to any port 123\n"
+	 "pass out quick proto udp from any to any port 53\n"
+	 "pass out quick proto tcp from any to any port 53\n"
+	 "\n"];
+
 	if (isAllowlist) {
 		[configText appendString: @"block return out proto tcp from any to any\n"
 		 "block return out proto udp from any to any\n"
