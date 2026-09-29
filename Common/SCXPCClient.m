@@ -175,13 +175,34 @@
     SMAppService* daemonService =
         [SMAppService daemonServiceWithPlistName: @"org.eyebeam.selfcontrold.plist"];
 
-    // Unregister any prior registration so a rebuilt daemon binary is picked up
-    // (mirrors the old SMJobRemove-before-SMJobBless dance). Failure is expected
-    // when nothing was registered — ignore it.
-    NSError* unregisterErr = nil;
-    [daemonService unregisterAndReturnError: &unregisterErr];
-    if (unregisterErr != nil) {
-        NSLog(@"Note: unregister of existing daemon returned %@ (usually harmless)", unregisterErr);
+    // Act on the service's current status rather than unconditionally
+    // unregistering and re-registering. unregisterAndReturnError: settles
+    // ASYNCHRONOUSLY inside smd, so calling registerAndReturnError: right after
+    // it races that teardown and intermittently fails with "Operation not
+    // permitted" (EPERM) — the error clears on a retry once the unregister has
+    // settled. The unconditional unregister also needlessly tears down an
+    // already-running daemon (and could strand a running block). installDaemon:
+    // runs on every block start, so this path must be idempotent and cheap.
+    //
+    // Dev note: since we don't re-register when already enabled, a rebuilt
+    // daemon binary is only picked up when the daemon process next relaunches
+    // (it execs from the bundle path). During development, bootout the daemon
+    // after reinstalling the app to force it onto a fresh binary.
+    switch (daemonService.status) {
+        case SMAppServiceStatusEnabled:
+            NSLog(@"Daemon already registered and enabled; nothing to do.");
+            callback(nil);
+            return;
+
+        case SMAppServiceStatusRequiresApproval:
+            NSLog(@"Daemon registration requires approval in System Settings; opening it");
+            [SMAppService openSystemSettingsLoginItems];
+            callback([SCErr errorWithCode: 500 subDescription: @"SelfControl's helper needs your approval in System Settings > General > Login Items. Enable it, then try again."]);
+            return;
+
+        default:
+            // SMAppServiceStatusNotRegistered / NotFound: fall through to register.
+            break;
     }
 
     NSError* registerErr = nil;
