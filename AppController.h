@@ -22,6 +22,7 @@
 
 // Forward declaration to avoid compiler weirdness
 @class TimerWindowController;
+@class SCXPCClient;
 
 #import <Cocoa/Cocoa.h>
 #import "DomainListWindowController.h"
@@ -56,6 +57,11 @@
 }
 
 @property (assign) BOOL addingBlock;
+
+// Shared daemon XPC connection. Exposed read-only so other app-side window
+// controllers (e.g. SCTediumWindowController) can reuse the same connection
+// instead of opening their own.
+@property (atomic, strong, readonly) SCXPCClient* xpc;
 
 // Called when the block duration slider is moved.  Updates the label that gives
 // the block duration in words (hours and minutes).
@@ -130,5 +136,10 @@
 
 // opens the SelfControl Support Hub in the default browser
 - (IBAction)openSupportHub:(id)sender;
+
+// Opens (creating if necessary) the tedium override challenge panel and
+// starts/resumes its daemon-held session. Only enabled (see
+// -validateMenuItem:) while a block is running.
+- (IBAction)openTediumOverride:(id)sender;
 
 @end

@@ -31,10 +31,12 @@
 #import "SCXPCClient.h"
 #import "SCBlockFileReaderWriter.h"
 #import "SCUIUtilities.h"
+#import "SCTediumWindowController.h"
 
 @interface AppController () {}
 
 @property (atomic, strong, readwrite) SCXPCClient* xpc;
+@property (nonatomic, strong) SCTediumWindowController* tediumWindowController;
 
 @end
 
@@ -415,6 +417,8 @@
                                        keyPath: @"values.BlockDuration"];
     
     blocklistTeaserLabel_.stringValue = [SCUIUtilities blockTeaserStringWithMaxLength: 60];
+
+    [self setUpTediumMenuItem];
 
 	[self refreshUserInterface];
     
@@ -801,5 +805,43 @@
     [[NSWorkspace sharedWorkspace] openURL: url];
 }
 
+// Appends the tedium override menu item (after a separator) to the menu
+// that already hosts our other block-related, non-toolbar commands
+// (Open/Save Blocklist live in the File menu). Programmatic - no xib edits.
+- (void)setUpTediumMenuItem {
+    NSMenu* mainMenu = [NSApp mainMenu];
+    NSMenuItem* fileMenuItem = [mainMenu itemWithTitle: @"File"];
+    // fall back to positional lookup in case the title's been localized
+    if (fileMenuItem == nil && mainMenu.itemArray.count > 1) {
+        fileMenuItem = mainMenu.itemArray[1];
+    }
+    NSMenu* fileMenu = fileMenuItem.submenu;
+    if (fileMenu == nil) {
+        NSLog(@"WARNING: Couldn't find File menu to attach tedium override menu item.");
+        return;
+    }
+
+    NSMenuItem* tediumItem = [[NSMenuItem alloc] initWithTitle: NSLocalizedString(@"Tedious Override…", @"menu item that opens the tedium override challenge")
+                                                         action: @selector(openTediumOverride:)
+                                                  keyEquivalent: @""];
+    tediumItem.target = self;
+    [fileMenu addItem: [NSMenuItem separatorItem]];
+    [fileMenu addItem: tediumItem];
+}
+
+- (IBAction)openTediumOverride:(id)sender {
+    [SCSentry addBreadcrumb: @"Opening tedium override" category:@"app"];
+    if (self.tediumWindowController == nil) {
+        self.tediumWindowController = [[SCTediumWindowController alloc] init];
+    }
+    [self.tediumWindowController beginChallenge];
+}
+
+- (BOOL)validateMenuItem:(NSMenuItem*)menuItem {
+    if (menuItem.action == @selector(openTediumOverride:)) {
+        return [SCUIUtilities blockIsRunning];
+    }
+    return YES;
+}
 
 @end

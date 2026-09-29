@@ -16,16 +16,19 @@ end
 common = group_named(project.main_group, 'Common')
 utility = group_named(common, 'Utility')
 tests = group_named(project.main_group, 'SelfControlTests')
-abort('expected project groups not found') unless common && utility && tests
+app_classes = group_named(project.main_group, 'App Classes')
+abort('expected project groups not found') unless common && utility && tests && app_classes
 
 files = {
   'Common/Utility/SCTediumChallenge.m' => [utility, %w[org.eyebeam.selfcontrold SelfControlTests]],
   'SelfControlTests/SCTediumChallengeTests.m' => [tests, %w[SelfControlTests]],
+  'SCTediumWindowController.m' => [app_classes, %w[SelfControl]],
 }
 
 header_groups = {
   'Common/SCTediumConfig.h' => common,
   'Common/Utility/SCTediumChallenge.h' => utility,
+  'SCTediumWindowController.h' => app_classes,
 }
 
 all_refs = project.files
