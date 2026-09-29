@@ -12,6 +12,7 @@
 #import "SCFileWatcher.h"
 #import "SCTrustedClock.h"
 #import <Security/Security.h>
+#import <signal.h>
 
 static NSString* serviceName = @"org.eyebeam.selfcontrold";
 float const INACTIVITY_LIMIT_SECS = 60 * 2; // 2 minutes
@@ -32,7 +33,27 @@ float const INACTIVITY_LIMIT_SECS = 60 * 2; // 2 minutes
 
 @property (nonatomic, strong) SCFileWatcher* hostsFileWatcher;
 
+// Dispatch signal sources for the clean-shutdown checkpoint flush. Retained on
+// strong properties because a dispatch source stops firing if it is released.
+@property (strong) dispatch_source_t sigtermSource;
+@property (strong) dispatch_source_t sigintSource;
+
 @end
+
+// Create a dispatch source that catches `sig` and runs `handler` on queue `q`.
+//
+// signal(sig, SIG_IGN) first: we take the signal away from the default
+// (process-terminating) disposition so the dispatch source receives it. The
+// event handler runs on a normal GCD queue -- NOT in async-signal context -- so
+// it is safe to do real work (SCSettings I/O) there. Nothing is done in signal
+// context itself.
+static dispatch_source_t SCMakeSignalSource(int sig, dispatch_queue_t q, dispatch_block_t handler) {
+    signal(sig, SIG_IGN);
+    dispatch_source_t src = dispatch_source_create(DISPATCH_SOURCE_TYPE_SIGNAL, sig, 0, q);
+    dispatch_source_set_event_handler(src, handler);
+    dispatch_resume(src);
+    return src;
+}
 
 @implementation SCDaemon
 
@@ -97,6 +118,39 @@ float const INACTIVITY_LIMIT_SECS = 60 * 2; // 2 minutes
             [SCDaemonBlockMethods checkBlockIntegrity];
         }
     }];
+
+    // Best-effort clean-shutdown flush: on SIGTERM/SIGINT write one final
+    // trusted-clock checkpoint so a graceful stop loses ~0 elapsed time instead
+    // of up to one checkpoint interval. Installed exactly once, here at daemon
+    // startup (this is -start, the daemon's run entry called from DaemonMain).
+    // The dispatch-source handler runs on the main queue -- a normal GCD queue,
+    // NOT async-signal context -- so the SCSettings write it performs is safe.
+    //
+    // If launchd delivers SIGKILL (uncatchable) on some shutdowns, the flush
+    // simply doesn't run and Phase-1 fail-closed behavior applies (elapsed time
+    // is only ever under-counted, never over-counted). That is acceptable: this
+    // is purely a best-effort improvement.
+    __weak typeof(self) weakSelf = self;
+    self.sigtermSource = SCMakeSignalSource(SIGTERM, dispatch_get_main_queue(), ^{
+        [weakSelf flushTrustedClockCheckpoint];
+        exit(0);
+    });
+    self.sigintSource = SCMakeSignalSource(SIGINT, dispatch_get_main_queue(), ^{
+        [weakSelf flushTrustedClockCheckpoint];
+        exit(0);
+    });
+}
+
+// Writes one monotonic trusted-clock checkpoint. Safe to call from the daemon's
+// normal queue only (it does real settings I/O) -- NOT from signal context.
+- (void)flushTrustedClockCheckpoint {
+    SCSettings* settings = [SCSettings sharedSettings];
+    NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
+    if (clockState.count > 0) {
+        [settings setValue:[SCTrustedClock checkpointState:clockState reading:[SCTrustedClock currentReading]]
+                    forKey:@"TrustedClockState"];
+        [settings syncSettingsAndWait:2];
+    }
 }
 
 - (void)startCheckupTimer {
