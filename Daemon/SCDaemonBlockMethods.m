@@ -20,6 +20,7 @@
 #import "SCEnforcementDecision.h"
 #import "SCEnforcementConfig.h"
 #import "SCOverrideDecision.h"
+#import "SCOverrideConfig.h"
 
 NSTimeInterval METHOD_LOCK_TIMEOUT = 5.0;
 NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for checkups, because we'd prefer not to have tons pile up
@@ -33,6 +34,7 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
                         generation:(NSUInteger)generation;
 + (NSDate*)overrideEndDateFromSettings:(SCSettings*)settings
                            outStateOut:(NSDictionary**)outState;
++ (NSTimeZone*)activationTimeZoneFromSettings:(SCSettings*)settings;
 @end
 
 // Single daemon-held tedium override challenge instance. All access is
@@ -142,8 +144,10 @@ static SCTediumChallenge* tediumChallenge = nil;
     NSInteger overrideMinutes = [blockSettings[@"OverrideMinutes"] integerValue];
     [settings setValue:@{ @"perDay": @(overridePerDay), @"minutes": @(overrideMinutes) }
                 forKey:@"OverridePolicy"];
-    NSString* today = [SCOverrideDecision dayStringForDate:[NSDate date]
-                                                  timeZone:[NSTimeZone systemTimeZone]];
+    NSString* activationTZName = [NSTimeZone systemTimeZone].name;
+    [settings setValue:activationTZName forKey:@"ActivationTimeZone"];
+    NSTimeZone* activationZone = [NSTimeZone timeZoneWithName:activationTZName] ?: [NSTimeZone timeZoneForSecondsFromGMT:0];
+    NSString* today = [SCOverrideDecision dayStringForDate:[NSDate date] timeZone:activationZone];
     [settings setValue:@{ @"remainingToday": @(overridePerDay),
                           @"lastResetDay": today }
                 forKey:@"OverrideState"];
@@ -352,6 +356,15 @@ static SCTediumChallenge* tediumChallenge = nil;
     return [end isKindOfClass:[NSDate class]] ? end : nil;
 }
 
+// The block's pinned override/reset timezone (captured at block start). Never
+// the live system zone (that would let a TZ change move the reset boundary);
+// falls back to UTC when unset.
++ (NSTimeZone*)activationTimeZoneFromSettings:(SCSettings*)settings {
+    id name = [settings valueForKey:@"ActivationTimeZone"];
+    NSTimeZone* tz = [name isKindOfClass:[NSString class]] ? [NSTimeZone timeZoneWithName:name] : nil;
+    return tz ?: [NSTimeZone timeZoneForSecondsFromGMT:0];
+}
+
 + (void)checkupBlock {
     if (![SCDaemonBlockMethods lockOrTimeout: nil timeout: CHECKUP_LOCK_TIMEOUT]) {
         return;
@@ -390,25 +403,36 @@ static SCTediumChallenge* tediumChallenge = nil;
     BOOL needsReVerification = [settings boolForKey:@"TrustedClockNeedsVerification"];
 
     // --- Override overlay (Phase 4): resolve fail-closed active state. ---
+    // Fail-closed requires a genuinely ANCHORED trusted clock: trustedNowForState:
+    // silently returns the raw system wall clock when wallAnchor is absent, so a
+    // non-nil trustedNow is NOT by itself a trust signal. Require wallAnchor, and
+    // bound the lift so a corrupt/oversized overrideEndDate cannot lift indefinitely.
     NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState
                                                     reading:[SCTrustedClock currentReading]];
     NSDate* overrideEndDate = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:NULL];
-    BOOL overrideActive = [SCOverrideDecision overrideActiveWithTrustedNow:trustedNow
-                                                          overrideEndDate:overrideEndDate];
+    BOOL clockAnchored = [clockState isKindOfClass:[NSDictionary class]] && clockState[@"wallAnchor"] != nil;
+    NSTimeInterval liftRemaining = (trustedNow != nil && overrideEndDate != nil)
+        ? [overrideEndDate timeIntervalSinceDate:trustedNow] : -1;
+    BOOL withinLiftBound = (liftRemaining >= 0) && (liftRemaining <= SC_OVERRIDE_MAX_LIFT_SECS);
+    BOOL overrideActive = clockAnchored && withinLiftBound &&
+        [SCOverrideDecision overrideActiveWithTrustedNow:trustedNow overrideEndDate:overrideEndDate];
 
     // Opportunistic midnight reset of the daily override counter. Only ever
     // performed against trustedNow (never the local wall clock), so a forward
     // wall-clock roll cannot trigger an early reset.
-    if (trustedNow != nil) {
+    if (trustedNow != nil && clockAnchored) {
         NSDictionary* ovState = nil;
         [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:&ovState];
         NSDictionary* policy = [settings valueForKey:@"OverridePolicy"];
         if ([ovState isKindOfClass:[NSDictionary class]] && [policy isKindOfClass:[NSDictionary class]]) {
             NSInteger perDay = [policy[@"perDay"] integerValue];
-            NSString* today = [SCOverrideDecision dayStringForDate:trustedNow timeZone:[NSTimeZone systemTimeZone]];
+            NSTimeZone* zone = [SCDaemonBlockMethods activationTimeZoneFromSettings:settings];
+            NSString* today = [SCOverrideDecision dayStringForDate:trustedNow timeZone:zone];
+            id lastReset = ovState[@"lastResetDay"];
+            NSString* lastResetStr = [lastReset isKindOfClass:[NSString class]] ? lastReset : nil;
             NSInteger newRemaining = 0;
             if ([SCOverrideDecision resetForVerifiedDay:today
-                                           lastResetDay:ovState[@"lastResetDay"]
+                                           lastResetDay:lastResetStr
                                                  perDay:perDay
                                         outNewRemaining:&newRemaining]) {
                 NSMutableDictionary* updated = [ovState mutableCopy];
