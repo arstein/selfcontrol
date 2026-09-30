@@ -1117,8 +1117,12 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     remaining2 -= 1;
     NSTimeInterval liftSecs = MIN(minutes2 * 60.0, SC_OVERRIDE_MAX_LIFT_SECS);
     NSDate* end = [trustedNow2 dateByAddingTimeInterval:liftSecs];
+    // lastResetDay never moves backwards (a wall-clock-seeded future day stays).
+    NSString* storedResetDay = [ovState2[@"lastResetDay"] isKindOfClass:[NSString class]] ? ovState2[@"lastResetDay"] : nil;
+    NSString* committedResetDay = (storedResetDay != nil && [storedResetDay compare:verifiedDay] == NSOrderedDescending)
+        ? storedResetDay : verifiedDay;
     [settings setValue:@{ @"remainingToday": @(remaining2),
-                          @"lastResetDay": verifiedDay,
+                          @"lastResetDay": committedResetDay,
                           @"overrideEndDate": end }
                 forKey:@"OverrideState"];
     NSError* syncError = [settings syncSettingsAndWait:5];
@@ -1140,24 +1144,32 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
 // overlay computation (see checkupBlock) so the UI's notion of "active" and
 // "remaining" always matches enforcement.
 + (void)getOverrideStatusWithReply:(void(^)(BOOL blockRunning, BOOL overrideActive, double overrideRemainingSecs, NSInteger remainingToday, NSInteger perDay))reply {
-    BOOL blockRunning = [SCBlockUtilities modernBlockIsRunning];
     SCSettings* settings = [SCSettings sharedSettings];
+    BOOL blockRunning, overrideActive;
+    NSTimeInterval remainingSecs;
+    NSInteger remainingToday, perDay;
 
-    NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
-    NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState reading:[SCTrustedClock currentReading]];
-    BOOL clockAnchored = [clockState isKindOfClass:[NSDictionary class]] && clockState[@"wallAnchor"] != nil;
+    // No daemonMethodLock, but hold SCSettings' own (brief, recursive) monitor so
+    // this frequent poll can't read the settings dictionary mid-mutation/reload.
+    @synchronized (settings) {
+        blockRunning = [SCBlockUtilities modernBlockIsRunning];
 
-    NSDictionary* ovState = nil;
-    NSDate* overrideEndDate = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:&ovState];
-    NSTimeInterval remainingSecs = [SCOverrideDecision liftRemainingSecsWithTrustedNow:trustedNow
-                                                                        overrideEndDate:overrideEndDate
-                                                                          clockAnchored:clockAnchored
-                                                                            maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS];
-    BOOL overrideActive = remainingSecs > 0;
+        NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
+        NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState reading:[SCTrustedClock currentReading]];
+        BOOL clockAnchored = [clockState isKindOfClass:[NSDictionary class]] && clockState[@"wallAnchor"] != nil;
 
-    NSInteger remainingToday = [ovState isKindOfClass:[NSDictionary class]] ? [ovState[@"remainingToday"] integerValue] : 0;
-    NSDictionary* policy = [settings valueForKey:@"OverridePolicy"];
-    NSInteger perDay = [policy isKindOfClass:[NSDictionary class]] ? [policy[@"perDay"] integerValue] : 0;
+        NSDictionary* ovState = nil;
+        NSDate* overrideEndDate = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:&ovState];
+        remainingSecs = [SCOverrideDecision liftRemainingSecsWithTrustedNow:trustedNow
+                                                            overrideEndDate:overrideEndDate
+                                                              clockAnchored:clockAnchored
+                                                                maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS];
+        overrideActive = remainingSecs > 0;
+
+        remainingToday = [ovState isKindOfClass:[NSDictionary class]] ? [ovState[@"remainingToday"] integerValue] : 0;
+        NSDictionary* policy = [settings valueForKey:@"OverridePolicy"];
+        perDay = [policy isKindOfClass:[NSDictionary class]] ? [policy[@"perDay"] integerValue] : 0;
+    }
 
     reply(blockRunning, overrideActive, remainingSecs, remainingToday, perDay);
 }

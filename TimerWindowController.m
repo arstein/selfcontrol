@@ -778,7 +778,7 @@ static const CGFloat kOverrideWindowGrowth = 56.0;
     BOOL hasStoredEndDate = [endVal isKindOfClass: [NSDate class]];
 
     if (hasStoredEndDate) {
-        self.overrideStatusLabel_.stringValue = NSLocalizedString(@"Override active — checking…", @"Shown while waiting for the daemon to confirm override status");
+        self.overrideStatusLabel_.stringValue = NSLocalizedString(@"Override status — checking…", @"Shown while waiting for the daemon to confirm override status");
         self.overrideStatusLabel_.hidden = NO;
     } else {
         self.overrideStatusLabel_.hidden = YES;
