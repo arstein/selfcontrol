@@ -1,0 +1,50 @@
+#import "SCOverrideDecision.h"
+
+@implementation SCOverrideDecision
+
++ (BOOL)overrideActiveWithTrustedNow:(NSDate*)trustedNow
+                     overrideEndDate:(NSDate*)overrideEndDate {
+    if (trustedNow == nil || overrideEndDate == nil) return NO;
+    return [trustedNow compare:overrideEndDate] == NSOrderedAscending;
+}
+
++ (BOOL)resetForVerifiedDay:(NSString*)verifiedDay
+               lastResetDay:(NSString*)lastResetDay
+                     perDay:(NSInteger)perDay
+            outNewRemaining:(NSInteger*)outNewRemaining {
+    if (verifiedDay != nil && (lastResetDay == nil || ![verifiedDay isEqualToString:lastResetDay])) {
+        if (outNewRemaining != NULL) *outNewRemaining = perDay;
+        return YES;
+    }
+    return NO;
+}
+
++ (SCOverrideInvokeResult)invokeAllowedWithBaseEnforcing:(BOOL)baseEnforcing
+                                              deepActive:(BOOL)deepActive
+                                           alreadyActive:(BOOL)alreadyActive
+                                            policyPerDay:(NSInteger)policyPerDay
+                                          remainingToday:(NSInteger)remainingToday {
+    if (!baseEnforcing) return SCOverrideInvokeDenyNoActiveBlock;
+    if (alreadyActive)  return SCOverrideInvokeDenyAlreadyActive;
+    if (deepActive)     return SCOverrideInvokeDenyDuringDeepBlock;
+    if (policyPerDay <= 0) return SCOverrideInvokeDenyNotAllowed;
+    if (remainingToday <= 0) return SCOverrideInvokeDenyExhausted;
+    return SCOverrideInvokeAllowed;
+}
+
++ (NSString*)dayStringForDate:(NSDate*)date timeZone:(NSTimeZone*)tz {
+    static NSDateFormatter* fmt;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        fmt = [[NSDateFormatter alloc] init];
+        fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+        fmt.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
+        fmt.dateFormat = @"yyyy-MM-dd";
+    });
+    @synchronized (fmt) {
+        fmt.timeZone = (tz != nil) ? tz : [NSTimeZone systemTimeZone];
+        return [fmt stringFromDate:date];
+    }
+}
+
+@end
