@@ -19,6 +19,7 @@
 #import "SCTediumConfig.h"
 #import "SCEnforcementDecision.h"
 #import "SCEnforcementConfig.h"
+#import "SCOverrideDecision.h"
 
 NSTimeInterval METHOD_LOCK_TIMEOUT = 5.0;
 NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for checkups, because we'd prefer not to have tons pile up
@@ -133,6 +134,17 @@ static SCTediumChallenge* tediumChallenge = nil;
     [settings setValue: blockSettings[@"BlockSoundShouldPlay"] forKey: @"BlockSoundShouldPlay"];
     [settings setValue: blockSettings[@"BlockSound"] forKey: @"BlockSound"];
     [settings setValue: blockSettings[@"EnableErrorReporting"] forKey: @"EnableErrorReporting"];
+
+    // --- Override policy + initial state (Phase 4) ---
+    NSInteger overridePerDay = [blockSettings[@"OverridePerDay"] integerValue];
+    NSInteger overrideMinutes = [blockSettings[@"OverrideMinutes"] integerValue];
+    [settings setValue:@{ @"perDay": @(overridePerDay), @"minutes": @(overrideMinutes) }
+                forKey:@"OverridePolicy"];
+    NSString* today = [SCOverrideDecision dayStringForDate:[NSDate date]
+                                                  timeZone:[NSTimeZone systemTimeZone]];
+    [settings setValue:@{ @"remainingToday": @(overridePerDay),
+                          @"lastResetDay": today }
+                forKey:@"OverrideState"];
 
     if ((filteredBlocklist.count <= 0 && !isAllowlist) || [SCBlockUtilities currentBlockIsExpired]) {
         NSLog(@"ERROR: Blocklist is empty, or block end date is in the past");

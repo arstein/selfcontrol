@@ -667,7 +667,9 @@ static void* AppControllerMaxBlockLengthContext = &AppControllerMaxBlockLengthCo
                                                                 @"IncludeLinkedDomains": [self->defaults_ valueForKey: @"IncludeLinkedDomains"],
                                                                 @"BlockSoundShouldPlay": [self->defaults_ valueForKey: @"BlockSoundShouldPlay"],
                                                                 @"BlockSound": [self->defaults_ valueForKey: @"BlockSound"],
-                                                                @"EnableErrorReporting": [self->defaults_ valueForKey: @"EnableErrorReporting"]
+                                                                @"EnableErrorReporting": [self->defaults_ valueForKey: @"EnableErrorReporting"],
+                                                                @"OverridePerDay": [self->defaults_ valueForKey: @"OverridePerDay"],
+                                                                @"OverrideMinutes": [self->defaults_ valueForKey: @"OverrideMinutes"]
                                                             }
                                                      reply:^(NSError * _Nonnull error) {
                         if (error != nil) {

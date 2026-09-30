@@ -6,6 +6,7 @@
 //
 
 #import "SCConstants.h"
+#import "SCOverrideConfig.h"
 
 OSStatus const AUTH_CANCELLED_STATUS = -60006;
 
@@ -48,6 +49,8 @@ OSStatus const AUTH_CANCELLED_STATUS = -60006;
             @"TimerWindowFloats": @NO,
             @"BadgeApplicationIcon": @YES,
             @"BlockDuration": @1,
+            @"OverridePerDay": @(SC_OVERRIDE_DEFAULT_PER_DAY),
+            @"OverrideMinutes": @(SC_OVERRIDE_DEFAULT_MINUTES),
             @"MaxBlockLength": @1440,
             @"WhitelistAlertSuppress": @NO,
             @"GetStartedShown": @NO,

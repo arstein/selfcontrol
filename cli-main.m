@@ -136,7 +136,9 @@ int main(int argc, char* argv[]) {
                 @"IncludeLinkedDomains": defaultsDict[@"IncludeLinkedDomains"],
                 @"BlockSoundShouldPlay": defaultsDict[@"BlockSoundShouldPlay"],
                 @"BlockSound": defaultsDict[@"BlockSound"],
-                @"EnableErrorReporting": defaultsDict[@"EnableErrorReporting"]
+                @"EnableErrorReporting": defaultsDict[@"EnableErrorReporting"],
+                @"OverridePerDay": defaultsDict[@"OverridePerDay"],
+                @"OverrideMinutes": defaultsDict[@"OverrideMinutes"]
             };
             blockSettings = [blockSettingsFromDefaults mutableCopy];
 
