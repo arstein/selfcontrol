@@ -21,6 +21,7 @@
 #import "SCEnforcementConfig.h"
 #import "SCOverrideDecision.h"
 #import "SCOverrideConfig.h"
+#import "SCSNTPClient.h"
 
 NSTimeInterval METHOD_LOCK_TIMEOUT = 5.0;
 NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for checkups, because we'd prefer not to have tons pile up
@@ -35,6 +36,24 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
 + (NSDate*)overrideEndDateFromSettings:(SCSettings*)settings
                            outStateOut:(NSDictionary**)outState;
 + (NSTimeZone*)activationTimeZoneFromSettings:(SCSettings*)settings;
+// Applies a verified-time trusted-timing decision (and, if verified-expired,
+// removes the block). Caller holds daemonMethodLock and has already checked
+// modernBlockIsRunning + verifier generation. Does NOT sync or notify, except
+// what removeBlock itself does. Returns NO (nothing written) when the decision
+// could not be computed.
++ (BOOL)applyVerifiedTime:(NSDate*)verifiedNow
+                  reading:(NSDictionary*)reading
+                 settings:(SCSettings*)settings
+           didRemoveBlock:(BOOL*)outRemoved
+           startCorrected:(BOOL*)outCorrected;
+// YES iff an anchored trustedNow indicates the daily override ration is due to
+// reset. Detection only; writes nothing.
++ (BOOL)overrideResetPendingForTrustedNow:(NSDate*)trustedNow
+                            clockAnchored:(BOOL)anchored
+                                 settings:(SCSettings*)settings;
+// Applies the daily ration reset against VERIFIED time. Writes OverrideState
+// (no sync). Returns YES iff a reset was written.
++ (BOOL)applyOverrideResetForVerifiedNow:(NSDate*)verifiedNow settings:(SCSettings*)settings;
 @end
 
 // Single daemon-held tedium override challenge instance. All access is
@@ -416,32 +435,13 @@ static SCTediumChallenge* tediumChallenge = nil;
                                                                  clockAnchored:clockAnchored
                                                                    maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS] > 0;
 
-    // Opportunistic midnight reset of the daily override counter. Only ever
-    // performed against trustedNow (never the local wall clock), so a forward
-    // wall-clock roll cannot trigger an early reset.
-    if (trustedNow != nil && clockAnchored) {
-        NSDictionary* ovState = nil;
-        [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:&ovState];
-        NSDictionary* policy = [settings valueForKey:@"OverridePolicy"];
-        if ([ovState isKindOfClass:[NSDictionary class]] && [policy isKindOfClass:[NSDictionary class]]) {
-            NSInteger perDay = [policy[@"perDay"] integerValue];
-            NSTimeZone* zone = [SCDaemonBlockMethods activationTimeZoneFromSettings:settings];
-            NSString* today = [SCOverrideDecision dayStringForDate:trustedNow timeZone:zone];
-            id lastReset = ovState[@"lastResetDay"];
-            NSString* lastResetStr = [lastReset isKindOfClass:[NSString class]] ? lastReset : nil;
-            NSInteger newRemaining = 0;
-            if ([SCOverrideDecision resetForVerifiedDay:today
-                                           lastResetDay:lastResetStr
-                                                 perDay:perDay
-                                        outNewRemaining:&newRemaining]) {
-                NSMutableDictionary* updated = [ovState mutableCopy];
-                updated[@"remainingToday"] = @(newRemaining);
-                updated[@"lastResetDay"] = today;
-                [settings setValue:updated forKey:@"OverrideState"];
-                [settings syncSettingsAndWait:5];
-                [SCHelperToolUtilities sendConfigurationChangedNotification];
-            }
-        }
+    // Midnight reset must be driven by VERIFIED time (master spec §4). trustedNow advances
+    // monotonically offline, so it may only DETECT that a reset is due; the reset itself is
+    // applied in handleVerifiedTime: from a live fetch. Offline => the reset waits.
+    if (modernRunning && [SCDaemonBlockMethods overrideResetPendingForTrustedNow:trustedNow clockAnchored:clockAnchored settings:settings]) {
+        [[SCBlockEndVerifier sharedVerifier] requestVerificationWithCompletion:^(NSDate* v, NSDictionary* r, NSUInteger g) {
+            [SCDaemonBlockMethods handleVerifiedTime:v reading:r generation:g];
+        }];
     }
 
     SCEnforcementAction action =
@@ -579,23 +579,55 @@ static SCTediumChallenge* tediumChallenge = nil;
         return;
     }
 
+    SCSettings* settings = [SCSettings sharedSettings];
+    BOOL removed = NO;
+    BOOL correctedStart = NO;
+    if (![SCDaemonBlockMethods applyVerifiedTime:verifiedNow
+                                         reading:reading
+                                        settings:settings
+                                  didRemoveBlock:&removed
+                                  startCorrected:&correctedStart]) {
+        [self.daemonMethodLock unlock];
+        return;
+    }
+
+    if (!removed) {
+        // Verified time in hand: this is the ONLY place the daily override
+        // ration resets (the checkup merely detects that one is due).
+        BOOL resetApplied = [SCDaemonBlockMethods applyOverrideResetForVerifiedNow:verifiedNow settings:settings];
+        if (resetApplied) NSLog(@"INFO: Daily override ration reset against verified network time.");
+        NSError* syncError = [settings syncSettingsAndWait:5];
+        if (syncError != nil) NSLog(@"WARNING: failed to persist verified time: %@", syncError);
+        if (correctedStart || resetApplied) [SCHelperToolUtilities sendConfigurationChangedNotification];
+    }
+
+    [self.daemonMethodLock unlock];
+}
+
++ (BOOL)applyVerifiedTime:(NSDate*)verifiedNow
+                  reading:(NSDictionary*)reading
+                 settings:(SCSettings*)settings
+           didRemoveBlock:(BOOL*)outRemoved
+           startCorrected:(BOOL*)outCorrected {
+    if (outRemoved != NULL) *outRemoved = NO;
+    if (outCorrected != NULL) *outCorrected = NO;
+
     NSDictionary* decision = [SCBlockUtilities
         trustedTimingDecisionForSettings:[SCBlockUtilities trustedTimingSettingsSnapshot]
                              verifiedNow:verifiedNow
                                  reading:reading];
     if (decision == nil) {
         NSLog(@"WARNING: Verified network time received, but trusted-timing state is incomplete; keeping block.");
-        [self.daemonMethodLock unlock];
-        return;
+        return NO;
     }
 
-    SCSettings* settings = [SCSettings sharedSettings];
     NSDictionary* writes = decision[SCTrustedTimingSettingsWritesKey];
     for (NSString* key in writes) {
         [settings setValue:writes[key] forKey:key];
     }
     BOOL correctedStart = [decision[SCTrustedTimingStartWasCorrectedKey] boolValue];
     if (correctedStart) NSLog(@"INFO: Corrected block start against verified network time.");
+    if (outCorrected != NULL) *outCorrected = correctedStart;
 
     if ([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
         NSLog(@"INFO: Block expiry verified against network time; removing block.");
@@ -604,13 +636,51 @@ static SCTediumChallenge* tediumChallenge = nil;
         [[SCBlockEndVerifier sharedVerifier] reset];
         [[SCDaemon sharedDaemon] stopCheckupTimer];
         [SCSentry addBreadcrumb:@"Daemon verified and cleared expired block" category:@"daemon"];
-    } else {
-        NSError* syncError = [settings syncSettingsAndWait:5];
-        if (syncError != nil) NSLog(@"WARNING: failed to persist verified time: %@", syncError);
-        if (correctedStart) [SCHelperToolUtilities sendConfigurationChangedNotification];
+        if (outRemoved != NULL) *outRemoved = YES;
     }
+    return YES;
+}
 
-    [self.daemonMethodLock unlock];
++ (BOOL)overrideResetPendingForTrustedNow:(NSDate*)trustedNow
+                            clockAnchored:(BOOL)anchored
+                                 settings:(SCSettings*)settings {
+    if (trustedNow == nil || !anchored) return NO;
+    NSDictionary* ovState = [settings valueForKey:@"OverrideState"];
+    NSDictionary* policy = [settings valueForKey:@"OverridePolicy"];
+    if (![ovState isKindOfClass:[NSDictionary class]] || ![policy isKindOfClass:[NSDictionary class]]) return NO;
+    NSString* day = [SCOverrideDecision dayStringForDate:trustedNow
+                                                timeZone:[SCDaemonBlockMethods activationTimeZoneFromSettings:settings]];
+    id lastReset = ovState[@"lastResetDay"];
+    NSString* lastResetStr = [lastReset isKindOfClass:[NSString class]] ? lastReset : nil;
+    NSInteger tmp = 0;
+    return [SCOverrideDecision resetForVerifiedDay:day
+                                      lastResetDay:lastResetStr
+                                            perDay:[policy[@"perDay"] integerValue]
+                                   outNewRemaining:&tmp];
+}
+
++ (BOOL)applyOverrideResetForVerifiedNow:(NSDate*)verifiedNow settings:(SCSettings*)settings {
+    if (verifiedNow == nil) return NO;
+    NSDictionary* ovState = [settings valueForKey:@"OverrideState"];
+    NSDictionary* policy = [settings valueForKey:@"OverridePolicy"];
+    if (![ovState isKindOfClass:[NSDictionary class]] || ![policy isKindOfClass:[NSDictionary class]]) return NO;
+    NSInteger perDay = [policy[@"perDay"] integerValue];
+    NSString* verifiedDay = [SCOverrideDecision dayStringForDate:verifiedNow
+                                                        timeZone:[SCDaemonBlockMethods activationTimeZoneFromSettings:settings]];
+    id lastReset = ovState[@"lastResetDay"];
+    NSString* lastResetStr = [lastReset isKindOfClass:[NSString class]] ? lastReset : nil;
+    NSInteger newRemaining = 0;
+    if (![SCOverrideDecision resetForVerifiedDay:verifiedDay
+                                    lastResetDay:lastResetStr
+                                          perDay:perDay
+                                 outNewRemaining:&newRemaining]) {
+        return NO;
+    }
+    NSMutableDictionary* updated = [ovState mutableCopy]; // keeps overrideEndDate
+    updated[@"remainingToday"] = @(newRemaining);
+    updated[@"lastResetDay"] = verifiedDay;
+    [settings setValue:updated forKey:@"OverrideState"];
+    return YES;
 }
 
 + (void)handleSelfHealVerifiedTime:(NSDate*)verifiedNow
@@ -791,98 +861,239 @@ static SCTediumChallenge* tediumChallenge = nil;
     return 300;
 }
 
+// Serializes invokes end-to-end (including the live network fetch, during
+// which daemonMethodLock is NOT held). A concurrent invoke is refused as busy.
++ (NSLock*)overrideInvokeGate {
+    static NSLock* gate = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        gate = [[NSLock alloc] init];
+    });
+    return gate;
+}
+
+// Reads the Phase 5 deep-block guard (DeepBlock key absent today => not active).
++ (BOOL)deepBlockActiveInSettings:(SCSettings*)settings trustedNow:(NSDate*)trustedNow clockAnchored:(BOOL)clockAnchored {
+    NSDictionary* deep = [settings valueForKey:@"DeepBlock"];
+    if (![deep isKindOfClass:[NSDictionary class]]) return NO;
+    id de = deep[@"endDate"];
+    return [de isKindOfClass:[NSDate class]] && trustedNow != nil && clockAnchored && [trustedNow compare:de] == NSOrderedAscending;
+}
+
 + (void)invokeOverrideWithReply:(void(^)(NSInteger remainingAfter, NSDate* _Nullable overrideEndDate, NSError* _Nullable error))reply {
+    NSLock* gate = [SCDaemonBlockMethods overrideInvokeGate];
+    // (1) One invoke at a time, end to end.
+    if (![gate tryLock]) {
+        reply(0, nil, [SCErr errorWithCode: 320]); // busy; app may retry
+        return;
+    }
+    // (2)
     if (![SCDaemonBlockMethods lockOrTimeout: nil timeout: METHOD_LOCK_TIMEOUT]) {
+        [gate unlock];
         reply(0, nil, [SCErr errorWithCode: 320]); // busy; app may retry
         return;
     }
     SCSettings* settings = [SCSettings sharedSettings];
 
+    // (3) Pre-check against stored state, so obviously-denied invokes (no block,
+    // exhausted, already active, deep block, disabled) fail fast with no network.
     BOOL modernRunning = [SCBlockUtilities modernBlockIsRunning];
     NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
     NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState reading:[SCTrustedClock currentReading]];
     BOOL clockAnchored = [clockState isKindOfClass:[NSDictionary class]] && clockState[@"wallAnchor"] != nil;
-    BOOL startIsVerified = [settings boolForKey:@"BlockStartIsVerified"];
-    BOOL needsReVerification = [settings boolForKey:@"TrustedClockNeedsVerification"];
 
     NSDictionary* ovState = nil;
     NSDate* overrideEndDate = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:&ovState];
-    BOOL alreadyActive = clockAnchored && [SCOverrideDecision overrideActiveWithTrustedNow:trustedNow overrideEndDate:overrideEndDate];
-
-    // Deep block guard (Phase 5 hook: DeepBlock key absent today => not active).
-    NSDictionary* deep = [settings valueForKey:@"DeepBlock"];
-    BOOL deepActive = NO;
-    if ([deep isKindOfClass:[NSDictionary class]]) {
-        id de = deep[@"endDate"];
-        deepActive = [de isKindOfClass:[NSDate class]] && trustedNow != nil && clockAnchored && [trustedNow compare:de] == NSOrderedAscending;
-    }
+    BOOL alreadyActive = [SCOverrideDecision liftRemainingSecsWithTrustedNow:trustedNow
+                                                             overrideEndDate:overrideEndDate
+                                                               clockAnchored:clockAnchored
+                                                                 maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS] > 0;
+    BOOL deepActive = [SCDaemonBlockMethods deepBlockActiveInSettings:settings trustedNow:trustedNow clockAnchored:clockAnchored];
 
     NSDictionary* policy = [settings valueForKey:@"OverridePolicy"];
     NSInteger perDay  = [policy isKindOfClass:[NSDictionary class]] ? [policy[@"perDay"] integerValue] : 0;
     NSInteger minutes = [policy isKindOfClass:[NSDictionary class]] ? [policy[@"minutes"] integerValue] : 0;
-
-    // A modern block must be running to override. `alreadyActive` is a SEPARATE
-    // deny reason checked by the gate (below), so it must NOT be folded into
-    // baseEnforcing — otherwise an invoke during an active override would report
-    // "no active block" (330) instead of "already running" (331).
-    BOOL baseEnforcing = modernRunning;
-
-    // Midnight reset (in-memory only; trusted day in the pinned activation zone) before the exhaustion check.
     NSInteger remaining = [ovState[@"remainingToday"] integerValue];
-    NSString* today = (trustedNow != nil && clockAnchored)
-        ? [SCOverrideDecision dayStringForDate:trustedNow timeZone:[SCDaemonBlockMethods activationTimeZoneFromSettings:settings]]
-        : nil;
-    id lastReset = ovState[@"lastResetDay"];
-    NSString* lastResetStr = [lastReset isKindOfClass:[NSString class]] ? lastReset : nil;
-    NSInteger resetRemaining = 0;
-    if (today != nil && [SCOverrideDecision resetForVerifiedDay:today lastResetDay:lastResetStr perDay:perDay outNewRemaining:&resetRemaining]) {
-        remaining = resetRemaining;
-    }
 
-    SCOverrideInvokeResult decision = [SCOverrideDecision invokeAllowedWithBaseEnforcing:baseEnforcing
-                                                                              deepActive:deepActive
-                                                                           alreadyActive:alreadyActive
-                                                                            policyPerDay:perDay
-                                                                          remainingToday:remaining];
-    if (decision != SCOverrideInvokeAllowed) {
+    // (4) If a reset looks due, pre-check as if reset (never persisted here; the
+    // real reset is re-evaluated below against VERIFIED time).
+    NSInteger preRemaining = [SCDaemonBlockMethods overrideResetPendingForTrustedNow:trustedNow
+                                                                        clockAnchored:clockAnchored
+                                                                             settings:settings] ? perDay : remaining;
+
+    // (5) `alreadyActive` is a separate deny reason, NOT folded into baseEnforcing
+    // (else an invoke during an active override would report 330 not 331).
+    SCOverrideInvokeResult preDecision = [SCOverrideDecision invokeAllowedWithBaseEnforcing:modernRunning
+                                                                                 deepActive:deepActive
+                                                                              alreadyActive:alreadyActive
+                                                                               policyPerDay:perDay
+                                                                             remainingToday:preRemaining];
+    if (preDecision != SCOverrideInvokeAllowed) {
         [self.daemonMethodLock unlock];
-        reply(0, nil, [SCErr errorWithCode:[SCDaemonBlockMethods errorCodeForOverrideResult:decision]]);
+        [gate unlock];
+        reply(0, nil, [SCErr errorWithCode:[SCDaemonBlockMethods errorCodeForOverrideResult:preDecision]]);
+        return;
+    }
+    if (minutes <= 0) {
+        [self.daemonMethodLock unlock];
+        [gate unlock];
+        reply(0, nil, [SCErr errorWithCode: 333]);
         return;
     }
 
-    // Relaxing action => require a NETWORK-VERIFIED, ANCHORED trusted clock. No live fetch.
-    BOOL haveVerifiedAnchor = (trustedNow != nil) && clockAnchored && startIsVerified && !needsReVerification;
-    if (!haveVerifiedAnchor) {
-        [self.daemonMethodLock unlock];
-        // Best-effort: nudge a background verification so a later retry can succeed.
-        [[SCBlockEndVerifier sharedVerifier] requestVerificationWithCompletion:^(NSDate* v, NSDictionary* r, NSUInteger g) { /* freshens anchor; checkup consumes it */ }];
+    // (6) Capture the generation, then release the daemon lock for the fetch
+    // (never hold it across network I/O). The gate stays held.
+    NSUInteger generation = [[SCBlockEndVerifier sharedVerifier] currentGeneration];
+    [self.daemonMethodLock unlock];
+
+    // (7) Relaxing action => require LIVE network-verified time (master spec:
+    // "no internet => no override"). The stored anchor is not sufficient.
+    // __block storage is heap-promoted when dispatch_async copies the block, so a
+    // late worker write after a timeout is memory-safe; we simply never read the
+    // vars after a timeout.
+    __block NSDate* verified = nil;
+    __block NSDictionary* verifiedReading = nil;
+    dispatch_semaphore_t done = dispatch_semaphore_create(0);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        @autoreleasepool {
+            NSDictionary* r = nil;
+            NSDate* v = [SCSNTPClient fetchNetworkTimeWithTimeout:SC_OVERRIDE_VERIFY_TIMEOUT_SECS readingAtResponse:&r];
+            verified = v;
+            verifiedReading = r;
+        }
+        dispatch_semaphore_signal(done);
+    });
+    long waitResult = dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SC_OVERRIDE_VERIFY_HARD_DEADLINE_SECS * NSEC_PER_SEC)));
+    NSDate* verifiedNow = nil;
+    NSDictionary* reading = nil;
+    if (waitResult == 0) {
+        verifiedNow = verified;
+        reading = verifiedReading;
+    }
+    if (waitResult != 0 || verifiedNow == nil || reading == nil) {
+        NSLog(@"WARNING: Override invoke denied: could not verify network time (%@).",
+              waitResult != 0 ? @"hard deadline exceeded" : @"fetch failed");
+        [gate unlock];
         reply(0, nil, [SCErr errorWithCode: 334]); // couldn't verify internet time
         return;
     }
 
-    // Commit. Clamp the lift to the same ceiling the checkup overlay enforces, so
-    // a misconfigured (large) `minutes` can't produce an overrideEndDate the overlay
-    // would immediately reject — which would burn a counter for a zero-length lift.
-    remaining -= 1;
-    NSTimeInterval liftSecs = MIN(minutes * 60.0, SC_OVERRIDE_MAX_LIFT_SECS);
-    NSDate* end = [trustedNow dateByAddingTimeInterval:liftSecs];
-    [settings setValue:@{ @"remainingToday": @(remaining),
-                          @"lastResetDay": (today ?: lastResetStr ?: @""),
+    // (8)
+    if (![SCDaemonBlockMethods lockOrTimeout: nil timeout: METHOD_LOCK_TIMEOUT]) {
+        [gate unlock];
+        reply(0, nil, [SCErr errorWithCode: 320]);
+        return;
+    }
+
+    // (9) A teardown/restart during the fetch invalidates this result.
+    if (![SCBlockUtilities modernBlockIsRunning] ||
+        ![[SCBlockEndVerifier sharedVerifier] isCurrentGeneration:generation]) {
+        [self.daemonMethodLock unlock];
+        [gate unlock];
+        reply(0, nil, [SCErr errorWithCode: 330]);
+        return;
+    }
+
+    // (10) Apply verified time exactly as handleVerifiedTime: would.
+    BOOL removed = NO;
+    BOOL correctedStart = NO;
+    if (![SCDaemonBlockMethods applyVerifiedTime:verifiedNow
+                                         reading:reading
+                                        settings:settings
+                                  didRemoveBlock:&removed
+                                  startCorrected:&correctedStart]) {
+        [self.daemonMethodLock unlock];
+        [gate unlock];
+        reply(0, nil, [SCErr errorWithCode: 334]);
+        return;
+    }
+    if (removed) {
+        // Verified-expired: the helper already tore the block down (removeBlock
+        // persists its own state, as in handleVerifiedTime:).
+        [self.daemonMethodLock unlock];
+        [gate unlock];
+        reply(0, nil, [SCErr errorWithCode: 330]);
+        return;
+    }
+
+    // (11) Re-read everything against the freshly verified state.
+    NSDictionary* clockState2 = [settings valueForKey:@"TrustedClockState"];
+    NSDate* trustedNow2 = [SCTrustedClock trustedNowForState:clockState2 reading:[SCTrustedClock currentReading]];
+    BOOL clockAnchored2 = [clockState2 isKindOfClass:[NSDictionary class]] && clockState2[@"wallAnchor"] != nil;
+    NSDictionary* ovState2 = nil;
+    NSDate* overrideEndDate2 = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:&ovState2];
+    NSDictionary* policy2 = [settings valueForKey:@"OverridePolicy"];
+    NSInteger perDay2  = [policy2 isKindOfClass:[NSDictionary class]] ? [policy2[@"perDay"] integerValue] : 0;
+    NSInteger minutes2 = [policy2 isKindOfClass:[NSDictionary class]] ? [policy2[@"minutes"] integerValue] : 0;
+    NSInteger remaining2 = [ovState2[@"remainingToday"] integerValue];
+    id lastReset2 = ovState2[@"lastResetDay"];
+    NSString* lastResetStr2 = [lastReset2 isKindOfClass:[NSString class]] ? lastReset2 : nil;
+    BOOL alreadyActive2 = [SCOverrideDecision liftRemainingSecsWithTrustedNow:trustedNow2
+                                                              overrideEndDate:overrideEndDate2
+                                                                clockAnchored:clockAnchored2
+                                                                  maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS] > 0;
+    BOOL deepActive2 = [SCDaemonBlockMethods deepBlockActiveInSettings:settings trustedNow:trustedNow2 clockAnchored:clockAnchored2];
+
+    // (12) Midnight reset against the verified day (pinned activation zone).
+    NSString* verifiedDay = (trustedNow2 != nil)
+        ? [SCOverrideDecision dayStringForDate:trustedNow2 timeZone:[SCDaemonBlockMethods activationTimeZoneFromSettings:settings]]
+        : nil;
+    NSInteger resetRemaining = 0;
+    if (verifiedDay != nil && [SCOverrideDecision resetForVerifiedDay:verifiedDay
+                                                         lastResetDay:lastResetStr2
+                                                               perDay:perDay2
+                                                      outNewRemaining:&resetRemaining]) {
+        remaining2 = resetRemaining; // lastResetDay becomes verifiedDay on commit
+    }
+
+    // (13) Final decision.
+    SCOverrideInvokeResult decision = [SCOverrideDecision invokeAllowedWithBaseEnforcing:YES
+                                                                              deepActive:deepActive2
+                                                                           alreadyActive:alreadyActive2
+                                                                            policyPerDay:perDay2
+                                                                          remainingToday:remaining2];
+    NSInteger denyCode = 0;
+    if (decision != SCOverrideInvokeAllowed) {
+        denyCode = [SCDaemonBlockMethods errorCodeForOverrideResult:decision];
+    } else if (minutes2 <= 0) {
+        denyCode = 333;
+    } else if (trustedNow2 == nil || !clockAnchored2 || verifiedDay == nil) {
+        // Defensive: the verified decision always writes an anchored clock state.
+        denyCode = 334;
+    }
+    if (denyCode != 0) {
+        // Persist the verified-time writes we already made (as handleVerifiedTime: would).
+        NSError* syncError = [settings syncSettingsAndWait:5];
+        if (syncError != nil) NSLog(@"WARNING: failed to persist verified time: %@", syncError);
+        if (correctedStart) [SCHelperToolUtilities sendConfigurationChangedNotification];
+        [self.daemonMethodLock unlock];
+        [gate unlock];
+        reply(0, nil, [SCErr errorWithCode:denyCode]);
+        return;
+    }
+
+    // (14) Commit. Clamp the lift to the same ceiling the checkup overlay enforces,
+    // so a misconfigured (large) `minutes` can't produce an overrideEndDate the
+    // overlay would immediately reject (burning a counter for a zero-length lift).
+    remaining2 -= 1;
+    NSTimeInterval liftSecs = MIN(minutes2 * 60.0, SC_OVERRIDE_MAX_LIFT_SECS);
+    NSDate* end = [trustedNow2 dateByAddingTimeInterval:liftSecs];
+    [settings setValue:@{ @"remainingToday": @(remaining2),
+                          @"lastResetDay": verifiedDay,
                           @"overrideEndDate": end }
                 forKey:@"OverrideState"];
-    if ([clockState isKindOfClass:[NSDictionary class]]) {
-        [settings setValue:[SCTrustedClock checkpointState:clockState reading:[SCTrustedClock currentReading]]
-                    forKey:@"TrustedClockState"];
-    }
-    [settings syncSettingsAndWait:5];
+    NSError* syncError = [settings syncSettingsAndWait:5];
+    if (syncError != nil) NSLog(@"WARNING: failed to persist override state: %@", syncError);
 
-    // Lift base rules now (don't wait a tick), then tell the app.
+    // (15) Lift base rules now (don't wait a tick), then tell the app.
     [SCHelperToolUtilities clearBlockRulesOnly];
     [SCHelperToolUtilities sendConfigurationChangedNotification];
 
-    NSLog(@"INFO: Override invoked; %ld remaining today; lifts until %@", (long)remaining, end);
+    NSLog(@"INFO: Override invoked against verified time; %ld remaining today; lifts until %@", (long)remaining2, end);
+    [[SCDaemon sharedDaemon] resetInactivityTimer];
     [self.daemonMethodLock unlock];
-    reply(remaining, end, nil);
+    [gate unlock];
+    reply(remaining2, end, nil);
 }
 
 @end
