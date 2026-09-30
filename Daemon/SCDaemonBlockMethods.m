@@ -861,9 +861,12 @@ static SCTediumChallenge* tediumChallenge = nil;
         return;
     }
 
-    // Commit.
+    // Commit. Clamp the lift to the same ceiling the checkup overlay enforces, so
+    // a misconfigured (large) `minutes` can't produce an overrideEndDate the overlay
+    // would immediately reject — which would burn a counter for a zero-length lift.
     remaining -= 1;
-    NSDate* end = [trustedNow dateByAddingTimeInterval:(minutes * 60.0)];
+    NSTimeInterval liftSecs = MIN(minutes * 60.0, SC_OVERRIDE_MAX_LIFT_SECS);
+    NSDate* end = [trustedNow dateByAddingTimeInterval:liftSecs];
     [settings setValue:@{ @"remainingToday": @(remaining),
                           @"lastResetDay": (today ?: lastResetStr ?: @""),
                           @"overrideEndDate": end }
