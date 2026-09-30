@@ -42,6 +42,10 @@ NS_ASSUME_NONNULL_BEGIN
 // Caller must hold daemonMethodLock; performs no locking itself.
 + (void)invalidateTediumChallenge;
 
+// Invokes an override: decides synchronously (no live network fetch) whether
+// an override may be granted right now, and if so, lifts the base block.
++ (void)invokeOverrideWithReply:(void(^)(NSInteger remainingAfter, NSDate* _Nullable overrideEndDate, NSError* _Nullable error))reply;
+
 @end
 
 NS_ASSUME_NONNULL_END

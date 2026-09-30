@@ -29,6 +29,12 @@
 
 }
 
++ (void)clearBlockRulesOnly {
+    NSLog(@"INFO: Lifting base block rules (override active).");
+    [[BlockManager new] clearBlock];
+    [SCHelperToolUtilities clearOSDNSCache];
+}
+
 + (void)unloadDaemonJob {
     NSLog(@"Unloading SelfControl daemon...");
     [SCSentry addBreadcrumb: @"Daemon about to unload" category: @"daemon"];

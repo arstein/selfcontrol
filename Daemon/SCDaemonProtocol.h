@@ -29,6 +29,10 @@ NS_ASSUME_NONNULL_BEGIN
 // XPC method to submit one challenge entry. outcome is SCTediumSubmitOutcome.
 - (void)submitTediumEntry:(NSInteger)digit reply:(void(^)(NSInteger outcome, NSInteger progress, NSInteger nextDigit, BOOL blockRemoved, NSError* _Nullable error))reply;
 
+// XPC method to invoke an override (temporarily lift the base block)
+- (void)invokeOverrideWithAuthorization:(NSData *)authData
+                                  reply:(void(^)(NSInteger remainingAfter, NSDate* _Nullable overrideEndDate, NSError* _Nullable error))reply;
+
 @end
 
 NS_ASSUME_NONNULL_END

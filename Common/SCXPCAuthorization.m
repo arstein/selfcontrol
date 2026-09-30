@@ -107,12 +107,23 @@ static NSDictionary* kAuthorizationRuleAuthenticateAsAdmin2MinTimeout;
                 @"prompt shown when user is required to authorize to modify their block"
             )
         };
-        
+        // Invoking an override is a relaxing action, but it's gated by the
+        // app's own in-app confirmation sheet (and the daemon's own
+        // SCOverrideDecision checks - policy limits, deep block, etc), not by
+        // an admin password: an "allow" rule means no authentication is
+        // required, just that the caller holds a valid AuthorizationRef.
+        NSDictionary* invokeOverrideCommandInfo = @{
+            kCommandKeyAuthRightName    : @"org.eyebeam.SelfControl.invokeOverride",
+            kCommandKeyAuthRightDefault : @"allow",
+            kCommandKeyAuthRightDesc    : NSLocalizedString(@"SelfControl is invoking an override.", @"prompt shown when invoking an override"),
+        };
+
         sCommandInfo = @{
             NSStringFromSelector(@selector(startBlockWithControllingUID:blocklist:isAllowlist:endDate:blockSettings:authorization:reply:)) : startBlockCommandInfo,
             NSStringFromSelector(@selector(updateBlocklist:authorization:reply:)) : modifyBlockCommandInfo,
             NSStringFromSelector(@selector(updateBlockEndDate:authorization:reply:)) : modifyBlockCommandInfo,
-            NSStringFromSelector(@selector(startTediumChallengeWithAuthorization:reply:)) : modifyBlockCommandInfo
+            NSStringFromSelector(@selector(startTediumChallengeWithAuthorization:reply:)) : modifyBlockCommandInfo,
+            NSStringFromSelector(@selector(invokeOverrideWithAuthorization:reply:)) : invokeOverrideCommandInfo
             #pragma clang diagnostic pop
         };
     });

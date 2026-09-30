@@ -37,6 +37,12 @@
 "321" = "No block is running.";
 "322" = "The block is no longer running.";
 "323" = "The override challenge was reset because SelfControl restarted. Open Tedious Override again to start over.";
+"330" = "There's no active block to override right now.";
+"331" = "An override is already running.";
+"332" = "Overrides are disabled during a deep block.";
+"333" = "This block has no overrides configured.";
+"334" = "Couldn't verify internet time — overrides need a network connection.";
+"335" = "You've used all of today's overrides.";
 
 // 400-499 = errors generated in the killer
 "400" = "SelfControl couldn't manually clear the block, because there was an error running the helper tool.";

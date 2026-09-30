@@ -403,6 +403,25 @@
     }];
 }
 
+- (void)invokeOverride:(void(^)(NSInteger remainingAfter, NSDate* _Nullable overrideEndDate, NSError* _Nullable error))reply {
+    [self connectAndExecuteCommandBlock:^(NSError * connectError) {
+        if (connectError != nil) {
+            [SCSentry captureError: connectError];
+            reply(0, nil, connectError);
+        } else {
+            [[self.daemonConnection remoteObjectProxyWithErrorHandler:^(NSError * proxyError) {
+                [SCSentry captureError: proxyError];
+                reply(0, nil, proxyError);
+            }] invokeOverrideWithAuthorization: self.authorization reply:^(NSInteger remainingAfter, NSDate* overrideEndDate, NSError* error) {
+                if (error != nil && ![SCMiscUtilities errorIsAuthCanceled: error]) {
+                    [SCSentry captureError: error];
+                }
+                reply(remainingAfter, overrideEndDate, error);
+            }];
+        }
+    }];
+}
+
 - (NSString*)selfControlHelperToolPath {
     static NSString* path;
 
