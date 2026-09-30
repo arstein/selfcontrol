@@ -12,7 +12,11 @@
                lastResetDay:(NSString*)lastResetDay
                      perDay:(NSInteger)perDay
             outNewRemaining:(NSInteger*)outNewRemaining {
-    if (verifiedDay != nil && (lastResetDay == nil || ![verifiedDay isEqualToString:lastResetDay])) {
+    // Days are yyyy-MM-dd, so lexicographic order == chronological order. Reset
+    // only on a strictly LATER day: a stale verified instant (earlier day) must
+    // never move the reset day backwards and refund the ration.
+    if (verifiedDay != nil &&
+        (lastResetDay == nil || [verifiedDay compare:lastResetDay] == NSOrderedDescending)) {
         if (outNewRemaining != NULL) *outNewRemaining = perDay;
         return YES;
     }
@@ -30,6 +34,16 @@
     if (policyPerDay <= 0) return SCOverrideInvokeDenyNotAllowed;
     if (remainingToday <= 0) return SCOverrideInvokeDenyExhausted;
     return SCOverrideInvokeAllowed;
+}
+
++ (NSTimeInterval)liftRemainingSecsWithTrustedNow:(NSDate*)trustedNow
+                                   overrideEndDate:(NSDate*)overrideEndDate
+                                     clockAnchored:(BOOL)clockAnchored
+                                       maxLiftSecs:(NSTimeInterval)maxLiftSecs {
+    if (trustedNow == nil || overrideEndDate == nil || !clockAnchored) return 0;
+    NSTimeInterval remaining = [overrideEndDate timeIntervalSinceDate:trustedNow];
+    if (remaining <= 0 || remaining > maxLiftSecs) return 0;
+    return remaining;
 }
 
 + (NSString*)dayStringForDate:(NSDate*)date timeZone:(NSTimeZone*)tz {

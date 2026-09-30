@@ -19,7 +19,9 @@ typedef NS_ENUM(NSInteger, SCOverrideInvokeResult) {
                      overrideEndDate:(nullable NSDate*)overrideEndDate;
 
 // Midnight reset (pure). Returns YES and fills outNewRemaining=perDay when the
-// verified day differs from lastResetDay (or lastResetDay is nil). Otherwise NO.
+// verified day is a strictly later day than lastResetDay (or lastResetDay is
+// nil); never moves backwards (an earlier or equal day => NO, out untouched).
+// Days are yyyy-MM-dd, so lexicographic order == chronological order.
 + (BOOL)resetForVerifiedDay:(NSString*)verifiedDay
                lastResetDay:(nullable NSString*)lastResetDay
                      perDay:(NSInteger)perDay
@@ -34,6 +36,13 @@ typedef NS_ENUM(NSInteger, SCOverrideInvokeResult) {
 
 // yyyy-MM-dd for `date` evaluated in `tz` (POSIX/en_US_POSIX, gregorian).
 + (NSString*)dayStringForDate:(NSDate*)date timeZone:(NSTimeZone*)tz;
+
+/// Seconds of lift remaining, fail-closed: 0 unless clockAnchored, both dates non-nil,
+/// and 0 < (overrideEndDate - trustedNow) <= maxLiftSecs. Otherwise returns end - now.
++ (NSTimeInterval)liftRemainingSecsWithTrustedNow:(nullable NSDate*)trustedNow
+                                   overrideEndDate:(nullable NSDate*)overrideEndDate
+                                     clockAnchored:(BOOL)clockAnchored
+                                       maxLiftSecs:(NSTimeInterval)maxLiftSecs;
 
 @end
 

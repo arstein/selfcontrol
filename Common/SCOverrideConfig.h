@@ -10,4 +10,9 @@
 // Legitimate overrides are minutes; this bound never limits real usage.
 #define SC_OVERRIDE_MAX_LIFT_SECS  (2 * 60 * 60.0)
 
+// Invoke live-verify budget: SNTP time budget across hosts, and a hard reply
+// deadline that also bounds unbounded DNS resolution.
+#define SC_OVERRIDE_VERIFY_TIMEOUT_SECS        (5.0)
+#define SC_OVERRIDE_VERIFY_HARD_DEADLINE_SECS  (10.0)
+
 #endif /* SCOverrideConfig_h */

@@ -76,6 +76,12 @@
     }
 }
 
+- (NSUInteger)currentGeneration {
+    @synchronized(self) {
+        return self.generation;
+    }
+}
+
 - (void)reset {
     @synchronized(self) {
         self.generation += 1;

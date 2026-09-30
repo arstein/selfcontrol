@@ -42,6 +42,13 @@
     XCTAssertTrue([SCOverrideDecision resetForVerifiedDay:@"2026-09-30" lastResetDay:nil perDay:5 outNewRemaining:&out]);
     XCTAssertEqual(out, 5);
 }
+- (void)testResetEarlierDayDoesNotReset {
+    // A stale verified instant (e.g. a fetch in flight across midnight) must
+    // never move the reset day backwards and refund the ration.
+    NSInteger out = -1;
+    XCTAssertFalse([SCOverrideDecision resetForVerifiedDay:@"2026-09-29" lastResetDay:@"2026-09-30" perDay:3 outNewRemaining:&out]);
+    XCTAssertEqual(out, -1);
+}
 
 #pragma mark invoke gate
 
@@ -62,6 +69,58 @@
 }
 - (void)testInvokeDenyExhausted {
     XCTAssertEqual([SCOverrideDecision invokeAllowedWithBaseEnforcing:YES deepActive:NO alreadyActive:NO policyPerDay:3 remainingToday:0], SCOverrideInvokeDenyExhausted);
+}
+
+#pragma mark lift remaining (fail-closed)
+
+- (void)testLiftRemainingNilTrustedNowIsZero {
+    NSDate* end = [NSDate dateWithTimeIntervalSinceNow:600];
+    XCTAssertEqualWithAccuracy([SCOverrideDecision liftRemainingSecsWithTrustedNow:nil
+                                                                    overrideEndDate:end
+                                                                      clockAnchored:YES
+                                                                        maxLiftSecs:7200], 0, 0.001);
+}
+- (void)testLiftRemainingNilEndDateIsZero {
+    XCTAssertEqualWithAccuracy([SCOverrideDecision liftRemainingSecsWithTrustedNow:[NSDate date]
+                                                                    overrideEndDate:nil
+                                                                      clockAnchored:YES
+                                                                        maxLiftSecs:7200], 0, 0.001);
+}
+- (void)testLiftRemainingUnanchoredIsZero {
+    NSDate* now = [NSDate date];
+    NSDate* end = [now dateByAddingTimeInterval:600];
+    XCTAssertEqualWithAccuracy([SCOverrideDecision liftRemainingSecsWithTrustedNow:now
+                                                                    overrideEndDate:end
+                                                                      clockAnchored:NO
+                                                                        maxLiftSecs:7200], 0, 0.001);
+}
+- (void)testLiftRemainingExceedsMaxIsZero {
+    NSDate* now = [NSDate date];
+    NSDate* end = [now dateByAddingTimeInterval:7201];
+    XCTAssertEqualWithAccuracy([SCOverrideDecision liftRemainingSecsWithTrustedNow:now
+                                                                    overrideEndDate:end
+                                                                      clockAnchored:YES
+                                                                        maxLiftSecs:7200], 0, 0.001);
+}
+- (void)testLiftRemainingEndAtOrBeforeNowIsZero {
+    NSDate* now = [NSDate date];
+    XCTAssertEqualWithAccuracy([SCOverrideDecision liftRemainingSecsWithTrustedNow:now
+                                                                    overrideEndDate:now
+                                                                      clockAnchored:YES
+                                                                        maxLiftSecs:7200], 0, 0.001);
+    NSDate* past = [now dateByAddingTimeInterval:-1];
+    XCTAssertEqualWithAccuracy([SCOverrideDecision liftRemainingSecsWithTrustedNow:now
+                                                                    overrideEndDate:past
+                                                                      clockAnchored:YES
+                                                                        maxLiftSecs:7200], 0, 0.001);
+}
+- (void)testLiftRemainingNormalCase {
+    NSDate* now = [NSDate date];
+    NSDate* end = [now dateByAddingTimeInterval:600];
+    XCTAssertEqualWithAccuracy([SCOverrideDecision liftRemainingSecsWithTrustedNow:now
+                                                                    overrideEndDate:end
+                                                                      clockAnchored:YES
+                                                                        maxLiftSecs:7200], 600, 0.001);
 }
 
 #pragma mark day string

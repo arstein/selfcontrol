@@ -422,6 +422,22 @@
     }];
 }
 
+- (void)getOverrideStatus:(void(^)(BOOL blockRunning, BOOL overrideActive, NSTimeInterval overrideRemainingSecs, NSInteger remainingToday, NSInteger perDay, NSError* _Nullable error))reply {
+    [self connectAndExecuteCommandBlock:^(NSError * connectError) {
+        if (connectError != nil) {
+            NSLog(@"Failed to get override status with connection error: %@", connectError);
+            reply(NO, NO, 0, 0, 0, connectError);
+        } else {
+            [[self.daemonConnection remoteObjectProxyWithErrorHandler:^(NSError * proxyError) {
+                NSLog(@"Failed to get override status with remote object proxy error: %@", proxyError);
+                reply(NO, NO, 0, 0, 0, proxyError);
+            }] getOverrideStatusWithReply:^(BOOL blockRunning, BOOL overrideActive, double overrideRemainingSecs, NSInteger remainingToday, NSInteger perDay) {
+                reply(blockRunning, overrideActive, overrideRemainingSecs, remainingToday, perDay, nil);
+            }];
+        }
+    }];
+}
+
 - (NSString*)selfControlHelperToolPath {
     static NSString* path;
 

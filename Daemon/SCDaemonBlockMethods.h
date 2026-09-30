@@ -42,9 +42,23 @@ NS_ASSUME_NONNULL_BEGIN
 // Caller must hold daemonMethodLock; performs no locking itself.
 + (void)invalidateTediumChallenge;
 
-// Invokes an override: decides synchronously (no live network fetch) whether
-// an override may be granted right now, and if so, lifts the base block.
+// Invokes an override. Pre-checks stored state (fast deny, no network), then
+// performs a LIVE network time fetch (bounded by SC_OVERRIDE_VERIFY_HARD_DEADLINE_SECS,
+// with daemonMethodLock released during it). No verified time => 334, nothing
+// written ("no internet => no override"). With verified time, applies it as the
+// checkup would (possibly verified-expiring the block => 330), resets the daily
+// ration against the verified day if due, re-decides, and if allowed lifts the
+// base block. Concurrent invokes are refused as busy (320). Blocks the calling
+// (XPC) queue for up to the hard deadline.
 + (void)invokeOverrideWithReply:(void(^)(NSInteger remainingAfter, NSDate* _Nullable overrideEndDate, NSError* _Nullable error))reply;
+
+// Read-only poll of the daemon's trusted-clock view of override status: no
+// daemonMethodLock, no network, always replies promptly. blockRunning is
+// whether a modern block is running at all; overrideActive/overrideRemainingSecs
+// are computed the same way the checkup's overlay decision is (trusted clock,
+// fail-closed); remainingToday/perDay reflect the stored policy/state as-is
+// (no reset applied -- resets only happen against verified time elsewhere).
++ (void)getOverrideStatusWithReply:(void(^)(BOOL blockRunning, BOOL overrideActive, double overrideRemainingSecs, NSInteger remainingToday, NSInteger perDay))reply;
 
 @end
 

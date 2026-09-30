@@ -25,6 +25,7 @@
 #import "TimerWindowController.h"
 #import "SCUIUtilities.h"
 #import "SCXPCClient.h"
+#import "SCTrustedClock.h"
 #import <math.h>
 
 @interface TimerWindowController ()
@@ -37,8 +38,23 @@
 @property (nonatomic, strong) NSButton* invokeOverrideButton_;
 @property (nonatomic, strong) NSTextField* overrideStatusLabel_;
 
+// Phase 4 live-verify: the daemon's trusted-clock view of override status,
+// polled over XPC (getOverrideStatus:) and interpolated between polls using
+// ONLY monotonic uptime (SCTrustedClock continuousUptimeSecs) -- never the
+// wall clock, which a user can roll forward/back to hide or fake the
+// countdown. All of these are main-thread only.
+@property (nonatomic, assign) BOOL overrideStatusInFlight_;
+@property (nonatomic, assign) NSTimeInterval overrideStatusRequestUptime_;
+@property (nonatomic, assign) NSTimeInterval lastStatusUptime_;
+@property (nonatomic, assign) BOOL lastStatusValid_;
+@property (nonatomic, assign) NSTimeInterval lastRemainingSecs_;
+@property (nonatomic, assign) BOOL lastActive_;
+@property (nonatomic, assign) NSInteger lastRemainingToday_;
+@property (nonatomic, assign) NSInteger lastPerDay_;
+
 - (void)setUpOverrideControlsIfNeeded;
 - (void)refreshOverrideUI;
+- (void)renderOverrideStatus;
 - (IBAction)invokeOverride:(id)sender;
 
 @end
@@ -665,9 +681,14 @@ static const CGFloat kOverrideWindowGrowth = 56.0;
     [self refreshOverrideUI];
 }
 
-// Refreshes the override button/label from current SCSettings state. Safe to
-// call before the controls exist (no-ops), and cheap enough to call on every
-// timer tick / configuration change.
+// Refreshes the override button/label. Safe to call before the controls
+// exist (no-ops), and cheap enough to call on every timer tick / config
+// change: when there's no modern block (or no override policy), this hides
+// and disables everything exactly as before and makes no XPC call. Otherwise
+// it (throttled) polls the daemon's trusted-clock override status via XPC,
+// and always re-renders from the latest poll via -renderOverrideStatus so the
+// display keeps ticking between polls. Never computes remaining time from
+// [NSDate date] / the wall clock -- see -renderOverrideStatus.
 - (void)refreshOverrideUI {
     if (self.invokeOverrideButton_ == nil) {
         return;
@@ -675,26 +696,100 @@ static const CGFloat kOverrideWindowGrowth = 56.0;
 
     SCSettings* settings = [SCSettings sharedSettings];
     NSDictionary* policy = [settings valueForKey: @"OverridePolicy"];
-    NSDictionary* state  = [settings valueForKey: @"OverrideState"];
+    NSInteger perDay = [policy isKindOfClass: [NSDictionary class]] ? [policy[@"perDay"] integerValue] : 0;
 
-    NSInteger perDay    = [policy isKindOfClass: [NSDictionary class]] ? [policy[@"perDay"] integerValue] : 0;
-    NSInteger remaining = [state isKindOfClass: [NSDictionary class]] ? [state[@"remainingToday"] integerValue] : 0;
+    if (![SCBlockUtilities modernBlockIsRunning] || perDay <= 0) {
+        self.overrideStatusLabel_.hidden = YES;
+        self.invokeOverrideButton_.title = [NSString stringWithFormat: @"Invoke override (%ld left)", 0L];
+        self.invokeOverrideButton_.enabled = NO;
+        self.invokeOverrideButton_.hidden = YES; // hide entirely for blocks with no override policy
+        return;
+    }
 
+    self.invokeOverrideButton_.hidden = NO;
+
+    NSTimeInterval nowUptime = [SCTrustedClock continuousUptimeSecs];
+    if (!self.overrideStatusInFlight_ || (nowUptime - self.overrideStatusRequestUptime_) > 3.0) {
+        self.overrideStatusInFlight_ = YES;
+        self.overrideStatusRequestUptime_ = nowUptime;
+
+        __weak typeof(self) weakSelf = self;
+        [self.appController.xpc getOverrideStatus:^(BOOL blockRunning, BOOL overrideActive, NSTimeInterval overrideRemainingSecs, NSInteger remainingToday, NSInteger polledPerDay, NSError * _Nullable error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                if (strongSelf == nil) {
+                    return;
+                }
+                strongSelf.overrideStatusInFlight_ = NO;
+                if (error == nil) {
+                    strongSelf.lastRemainingSecs_ = overrideRemainingSecs;
+                    strongSelf.lastActive_ = overrideActive;
+                    strongSelf.lastRemainingToday_ = remainingToday;
+                    strongSelf.lastPerDay_ = polledPerDay;
+                    strongSelf.lastStatusUptime_ = [SCTrustedClock continuousUptimeSecs];
+                    strongSelf.lastStatusValid_ = YES;
+                }
+                [strongSelf renderOverrideStatus];
+            });
+        }];
+    }
+
+    // Always re-render, so the displayed countdown keeps interpolating
+    // (against monotonic uptime) on every tick, not just when a poll lands.
+    [self renderOverrideStatus];
+}
+
+// Renders the override button/label from the last daemon poll (see
+// -refreshOverrideUI), interpolating the shown countdown using ONLY the
+// monotonic uptime elapsed since that poll landed. Falls back to a
+// settings-derived display (no seconds countdown) when the last poll is
+// stale or hasn't landed yet. Never touches [NSDate date] / the wall clock.
+- (void)renderOverrideStatus {
+    if (self.invokeOverrideButton_ == nil) {
+        return;
+    }
+
+    NSTimeInterval nowUptime = [SCTrustedClock continuousUptimeSecs];
+
+    if (self.lastStatusValid_ && (nowUptime - self.lastStatusUptime_) <= 5.0) {
+        NSTimeInterval shown = MAX(0.0, self.lastRemainingSecs_ - (nowUptime - self.lastStatusUptime_));
+
+        if (self.lastActive_ && shown > 0) {
+            NSInteger secs = (NSInteger)ceil(shown);
+            self.overrideStatusLabel_.stringValue = [NSString stringWithFormat: @"Override active — %ldm %02lds left", (long)(secs / 60), (long)(secs % 60)];
+            self.overrideStatusLabel_.hidden = NO;
+        } else {
+            self.overrideStatusLabel_.hidden = YES;
+        }
+
+        self.invokeOverrideButton_.title = [NSString stringWithFormat: @"Invoke override (%ld left)", (long)self.lastRemainingToday_];
+        self.invokeOverrideButton_.enabled = (self.lastPerDay_ > 0) && (self.lastRemainingToday_ > 0) && !self.lastActive_;
+        return;
+    }
+
+    // Stale or no poll landed yet: fall back to what we had before
+    // live-verify existed, minus any wall-clock countdown math. We only know
+    // (from settings) whether an override end date is stored at all, not how
+    // many seconds are left, so we show a "checking…" placeholder rather than
+    // a number.
+    SCSettings* settings = [SCSettings sharedSettings];
+    NSDictionary* state = [settings valueForKey: @"OverrideState"];
     id endVal = [state isKindOfClass: [NSDictionary class]] ? state[@"overrideEndDate"] : nil;
-    NSDate* end = [endVal isKindOfClass: [NSDate class]] ? endVal : nil;
-    BOOL active = (end != nil) && ([end timeIntervalSinceNow] > 0);
+    BOOL hasStoredEndDate = [endVal isKindOfClass: [NSDate class]];
 
-    if (active) {
-        NSInteger secs = (NSInteger)round([end timeIntervalSinceNow]);
-        self.overrideStatusLabel_.stringValue = [NSString stringWithFormat: @"Override active — %ldm %02lds left", (long)(secs / 60), (long)(secs % 60)];
+    if (hasStoredEndDate) {
+        self.overrideStatusLabel_.stringValue = NSLocalizedString(@"Override status — checking…", @"Shown while waiting for the daemon to confirm override status");
         self.overrideStatusLabel_.hidden = NO;
     } else {
         self.overrideStatusLabel_.hidden = YES;
     }
 
+    NSDictionary* policy = [settings valueForKey: @"OverridePolicy"];
+    NSInteger perDay    = [policy isKindOfClass: [NSDictionary class]] ? [policy[@"perDay"] integerValue] : 0;
+    NSInteger remaining = [state isKindOfClass: [NSDictionary class]] ? [state[@"remainingToday"] integerValue] : 0;
+
     self.invokeOverrideButton_.title = [NSString stringWithFormat: @"Invoke override (%ld left)", (long)remaining];
-    self.invokeOverrideButton_.enabled = (perDay > 0) && (remaining > 0) && !active;
-    self.invokeOverrideButton_.hidden = (perDay <= 0); // hide entirely for blocks with no override policy
+    self.invokeOverrideButton_.enabled = (perDay > 0) && (remaining > 0);
 }
 
 - (IBAction)invokeOverride:(id)sender {
@@ -725,6 +820,11 @@ static const CGFloat kOverrideWindowGrowth = 56.0;
                 if (error != nil) {
                     [SCUIUtilities presentError: error];
                 }
+                // Don't trust (or interpolate from) whatever status we had
+                // cached before this invoke -- it's now stale. Force a fresh
+                // poll of the daemon's trusted-clock status instead of
+                // displaying end − now from the invoke reply itself.
+                self.lastStatusValid_ = NO;
                 [self refreshOverrideUI];
             });
         }];

@@ -24,6 +24,12 @@ NS_ASSUME_NONNULL_BEGIN
                                                     NSDictionary* readingAtResponse,
                                                     NSUInteger generation))completion;
 - (BOOL)isCurrentGeneration:(NSUInteger)generation;
+
+/// The generation counter's current value, under the same synchronization as
+/// isCurrentGeneration:/reset. Useful for callers that need to capture a
+/// generation without first issuing a request.
+- (NSUInteger)currentGeneration;
+
 - (void)reset;
 
 @end

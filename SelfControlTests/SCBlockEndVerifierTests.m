@@ -40,4 +40,15 @@
     XCTAssertTrue([verifier isCurrentGeneration:1]);
 }
 
+- (void)testCurrentGenerationTracksReset {
+    SCBlockEndVerifier* verifier = [SCBlockEndVerifier new];
+    NSUInteger before = [verifier currentGeneration];
+    XCTAssertTrue([verifier isCurrentGeneration:before]);
+    [verifier reset];
+    NSUInteger after = [verifier currentGeneration];
+    XCTAssertNotEqual(before, after);
+    XCTAssertFalse([verifier isCurrentGeneration:before]);
+    XCTAssertTrue([verifier isCurrentGeneration:after]);
+}
+
 @end
