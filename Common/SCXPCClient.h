@@ -25,6 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)startTediumChallenge:(void(^)(NSInteger digit, NSInteger progress, NSInteger requiredEntries, NSError* _Nullable error))reply;
 - (void)submitTediumEntry:(NSInteger)digit reply:(void(^)(NSInteger outcome, NSInteger progress, NSInteger nextDigit, BOOL blockRemoved, NSError* _Nullable error))reply;
 - (void)invokeOverride:(void(^)(NSInteger remainingAfter, NSDate* _Nullable overrideEndDate, NSError* _Nullable error))reply;
+- (void)getOverrideStatus:(void(^)(BOOL blockRunning, BOOL overrideActive, NSTimeInterval overrideRemainingSecs, NSInteger remainingToday, NSInteger perDay, NSError* _Nullable error))reply;
 
 @end
 

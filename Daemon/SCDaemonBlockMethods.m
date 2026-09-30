@@ -1135,4 +1135,31 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     reply(remaining2, end, nil);
 }
 
+// Read-only, no daemonMethodLock (no writes, and this must never block behind
+// a slow checkup/invoke), no network. Mirrors the checkup's fail-closed
+// overlay computation (see checkupBlock) so the UI's notion of "active" and
+// "remaining" always matches enforcement.
++ (void)getOverrideStatusWithReply:(void(^)(BOOL blockRunning, BOOL overrideActive, double overrideRemainingSecs, NSInteger remainingToday, NSInteger perDay))reply {
+    BOOL blockRunning = [SCBlockUtilities modernBlockIsRunning];
+    SCSettings* settings = [SCSettings sharedSettings];
+
+    NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
+    NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState reading:[SCTrustedClock currentReading]];
+    BOOL clockAnchored = [clockState isKindOfClass:[NSDictionary class]] && clockState[@"wallAnchor"] != nil;
+
+    NSDictionary* ovState = nil;
+    NSDate* overrideEndDate = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:&ovState];
+    NSTimeInterval remainingSecs = [SCOverrideDecision liftRemainingSecsWithTrustedNow:trustedNow
+                                                                        overrideEndDate:overrideEndDate
+                                                                          clockAnchored:clockAnchored
+                                                                            maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS];
+    BOOL overrideActive = remainingSecs > 0;
+
+    NSInteger remainingToday = [ovState isKindOfClass:[NSDictionary class]] ? [ovState[@"remainingToday"] integerValue] : 0;
+    NSDictionary* policy = [settings valueForKey:@"OverridePolicy"];
+    NSInteger perDay = [policy isKindOfClass:[NSDictionary class]] ? [policy[@"perDay"] integerValue] : 0;
+
+    reply(blockRunning, overrideActive, remainingSecs, remainingToday, perDay);
+}
+
 @end

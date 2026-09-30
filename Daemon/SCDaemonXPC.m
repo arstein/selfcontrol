@@ -117,4 +117,12 @@
     [SCDaemonBlockMethods invokeOverrideWithReply: reply];
 }
 
+// Read-only status poll: no authorization check (everyone code-signature-
+// gated onto this connection may read override status), and deliberately no
+// resetInactivityTimer call here -- a UI status poll must not, by itself,
+// keep an otherwise-idle daemon alive.
+- (void)getOverrideStatusWithReply:(void(^)(BOOL blockRunning, BOOL overrideActive, double overrideRemainingSecs, NSInteger remainingToday, NSInteger perDay))reply {
+    [SCDaemonBlockMethods getOverrideStatusWithReply: reply];
+}
+
 @end

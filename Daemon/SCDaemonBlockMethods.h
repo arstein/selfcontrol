@@ -52,6 +52,14 @@ NS_ASSUME_NONNULL_BEGIN
 // (XPC) queue for up to the hard deadline.
 + (void)invokeOverrideWithReply:(void(^)(NSInteger remainingAfter, NSDate* _Nullable overrideEndDate, NSError* _Nullable error))reply;
 
+// Read-only poll of the daemon's trusted-clock view of override status: no
+// daemonMethodLock, no network, always replies promptly. blockRunning is
+// whether a modern block is running at all; overrideActive/overrideRemainingSecs
+// are computed the same way the checkup's overlay decision is (trusted clock,
+// fail-closed); remainingToday/perDay reflect the stored policy/state as-is
+// (no reset applied -- resets only happen against verified time elsewhere).
++ (void)getOverrideStatusWithReply:(void(^)(BOOL blockRunning, BOOL overrideActive, double overrideRemainingSecs, NSInteger remainingToday, NSInteger perDay))reply;
+
 @end
 
 NS_ASSUME_NONNULL_END

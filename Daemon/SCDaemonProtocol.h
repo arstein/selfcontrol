@@ -33,6 +33,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)invokeOverrideWithAuthorization:(NSData *)authData
                                   reply:(void(^)(NSInteger remainingAfter, NSDate* _Nullable overrideEndDate, NSError* _Nullable error))reply;
 
+// XPC method to poll the daemon's trusted-clock view of override status. Read-
+// only, no authorization required (the connection is already code-signature
+// gated), no side effects -- safe to poll frequently, and always replies
+// promptly (no network, no lock wait).
+- (void)getOverrideStatusWithReply:(void(^)(BOOL blockRunning, BOOL overrideActive, double overrideRemainingSecs, NSInteger remainingToday, NSInteger perDay))reply;
+
 @end
 
 NS_ASSUME_NONNULL_END
