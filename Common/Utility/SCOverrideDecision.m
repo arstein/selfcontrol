@@ -12,7 +12,11 @@
                lastResetDay:(NSString*)lastResetDay
                      perDay:(NSInteger)perDay
             outNewRemaining:(NSInteger*)outNewRemaining {
-    if (verifiedDay != nil && (lastResetDay == nil || ![verifiedDay isEqualToString:lastResetDay])) {
+    // Days are yyyy-MM-dd, so lexicographic order == chronological order. Reset
+    // only on a strictly LATER day: a stale verified instant (earlier day) must
+    // never move the reset day backwards and refund the ration.
+    if (verifiedDay != nil &&
+        (lastResetDay == nil || [verifiedDay compare:lastResetDay] == NSOrderedDescending)) {
         if (outNewRemaining != NULL) *outNewRemaining = perDay;
         return YES;
     }

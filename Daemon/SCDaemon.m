@@ -144,6 +144,14 @@ static dispatch_source_t SCMakeSignalSource(int sig, dispatch_queue_t q, dispatc
 // Writes one monotonic trusted-clock checkpoint. Safe to call from the daemon's
 // normal queue only (it does real settings I/O) -- NOT from signal context.
 - (void)flushTrustedClockCheckpoint {
+    // Take the daemon method lock (bounded wait) so this read-modify-write of
+    // TrustedClockState doesn't race a concurrent verified-time / checkup write.
+    // Best-effort: if the lock can't be had quickly (e.g. a long operation is in
+    // progress), flush anyway, as before, rather than stall shutdown.
+    NSLock* lock = SCDaemonBlockMethods.daemonMethodLock;
+    BOOL locked = [lock lockBeforeDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];
+    if (!locked) NSLog(@"WARNING: Shutdown checkpoint flush proceeding without the daemon lock.");
+
     SCSettings* settings = [SCSettings sharedSettings];
     NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
     if (clockState.count > 0) {
@@ -151,6 +159,8 @@ static dispatch_source_t SCMakeSignalSource(int sig, dispatch_queue_t q, dispatc
                     forKey:@"TrustedClockState"];
         [settings syncSettingsAndWait:2];
     }
+
+    if (locked) [lock unlock];
 }
 
 - (void)startCheckupTimer {

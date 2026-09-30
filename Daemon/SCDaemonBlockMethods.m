@@ -22,6 +22,7 @@
 #import "SCOverrideDecision.h"
 #import "SCOverrideConfig.h"
 #import "SCSNTPClient.h"
+#import <stdatomic.h>
 
 NSTimeInterval METHOD_LOCK_TIMEOUT = 5.0;
 NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for checkups, because we'd prefer not to have tons pile up
@@ -51,8 +52,10 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
 + (BOOL)overrideResetPendingForTrustedNow:(NSDate*)trustedNow
                             clockAnchored:(BOOL)anchored
                                  settings:(SCSettings*)settings;
-// Applies the daily ration reset against VERIFIED time. Writes OverrideState
-// (no sync). Returns YES iff a reset was written.
+// Applies the daily ration reset against VERIFIED time. Must be called right
+// after applyVerifiedTime: succeeded (the day is taken from the freshly
+// anchored TrustedClockState; `verifiedNow` is only a nil-guard). Writes
+// OverrideState (no sync). Returns YES iff a reset was written.
 + (BOOL)applyOverrideResetForVerifiedNow:(NSDate*)verifiedNow settings:(SCSettings*)settings;
 @end
 
@@ -60,6 +63,10 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
 // serialized under daemonMethodLock (see startTediumChallengeWithReply: and
 // submitTediumEntry:reply:).
 static SCTediumChallenge* tediumChallenge = nil;
+
+// YES while an invoke's live SNTP worker is running (see invokeOverrideWithReply:).
+// Set by the invoker just before dispatch; cleared only by the worker itself.
+static atomic_bool sOverrideSNTPWorkerInFlight = false;
 
 @implementation SCDaemonBlockMethods
 
@@ -665,7 +672,18 @@ static SCTediumChallenge* tediumChallenge = nil;
     NSDictionary* policy = [settings valueForKey:@"OverridePolicy"];
     if (![ovState isKindOfClass:[NSDictionary class]] || ![policy isKindOfClass:[NSDictionary class]]) return NO;
     NSInteger perDay = [policy[@"perDay"] integerValue];
-    NSString* verifiedDay = [SCOverrideDecision dayStringForDate:verifiedNow
+    // Derive the day from the trusted clock as it stands NOW, not from the raw
+    // `verifiedNow` instant. Callers invoke this right after applyVerifiedTime:
+    // wrote a fresh anchored TrustedClockState, so `now` ~= current verified
+    // time. `verifiedNow` itself may be stale (e.g. a checkup fetch that started
+    // before midnight and completed after an invoke already committed the next
+    // day); a stale verified instant must never move the reset day backwards
+    // (and the pure rule additionally only resets on a strictly later day).
+    NSDictionary* cs = [settings valueForKey:@"TrustedClockState"];
+    BOOL anchored = [cs isKindOfClass:[NSDictionary class]] && cs[@"wallAnchor"] != nil;
+    NSDate* now = anchored ? [SCTrustedClock trustedNowForState:cs reading:[SCTrustedClock currentReading]] : nil;
+    if (now == nil) return NO;
+    NSString* verifiedDay = [SCOverrideDecision dayStringForDate:now
                                                         timeZone:[SCDaemonBlockMethods activationTimeZoneFromSettings:settings]];
     id lastReset = ovState[@"lastResetDay"];
     NSString* lastResetStr = [lastReset isKindOfClass:[NSString class]] ? lastReset : nil;
@@ -951,6 +969,20 @@ static SCTediumChallenge* tediumChallenge = nil;
     // __block storage is heap-promoted when dispatch_async copies the block, so a
     // late worker write after a timeout is memory-safe; we simply never read the
     // vars after a timeout.
+    //
+    // At most one SNTP worker in flight: a worker from an earlier invoke that hit
+    // the hard deadline may still be running (the gate was released on timeout),
+    // and repeated invokes must not pile up more. The daemon lock is already
+    // released here and the gate is held, so the only thing to undo on refusal
+    // is the gate. The flag is set here (only when we are about to dispatch) and
+    // cleared solely by the worker at the very end of its work, whether or not
+    // we timed out waiting for it -- so no return path below can leak it.
+    if (atomic_exchange(&sOverrideSNTPWorkerInFlight, true)) {
+        NSLog(@"WARNING: Override invoke refused: previous network-time fetch still in flight.");
+        [gate unlock];
+        reply(0, nil, [SCErr errorWithCode: 320]); // busy; app may retry
+        return;
+    }
     __block NSDate* verified = nil;
     __block NSDictionary* verifiedReading = nil;
     dispatch_semaphore_t done = dispatch_semaphore_create(0);
@@ -961,6 +993,7 @@ static SCTediumChallenge* tediumChallenge = nil;
             verified = v;
             verifiedReading = r;
         }
+        atomic_store(&sOverrideSNTPWorkerInFlight, false);
         dispatch_semaphore_signal(done);
     });
     long waitResult = dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(SC_OVERRIDE_VERIFY_HARD_DEADLINE_SECS * NSEC_PER_SEC)));
@@ -994,7 +1027,8 @@ static SCTediumChallenge* tediumChallenge = nil;
         return;
     }
 
-    // (10) Apply verified time exactly as handleVerifiedTime: would.
+    // (10) Apply verified time via the same applyVerifiedTime: path that
+    // handleVerifiedTime: uses (the ration reset is handled in (12)/(13)/(14)).
     BOOL removed = NO;
     BOOL correctedStart = NO;
     if (![SCDaemonBlockMethods applyVerifiedTime:verifiedNow
@@ -1062,10 +1096,15 @@ static SCTediumChallenge* tediumChallenge = nil;
         denyCode = 334;
     }
     if (denyCode != 0) {
-        // Persist the verified-time writes we already made (as handleVerifiedTime: would).
+        // Denied, but we hold verified time: persist the verified-time writes we
+        // already made plus any due daily ration reset (the same verified-time
+        // side effects handleVerifiedTime: persists), so a deny doesn't leave a
+        // due reset unpersisted.
+        BOOL resetApplied = [SCDaemonBlockMethods applyOverrideResetForVerifiedNow:verifiedNow settings:settings];
+        if (resetApplied) NSLog(@"INFO: Daily override ration reset against verified network time.");
         NSError* syncError = [settings syncSettingsAndWait:5];
         if (syncError != nil) NSLog(@"WARNING: failed to persist verified time: %@", syncError);
-        if (correctedStart) [SCHelperToolUtilities sendConfigurationChangedNotification];
+        if (correctedStart || resetApplied) [SCHelperToolUtilities sendConfigurationChangedNotification];
         [self.daemonMethodLock unlock];
         [gate unlock];
         reply(0, nil, [SCErr errorWithCode:denyCode]);

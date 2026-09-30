@@ -42,6 +42,13 @@
     XCTAssertTrue([SCOverrideDecision resetForVerifiedDay:@"2026-09-30" lastResetDay:nil perDay:5 outNewRemaining:&out]);
     XCTAssertEqual(out, 5);
 }
+- (void)testResetEarlierDayDoesNotReset {
+    // A stale verified instant (e.g. a fetch in flight across midnight) must
+    // never move the reset day backwards and refund the ration.
+    NSInteger out = -1;
+    XCTAssertFalse([SCOverrideDecision resetForVerifiedDay:@"2026-09-29" lastResetDay:@"2026-09-30" perDay:3 outNewRemaining:&out]);
+    XCTAssertEqual(out, -1);
+}
 
 #pragma mark invoke gate
 
