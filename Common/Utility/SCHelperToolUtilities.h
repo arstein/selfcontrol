@@ -19,6 +19,10 @@ NS_ASSUME_NONNULL_BEGIN
 // ipfw firewall.
 + (void)installBlockRulesFromSettings;
 
+// Removes the hosts/pf block rules WITHOUT touching settings/flags or playing
+// the end sound. Used to temporarily lift the base block during an override.
++ (void)clearBlockRulesOnly;
+
 // exits the daemon process cleanly once settings are synced; launchd's
 // KeepAlive={SuccessfulExit=false} keeps it dead until relaunched on-demand
 + (void)unloadDaemonJob;
