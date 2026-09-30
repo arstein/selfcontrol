@@ -822,7 +822,11 @@ static SCTediumChallenge* tediumChallenge = nil;
     NSInteger perDay  = [policy isKindOfClass:[NSDictionary class]] ? [policy[@"perDay"] integerValue] : 0;
     NSInteger minutes = [policy isKindOfClass:[NSDictionary class]] ? [policy[@"minutes"] integerValue] : 0;
 
-    BOOL baseEnforcing = modernRunning && !alreadyActive;
+    // A modern block must be running to override. `alreadyActive` is a SEPARATE
+    // deny reason checked by the gate (below), so it must NOT be folded into
+    // baseEnforcing — otherwise an invoke during an active override would report
+    // "no active block" (330) instead of "already running" (331).
+    BOOL baseEnforcing = modernRunning;
 
     // Midnight reset (in-memory only; trusted day in the pinned activation zone) before the exhaustion check.
     NSInteger remaining = [ovState[@"remainingToday"] integerValue];
