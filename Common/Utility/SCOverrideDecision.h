@@ -35,6 +35,13 @@ typedef NS_ENUM(NSInteger, SCOverrideInvokeResult) {
 // yyyy-MM-dd for `date` evaluated in `tz` (POSIX/en_US_POSIX, gregorian).
 + (NSString*)dayStringForDate:(NSDate*)date timeZone:(NSTimeZone*)tz;
 
+/// Seconds of lift remaining, fail-closed: 0 unless clockAnchored, both dates non-nil,
+/// and 0 < (overrideEndDate - trustedNow) <= maxLiftSecs. Otherwise returns end - now.
++ (NSTimeInterval)liftRemainingSecsWithTrustedNow:(nullable NSDate*)trustedNow
+                                   overrideEndDate:(nullable NSDate*)overrideEndDate
+                                     clockAnchored:(BOOL)clockAnchored
+                                       maxLiftSecs:(NSTimeInterval)maxLiftSecs;
+
 @end
 
 NS_ASSUME_NONNULL_END

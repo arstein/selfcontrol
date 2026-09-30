@@ -411,11 +411,10 @@ static SCTediumChallenge* tediumChallenge = nil;
                                                     reading:[SCTrustedClock currentReading]];
     NSDate* overrideEndDate = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:NULL];
     BOOL clockAnchored = [clockState isKindOfClass:[NSDictionary class]] && clockState[@"wallAnchor"] != nil;
-    NSTimeInterval liftRemaining = (trustedNow != nil && overrideEndDate != nil)
-        ? [overrideEndDate timeIntervalSinceDate:trustedNow] : -1;
-    BOOL withinLiftBound = (liftRemaining >= 0) && (liftRemaining <= SC_OVERRIDE_MAX_LIFT_SECS);
-    BOOL overrideActive = clockAnchored && withinLiftBound &&
-        [SCOverrideDecision overrideActiveWithTrustedNow:trustedNow overrideEndDate:overrideEndDate];
+    BOOL overrideActive = [SCOverrideDecision liftRemainingSecsWithTrustedNow:trustedNow
+                                                               overrideEndDate:overrideEndDate
+                                                                 clockAnchored:clockAnchored
+                                                                   maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS] > 0;
 
     // Opportunistic midnight reset of the daily override counter. Only ever
     // performed against trustedNow (never the local wall clock), so a forward

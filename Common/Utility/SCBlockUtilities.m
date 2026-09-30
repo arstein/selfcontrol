@@ -189,6 +189,10 @@ NSString* const SCKillerExpiryNotVerifiedMarker = @"SC_KILLER_REFUSED_EXPIRY_NOT
     [settings setValue: nil forKey: @"BlockEndDate"];
     [settings setValue: nil forKey: @"ActiveBlocklist"];
     [settings setValue: nil forKey: @"ActiveBlockAsWhitelist"];
+    // Stale override state must not outlive its block.
+    [settings setValue: nil forKey: @"OverrideState"];
+    [settings setValue: nil forKey: @"OverridePolicy"];
+    [settings setValue: nil forKey: @"ActivationTimeZone"];
     [self clearTrustedTimingSettings];
 }
 

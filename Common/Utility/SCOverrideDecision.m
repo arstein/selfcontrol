@@ -32,6 +32,16 @@
     return SCOverrideInvokeAllowed;
 }
 
++ (NSTimeInterval)liftRemainingSecsWithTrustedNow:(NSDate*)trustedNow
+                                   overrideEndDate:(NSDate*)overrideEndDate
+                                     clockAnchored:(BOOL)clockAnchored
+                                       maxLiftSecs:(NSTimeInterval)maxLiftSecs {
+    if (trustedNow == nil || overrideEndDate == nil || !clockAnchored) return 0;
+    NSTimeInterval remaining = [overrideEndDate timeIntervalSinceDate:trustedNow];
+    if (remaining <= 0 || remaining > maxLiftSecs) return 0;
+    return remaining;
+}
+
 + (NSString*)dayStringForDate:(NSDate*)date timeZone:(NSTimeZone*)tz {
     static NSDateFormatter* fmt;
     static dispatch_once_t once;
