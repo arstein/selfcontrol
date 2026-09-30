@@ -24,13 +24,48 @@
 
 #import "TimerWindowController.h"
 #import "SCUIUtilities.h"
+#import "SCXPCClient.h"
 #import <math.h>
 
 @interface TimerWindowController ()
 
 @property(nonatomic, readonly) AppController* appController;
 
+// Phase 4: minimal, programmatically-created override UI. These are plain
+// properties (not IBOutlets) because the controls aren't in the xib -- see
+// -setUpOverrideControlsIfNeeded.
+@property (nonatomic, strong) NSButton* invokeOverrideButton_;
+@property (nonatomic, strong) NSTextField* overrideStatusLabel_;
+
+- (void)setUpOverrideControlsIfNeeded;
+- (void)refreshOverrideUI;
+- (IBAction)invokeOverride:(id)sender;
+
 @end
+
+// A half-open vertical interval [minY, maxY) in a view's local coordinate
+// space, used to find empty space for the override controls below.
+typedef struct {
+    CGFloat minY;
+    CGFloat maxY;
+} SCVerticalInterval;
+
+static int SCCompareVerticalIntervals(const void* a, const void* b) {
+    CGFloat ay = ((const SCVerticalInterval*)a)->minY;
+    CGFloat by = ((const SCVerticalInterval*)b)->minY;
+    if (ay < by) return -1;
+    if (ay > by) return 1;
+    return 0;
+}
+
+// Layout constants for the override row (Phase 4).
+static const CGFloat kOverrideRowMargin = 18.0;
+static const CGFloat kOverrideButtonWidth = 200.0;
+static const CGFloat kOverrideButtonHeight = 28.0;
+static const CGFloat kOverrideLabelHeight = 14.0;
+static const CGFloat kOverrideRowSpacing = 4.0;
+static const CGFloat kOverrideVerticalPadding = 8.0;
+static const CGFloat kOverrideWindowGrowth = 56.0;
 
 @implementation TimerWindowController
 
@@ -118,6 +153,16 @@
     [NSTimer scheduledTimerWithTimeInterval: 3.0 repeats: NO block:^(NSTimer * _Nonnull timer) {
         [SCSentry showErrorReportingPromptIfNeeded];
     }];
+
+    // Phase 4: set up the (programmatic, not-in-xib) override controls now that
+    // the window and its nib-defined controls are loaded and laid out.
+    //
+    // NOTE: this is done here rather than in -windowDidLoad because this class's
+    // -awakeFromNib override above doesn't call [super awakeFromNib], and
+    // NSWindowController relies on that super call to trigger -windowDidLoad.
+    // Adding a -windowDidLoad override without that super call would silently
+    // never fire, so we hook the one lifecycle method we know actually runs.
+    [self setUpOverrideControlsIfNeeded];
 }
 
 - (void)blockEnded {
@@ -133,7 +178,8 @@
     [timerLabel_ sizeToFit];
 
     [self resetStrikes];
-    
+    [self refreshOverrideUI];
+
     [SCSentry addBreadcrumb: @"Block ended and timer window is closing" category: @"app"];
 }
 
@@ -233,6 +279,8 @@
     if ([SCBlockUtilities modernBlockIsRunning]) {
         addToBlockButton_.enabled = ![settings_ boolForKey: @"ActiveBlockAsWhitelist"];
     }
+
+    [self refreshOverrideUI];
 }
 
 - (void)windowShouldClose:(NSNotification *)notification {
@@ -313,6 +361,7 @@
     // update the blocklist teaser in case that changed
     blocklistTeaserLabel_.stringValue = [SCUIUtilities blockTeaserStringWithMaxLength: 45];
     [self updateTimerDisplay: nil];
+    [self refreshOverrideUI];
 }
 
 - (void)didEndSheet:(NSWindow *)sheet returnCode:(int)returnCode contextInfo:(void *)contextInfo {
@@ -475,6 +524,211 @@
 
 - (void)dealloc {
 	[timerUpdater_ invalidate];
+}
+
+#pragma mark - Override UI (Phase 4, minimal/interim)
+
+// Finds the largest vertical band, at least minHeight tall, within
+// contentView's own bounds that doesn't overlap the frame of any view in
+// `views`. The views are assumed to be direct subviews of contentView (so
+// their .frame is already in its coordinate space). Returns NSZeroRect if
+// no such band exists.
+- (NSRect)availableBandInView:(NSView*)contentView avoidingViews:(NSArray<NSView*>*)views minHeight:(CGFloat)minHeight {
+    CGFloat contentWidth = NSWidth(contentView.bounds);
+    CGFloat contentHeight = NSHeight(contentView.bounds);
+
+    NSUInteger count = views.count;
+    if (count == 0) {
+        return (contentHeight >= minHeight) ? contentView.bounds : NSZeroRect;
+    }
+
+    SCVerticalInterval* intervals = calloc(count, sizeof(SCVerticalInterval));
+    if (intervals == NULL) {
+        return NSZeroRect;
+    }
+    for (NSUInteger i = 0; i < count; i++) {
+        NSRect f = ((NSView*)views[i]).frame;
+        intervals[i].minY = NSMinY(f);
+        intervals[i].maxY = NSMaxY(f);
+    }
+    qsort(intervals, count, sizeof(SCVerticalInterval), SCCompareVerticalIntervals);
+
+    CGFloat cursor = 0;
+    NSRect bestGap = NSZeroRect;
+    CGFloat bestGapHeight = 0;
+
+    for (NSUInteger i = 0; i < count; i++) {
+        CGFloat gapHeight = intervals[i].minY - cursor;
+        if (gapHeight > bestGapHeight) {
+            bestGapHeight = gapHeight;
+            bestGap = NSMakeRect(0, cursor, contentWidth, gapHeight);
+        }
+        if (intervals[i].maxY > cursor) {
+            cursor = intervals[i].maxY;
+        }
+    }
+
+    // the trailing gap, from the topmost occupied point up to the top of the view
+    CGFloat trailingGapHeight = contentHeight - cursor;
+    if (trailingGapHeight > bestGapHeight) {
+        bestGapHeight = trailingGapHeight;
+        bestGap = NSMakeRect(0, cursor, contentWidth, trailingGapHeight);
+    }
+
+    free(intervals);
+
+    return (bestGapHeight >= minHeight) ? bestGap : NSZeroRect;
+}
+
+// Creates the (minimal, interim) invoke-override button + status label and adds
+// them as plain subviews of the window's content view -- NOT via the xib, since
+// hand-editing that nib's XML is fragile. Safe to call more than once; only the
+// first call does anything.
+- (void)setUpOverrideControlsIfNeeded {
+    if (self.invokeOverrideButton_ != nil) {
+        return;
+    }
+
+    NSWindow* window = self.window;
+    NSView* contentView = window.contentView;
+    if (contentView == nil) {
+        NSLog(@"WARNING: TimerWindowController has no content view; skipping override UI setup.");
+        return;
+    }
+
+    [contentView layoutSubtreeIfNeeded];
+
+    NSMutableArray<NSView*>* existingControls = [NSMutableArray array];
+    if (addToBlockButton_ != nil)      { [existingControls addObject: addToBlockButton_]; }
+    if (killBlockButton_ != nil)       { [existingControls addObject: killBlockButton_]; }
+    if (extendBlockButton_ != nil)     { [existingControls addObject: extendBlockButton_]; }
+    if (blocklistTeaserLabel_ != nil)  { [existingControls addObject: blocklistTeaserLabel_]; }
+    if (timerLabel_ != nil)            { [existingControls addObject: timerLabel_]; }
+    if (legacyBlockWarningLabel_ != nil) { [existingControls addObject: legacyBlockWarningLabel_]; }
+
+    CGFloat neededHeight = kOverrideButtonHeight + kOverrideRowSpacing + kOverrideLabelHeight + (kOverrideVerticalPadding * 2);
+
+    NSRect gap = [self availableBandInView: contentView avoidingViews: existingControls minHeight: neededHeight];
+
+    if (gap.size.height <= 0) {
+        // Not enough room among the existing controls -- grow the window's
+        // content height, keeping the top-left corner anchored on screen (so
+        // the window doesn't jump around), and try again.
+        NSRect windowFrame = window.frame;
+        windowFrame.origin.y -= kOverrideWindowGrowth;
+        windowFrame.size.height += kOverrideWindowGrowth;
+        [window setFrame: windowFrame display: YES];
+        [contentView layoutSubtreeIfNeeded];
+
+        gap = [self availableBandInView: contentView avoidingViews: existingControls minHeight: neededHeight];
+    }
+
+    if (gap.size.height <= 0) {
+        NSLog(@"WARNING: TimerWindowController couldn't find a safe, non-overlapping spot for the override controls, even after growing the window. Skipping override UI setup.");
+        return;
+    }
+
+    CGFloat contentWidth = NSWidth(contentView.bounds);
+    CGFloat rowWidth = contentWidth - (kOverrideRowMargin * 2);
+    if (rowWidth < 40) {
+        NSLog(@"WARNING: TimerWindowController's content view is too narrow for the override controls. Skipping override UI setup.");
+        return;
+    }
+
+    // Center our two-row block (label above button) vertically within the gap.
+    CGFloat blockHeight = kOverrideButtonHeight + kOverrideRowSpacing + kOverrideLabelHeight;
+    CGFloat blockBottom = NSMinY(gap) + MAX((CGFloat)0.0, (NSHeight(gap) - blockHeight) / 2.0);
+
+    NSButton* button = [[NSButton alloc] initWithFrame: NSMakeRect(kOverrideRowMargin, blockBottom, MIN(kOverrideButtonWidth, rowWidth), kOverrideButtonHeight)];
+    button.bezelStyle = NSBezelStyleRounded;
+    button.title = @"Invoke override";
+    button.target = self;
+    button.action = @selector(invokeOverride:);
+    button.autoresizingMask = NSViewMaxYMargin;
+    [contentView addSubview: button];
+    self.invokeOverrideButton_ = button;
+
+    NSTextField* label = [[NSTextField alloc] initWithFrame: NSMakeRect(kOverrideRowMargin, blockBottom + kOverrideButtonHeight + kOverrideRowSpacing, rowWidth, kOverrideLabelHeight)];
+    label.editable = NO;
+    label.selectable = NO;
+    label.bezeled = NO;
+    label.drawsBackground = NO;
+    label.alignment = NSTextAlignmentLeft;
+    label.lineBreakMode = NSLineBreakByTruncatingTail;
+    label.font = [NSFont systemFontOfSize: [NSFont smallSystemFontSize]];
+    label.textColor = [NSColor secondaryLabelColor];
+    label.hidden = YES;
+    label.autoresizingMask = (NSViewWidthSizable | NSViewMaxYMargin);
+    [contentView addSubview: label];
+    self.overrideStatusLabel_ = label;
+
+    [self refreshOverrideUI];
+}
+
+// Refreshes the override button/label from current SCSettings state. Safe to
+// call before the controls exist (no-ops), and cheap enough to call on every
+// timer tick / configuration change.
+- (void)refreshOverrideUI {
+    if (self.invokeOverrideButton_ == nil) {
+        return;
+    }
+
+    SCSettings* settings = [SCSettings sharedSettings];
+    NSDictionary* policy = [settings valueForKey: @"OverridePolicy"];
+    NSDictionary* state  = [settings valueForKey: @"OverrideState"];
+
+    NSInteger perDay    = [policy isKindOfClass: [NSDictionary class]] ? [policy[@"perDay"] integerValue] : 0;
+    NSInteger remaining = [state isKindOfClass: [NSDictionary class]] ? [state[@"remainingToday"] integerValue] : 0;
+
+    id endVal = [state isKindOfClass: [NSDictionary class]] ? state[@"overrideEndDate"] : nil;
+    NSDate* end = [endVal isKindOfClass: [NSDate class]] ? endVal : nil;
+    BOOL active = (end != nil) && ([end timeIntervalSinceNow] > 0);
+
+    if (active) {
+        NSInteger secs = (NSInteger)round([end timeIntervalSinceNow]);
+        self.overrideStatusLabel_.stringValue = [NSString stringWithFormat: @"Override active — %ldm %02lds left", (long)(secs / 60), (long)(secs % 60)];
+        self.overrideStatusLabel_.hidden = NO;
+    } else {
+        self.overrideStatusLabel_.hidden = YES;
+    }
+
+    self.invokeOverrideButton_.title = [NSString stringWithFormat: @"Invoke override (%ld left)", (long)remaining];
+    self.invokeOverrideButton_.enabled = (perDay > 0) && (remaining > 0) && !active;
+    self.invokeOverrideButton_.hidden = (perDay <= 0); // hide entirely for blocks with no override policy
+}
+
+- (IBAction)invokeOverride:(id)sender {
+    SCSettings* settings = [SCSettings sharedSettings];
+    NSDictionary* policy = [settings valueForKey: @"OverridePolicy"];
+    NSDictionary* state  = [settings valueForKey: @"OverrideState"];
+
+    NSInteger minutes   = [policy isKindOfClass: [NSDictionary class]] ? [policy[@"minutes"] integerValue] : 0;
+    NSInteger remaining = [state isKindOfClass: [NSDictionary class]] ? [state[@"remainingToday"] integerValue] : 0;
+
+    NSAlert* alert = [[NSAlert alloc] init];
+    alert.messageText = @"Use an override?";
+    alert.informativeText = [NSString stringWithFormat:
+        @"This uses 1 of your %ld remaining overrides today and unblocks sites for %ld minutes. You can't cancel it once it starts.",
+        (long)remaining, (long)minutes];
+    [alert addButtonWithTitle: @"Use Override"];
+    [alert addButtonWithTitle: @"Cancel"];
+
+    [alert beginSheetModalForWindow: self.window completionHandler:^(NSModalResponse response) {
+        if (response != NSAlertFirstButtonReturn) {
+            return;
+        }
+
+        self.invokeOverrideButton_.enabled = NO;
+
+        [self.appController.xpc invokeOverride:^(NSInteger remainingAfter, NSDate * _Nullable overrideEndDate, NSError * _Nullable error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (error != nil) {
+                    [SCUIUtilities presentError: error];
+                }
+                [self refreshOverrideUI];
+            });
+        }];
+    }];
 }
 
 #pragma mark - Properties
