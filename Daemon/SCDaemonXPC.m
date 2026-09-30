@@ -103,4 +103,18 @@
     [SCDaemonBlockMethods submitTediumEntry: digit reply: reply];
 }
 
+- (void)invokeOverrideWithAuthorization:(NSData *)authData
+                                  reply:(void(^)(NSInteger remainingAfter, NSDate* _Nullable overrideEndDate, NSError* _Nullable error))reply {
+    NSLog(@"XPC method called: invokeOverrideWithAuthorization");
+
+    NSError* error = [SCXPCAuthorization checkAuthorization: authData command: _cmd];
+    if (error != nil) {
+        NSLog(@"AUTHORIZATION FAILED for invokeOverride: %@", error);
+        reply(0, nil, error);
+        return;
+    }
+    NSLog(@"AUTHORIZATION ACCEPTED for invokeOverride");
+    [SCDaemonBlockMethods invokeOverrideWithReply: reply];
+}
+
 @end
