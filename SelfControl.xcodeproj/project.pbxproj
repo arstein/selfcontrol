@@ -11,6 +11,7 @@
 		0C9F4B971321BEAF47EA415A /* SCTediumChallenge.m in Sources */ = {isa = PBXBuildFile; fileRef = 79957742827112D9CEEDAC30 /* SCTediumChallenge.m */; };
 		1B2E23F29C9745ECE6481B58 /* SCMinutesValueTransformer.m in Sources */ = {isa = PBXBuildFile; fileRef = AB08B8166109BB41FB60297D /* SCMinutesValueTransformer.m */; };
 		1D6F3A5DF697E575B95E6389 /* SCTediumChallenge.m in Sources */ = {isa = PBXBuildFile; fileRef = 79957742827112D9CEEDAC30 /* SCTediumChallenge.m */; };
+		21AF92BBCF4D26FE4A2D0F6D /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91292ED313D37246F4C032E2 /* Components.swift */; };
 		2F9989BADDC99A606C164352 /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		30A5008975210B30439A05ED /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		30F48D88C3698773586040F6 /* UIFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */; };
@@ -601,6 +602,7 @@
 		895BEE3423889EBCCFFD10F9 /* SCMinutesValueTransformerTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCMinutesValueTransformerTests.m; sourceTree = "<group>"; };
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* SelfControl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SelfControl.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		91292ED313D37246F4C032E2 /* Components.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		949F9F8815B32EC6007B8B42 /* zh-Hans */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		949F9F8D15B333A1007B8B42 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		AB08B8166109BB41FB60297D /* SCMinutesValueTransformer.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCMinutesValueTransformer.m; sourceTree = "<group>"; };
@@ -1719,6 +1721,7 @@
 				0355C8DA4854E076651125A6 /* Theme.swift */,
 				B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */,
 				F941664451CD7AE1E9AEC3AF /* AppModel.swift */,
+				91292ED313D37246F4C032E2 /* Components.swift */,
 			);
 			name = UI;
 			path = UI;
@@ -3812,6 +3815,7 @@
 				5D3D3DC07F2795ED3633C9DF /* Theme.swift in Sources */,
 				4D0D506CC517333BF9CD146F /* UIFormatting.swift in Sources */,
 				6123D11BFFE3AEC36F930820 /* AppModel.swift in Sources */,
+				21AF92BBCF4D26FE4A2D0F6D /* Components.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
