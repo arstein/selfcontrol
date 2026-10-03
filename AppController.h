@@ -144,8 +144,8 @@
 
 #pragma mark - Actions for the SwiftUI window (completion is always called on the main queue)
 
-// Serializes block modifications (add entries / extend). Shared by old + new UI.
-@property (nonatomic, strong, readonly) NSLock* modifyBlockLock;
+// Both methods below must be called on the main thread; they are serialized
+// by a main-thread-only "modifying block" flag (busy -> error, not queued).
 
 // Adds cleaned entries from rawInput to the RUNNING block via the daemon's
 // updateBlocklist. Mirrors -addToBlockList:lock: but returns errors instead of

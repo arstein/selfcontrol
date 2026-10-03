@@ -38,7 +38,9 @@
 
 @property (atomic, strong, readwrite) SCXPCClient* xpc;
 @property (nonatomic, strong) SCTediumWindowController* tediumWindowController;
-@property (nonatomic, strong, readwrite) NSLock* modifyBlockLock;
+// Main-thread-only guard serializing the SwiftUI window's block modifications
+// (add entries / extend). The old TimerWindowController keeps its own NSLock.
+@property (nonatomic, assign) BOOL modifyingBlock;
 
 @end
 
@@ -65,7 +67,6 @@ static void* AppControllerMaxBlockLengthContext = &AppControllerMaxBlockLengthCo
 		// method alter the blockIsOn variable atomically (will no longer be necessary once we can
 		// use properties).
 		refreshUILock_ = [[NSLock alloc] init];
-		self.modifyBlockLock = [[NSLock alloc] init];
 	}
 
 	return self;
@@ -899,8 +900,16 @@ static void* AppControllerMaxBlockLengthContext = &AppControllerMaxBlockLengthCo
 }
 
 - (void)addEntriesToRunningBlock:(NSString*)rawInput completion:(void (^)(NSError* _Nullable error))completion {
+    NSAssert([NSThread isMainThread], @"addEntriesToRunningBlock must be called on the main thread");
     void (^finish)(NSError*) = ^(NSError* err) {
         dispatch_async(dispatch_get_main_queue(), ^{ completion(err); });
+    };
+    // Used only once modifyingBlock has been claimed by this call.
+    void (^finishAndRelease)(NSError*) = ^(NSError* err) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.modifyingBlock = NO;
+            completion(err);
+        });
     };
 
     if (![SCUIUtilities blockIsRunning]) { finish([SCErr errorWithCode: 102]); return; }
@@ -916,10 +925,11 @@ static void* AppControllerMaxBlockLengthContext = &AppControllerMaxBlockLengthCo
         finish([self uiErrorWithDescription: NSLocalizedString(@"No network connection detected", "No network connection detected message")]);
         return;
     }
-    if (![self.modifyBlockLock tryLock]) {
+    if (self.modifyingBlock) {
         finish([self uiErrorWithDescription: NSLocalizedString(@"Another change to this block is still in progress.", @"busy modifying block")]);
         return;
     }
+    self.modifyingBlock = YES;
 
     // Note we RETRIEVE the latest list from settings (ActiveBlocklist), but we SET the new list in defaults
     // since the helper daemon should be the only one changing ActiveBlocklist
@@ -938,15 +948,22 @@ static void* AppControllerMaxBlockLengthContext = &AppControllerMaxBlockLengthCo
             if (error == nil) {
                 [SCSentry addBreadcrumb: @"Blocklist updated successfully" category:@"app"];
             }
-            [self.modifyBlockLock unlock];
-            finish(error);
+            finishAndRelease(error);
         }];
     }];
 }
 
 - (void)extendRunningBlockByMinutes:(NSInteger)minutes completion:(void (^)(NSError* _Nullable error))completion {
+    NSAssert([NSThread isMainThread], @"extendRunningBlockByMinutes must be called on the main thread");
     void (^finish)(NSError*) = ^(NSError* err) {
         dispatch_async(dispatch_get_main_queue(), ^{ completion(err); });
+    };
+    // Used only once modifyingBlock has been claimed by this call.
+    void (^finishAndRelease)(NSError*) = ^(NSError* err) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.modifyingBlock = NO;
+            completion(err);
+        });
     };
 
     NSInteger maxBlockLength = [defaults_ integerForKey: @"MaxBlockLength"];
@@ -955,12 +972,17 @@ static void* AppControllerMaxBlockLengthContext = &AppControllerMaxBlockLengthCo
 
     if (![SCUIUtilities blockIsRunning]) { finish([SCErr errorWithCode: 103]); return; }
     if (![SCBlockUtilities modernBlockIsRunning]) { finish([SCErr errorWithCode: 306]); return; }
-    if (![self.modifyBlockLock tryLock]) {
+    if (self.modifyingBlock) {
         finish([self uiErrorWithDescription: NSLocalizedString(@"Another change to this block is still in progress.", @"busy modifying block")]);
         return;
     }
+    self.modifyingBlock = YES;
 
     NSDate* oldBlockEndDate = [settings_ valueForKey: @"BlockEndDate"];
+    if (oldBlockEndDate == nil) {
+        finishAndRelease([self uiErrorWithDescription: NSLocalizedString(@"This block has already ended.", @"extend error when the block is over")]);
+        return;
+    }
     NSDate* newBlockEndDate = [oldBlockEndDate dateByAddingTimeInterval: (minutes * 60)];
 
     // we're about to launch a helper tool which will read settings, so make sure the ones on disk are valid
@@ -970,16 +992,14 @@ static void* AppControllerMaxBlockLengthContext = &AppControllerMaxBlockLengthCo
     [self.xpc refreshConnectionAndRun:^{
         // Before we try to extend the block, make sure the block time didn't run out (or is about to run out) in the meantime
         if ([SCBlockUtilities currentBlockIsExpired] || [oldBlockEndDate timeIntervalSinceNow] < 1) {
-            [self.modifyBlockLock unlock];
-            finish(nil);
+            finishAndRelease([self uiErrorWithDescription: NSLocalizedString(@"This block has already ended.", @"extend error when the block is over")]);
             return;
         }
         [self.xpc updateBlockEndDate: newBlockEndDate reply:^(NSError * _Nonnull error) {
             if (error == nil) {
                 [SCSentry addBreadcrumb: @"App extended block duration successfully" category:@"app"];
             }
-            [self.modifyBlockLock unlock];
-            finish(error);
+            finishAndRelease(error);
         }];
     }];
 }

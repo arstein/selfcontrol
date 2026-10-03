@@ -27,6 +27,13 @@ struct OverrideStatus: Equatable {
 
 enum TediumFlash: Equatable { case wrong, tooFast }
 
+/// Outcome of a running-block action. `.cancelled` = nothing to report (auth cancel, not live).
+enum ActionResult: Equatable {
+    case ok
+    case cancelled
+    case failed(String)
+}
+
 struct TediumState: Equatable {
     var started = false
     var digit: Int? = nil
@@ -77,8 +84,10 @@ final class AppModel: ObservableObject {
 
     let live: Bool
     private let defaults: UserDefaults
-    private var timer: Timer?
-    private var strikes = 0
+    // nonisolated(unsafe) only so deinit can invalidate it; otherwise touched on main only.
+    nonisolated(unsafe) private var timer: Timer?
+    private var finishingSinceUptime: TimeInterval?
+    private var stuckReported = false
     private var statusInFlight = false
     private var statusRequestUptime: TimeInterval = 0
     private var lastStatus: (remaining: Double, active: Bool, remainingToday: Int, perDay: Int, uptime: TimeInterval)?
@@ -98,9 +107,16 @@ final class AppModel: ObservableObject {
 
     deinit {
         if let o = defaultsObserver { NotificationCenter.default.removeObserver(o) }
+        timer?.invalidate()
     }
 
-    private var appController: AppController? { NSApp.delegate as? AppController }
+    /// nil when !live: previews/tests run inside the app process and must never reach it.
+    private var appController: AppController? { live ? NSApp.delegate as? AppController : nil }
+
+    /// Assigns only on change, so per-second reloads don't spam objectWillChange.
+    private func assign<T: Equatable>(_ kp: ReferenceWritableKeyPath<AppModel, T>, _ v: T) {
+        if self[keyPath: kp] != v { self[keyPath: kp] = v }
+    }
 
     // MARK: - Derived
 
@@ -128,6 +144,11 @@ final class AppModel: ObservableObject {
         timer = t
     }
 
+    func stopTicking() {
+        timer?.invalidate()
+        timer = nil
+    }
+
     private func tick() {
         // AppController.refreshUserInterface handles block on/off side effects and calls back into reload().
         if let ac = appController { ac.refreshUserInterface() } else { reload() }
@@ -139,34 +160,47 @@ final class AppModel: ObservableObject {
         let wasRunning = isBlockRunning
         let settings = SCSettings.shared()
 
-        isBlockRunning = SCUIUtilities.blockIsRunning()
-        isModernBlock = SCBlockUtilities.modernBlockIsRunning()
-        isLegacyBlock = !isModernBlock && SCBlockUtilities.legacyBlockIsRunning()
-        isAddingBlock = appController?.addingBlock ?? false
-        activeEntries = settings.value(forKey: "ActiveBlocklist") as? [String] ?? []
-        isActiveAllowlist = settings.bool(forKey: "ActiveBlockAsWhitelist")
-        blockDurationSecs = (settings.value(forKey: "BlockDurationSecs") as? NSNumber)?.doubleValue
+        assign(\.isBlockRunning, SCUIUtilities.blockIsRunning())
+        let modern = SCBlockUtilities.modernBlockIsRunning()
+        assign(\.isModernBlock, modern)
+        assign(\.isLegacyBlock, !modern && SCBlockUtilities.legacyBlockIsRunning())
+        assign(\.isAddingBlock, appController?.addingBlock ?? false)
+        assign(\.activeEntries, settings.value(forKey: "ActiveBlocklist") as? [String] ?? [])
+        assign(\.isActiveAllowlist, settings.bool(forKey: "ActiveBlockAsWhitelist"))
+        assign(\.blockDurationSecs, (settings.value(forKey: "BlockDurationSecs") as? NSNumber)?.doubleValue)
         reloadDefaults()
         updateTime()
         refreshOverride()
 
         if wasRunning != isBlockRunning {
-            path = []
-            sheet = nil
-            if !isBlockRunning { tedium = TediumState() }
+            if !isBlockRunning && tedium.blockRemoved {
+                // let the "Block removed." state show briefly before resetting
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                    guard let self, !self.isBlockRunning else { return }
+                    self.resetNavigation()
+                }
+            } else {
+                resetNavigation()
+            }
         }
+    }
+
+    private func resetNavigation() {
+        assign(\.path, [])
+        assign(\.sheet, nil)
+        if !isBlockRunning { assign(\.tedium, TediumState()) }
     }
 
     func reloadDefaults() {
         guard live else { return }
-        editableEntries = defaults.stringArray(forKey: "Blocklist") ?? []
-        isAllowlist = defaults.bool(forKey: "BlockAsWhitelist")
-        maxBlockLengthMinutes = max(1, defaults.integer(forKey: "MaxBlockLength"))
-        blockDurationMinutes = defaults.integer(forKey: "BlockDuration")
-        overridePerDayDefault = defaults.integer(forKey: "OverridePerDay")
-        overrideMinutesDefault = defaults.integer(forKey: "OverrideMinutes")
-        keepWindowOnTop = defaults.bool(forKey: "TimerWindowFloats")
-        highlightInvalidHosts = defaults.bool(forKey: "HighlightInvalidHosts")
+        assign(\.editableEntries, defaults.stringArray(forKey: "Blocklist") ?? [])
+        assign(\.isAllowlist, defaults.bool(forKey: "BlockAsWhitelist"))
+        assign(\.maxBlockLengthMinutes, max(1, defaults.integer(forKey: "MaxBlockLength")))
+        assign(\.blockDurationMinutes, defaults.integer(forKey: "BlockDuration"))
+        assign(\.overridePerDayDefault, defaults.integer(forKey: "OverridePerDay"))
+        assign(\.overrideMinutesDefault, defaults.integer(forKey: "OverrideMinutes"))
+        assign(\.keepWindowOnTop, defaults.bool(forKey: "TimerWindowFloats"))
+        assign(\.highlightInvalidHosts, defaults.bool(forKey: "HighlightInvalidHosts"))
         // keep the Ready duration inside the (possibly lowered) max, as the old KVO did
         if !isBlockRunning && blockDurationMinutes > maxBlockLengthMinutes {
             setBlockDuration(maxBlockLengthMinutes)
@@ -177,9 +211,11 @@ final class AppModel: ObservableObject {
 
     private func updateTime() {
         guard isBlockRunning else {
-            timeState = .countdown(seconds: 0)
-            strikes = 0
-            isStuck = false
+            assign(\.timeState, .countdown(seconds: 0))
+            finishingSinceUptime = nil
+            stuckReported = false
+            assign(\.isStuck, false)
+            if live && NSApp.dockTile.badgeLabel != nil { NSApp.dockTile.badgeLabel = nil }
             return
         }
         let remaining: Double
@@ -193,41 +229,49 @@ final class AppModel: ObservableObject {
             // legacyBlockEndDate never returns nil (distantPast when unknown)
             remaining = SCMigrationUtilities.legacyBlockEndDate().timeIntervalSinceNow
         }
-        let secs = Int(ceil(remaining))
-        // Strikes only count when we're past zero AND already showing the finishing
-        // state (Obj-C: numSeconds < 0 && label == finishingString); the first tick
-        // at/below zero just switches to finishing and resets strikes.
+        // Non-finite remaining fails closed into the finishing/verifying state (never Int(ceil(nan/inf))).
+        // Finite values are clamped so the Int conversion can't trap.
+        let secs = remaining.isFinite ? Int(ceil(min(max(remaining, -1e9), 1e9))) : -1
+        let finishingState: TimeState = isModernBlock ? .verifyingEnd : .finishing
+        // Obj-C semantics: the first tick at/below zero (or any tick at exactly 0) just switches
+        // to finishing and restarts the stuck clock; only time spent past zero while already
+        // finishing counts toward "stuck". Measured in monotonic uptime, not tick count.
         let alreadyFinishing = timeState == .verifyingEnd || timeState == .finishing
+        let nowUptime = SCTrustedClock.continuousUptimeSecs()
         if secs > 0 {
-            timeState = .countdown(seconds: secs)
-            strikes = 0
-            isStuck = false
-        } else if secs == 0 || !alreadyFinishing {
-            timeState = isModernBlock ? .verifyingEnd : .finishing
-            strikes = 0
-            isStuck = false
+            assign(\.timeState, .countdown(seconds: secs))
+            finishingSinceUptime = nil
+            stuckReported = false
+            assign(\.isStuck, false)
+        } else if secs == 0 || !alreadyFinishing || finishingSinceUptime == nil {
+            assign(\.timeState, finishingState)
+            finishingSinceUptime = nowUptime
+            stuckReported = false
+            assign(\.isStuck, false)
         } else {
-            timeState = isModernBlock ? .verifyingEnd : .finishing
-            strikes += 1
-            if strikes == 300 {
+            assign(\.timeState, finishingState)
+            let stuck = nowUptime - (finishingSinceUptime ?? nowUptime) >= 300
+            if stuck && !stuckReported {
+                stuckReported = true
                 NSLog("WARNING: Block should have ended! Probable failure to remove.")
                 SCSentry.captureError(SCErr.error(withCode: 105))
             }
-            isStuck = strikes >= 300
+            assign(\.isStuck, stuck)
         }
         updateDockBadge(seconds: secs)
     }
 
     private func updateDockBadge(seconds: Int) {
         guard defaults.bool(forKey: "BadgeApplicationIcon"), seconds > 0 else {
-            NSApp.dockTile.badgeLabel = nil
+            if NSApp.dockTile.badgeLabel != nil { NSApp.dockTile.badgeLabel = nil }
             return
         }
         let hours = seconds / 3600
         var minutes = (seconds % 3600) / 60
         // round minutes up, standard when we aren't displaying seconds
         if seconds % 60 > 0 && minutes != 59 { minutes += 1 }
-        NSApp.dockTile.badgeLabel = String(format: "%02d:%02d", hours, minutes)
+        let label = String(format: "%02d:%02d", hours, minutes)
+        if NSApp.dockTile.badgeLabel != label { NSApp.dockTile.badgeLabel = label }
     }
 
     // MARK: - Overrides (port of -refreshOverrideUI / -renderOverrideStatus)
@@ -238,7 +282,7 @@ final class AppModel: ObservableObject {
         let perDay = (policy?["perDay"] as? NSNumber)?.intValue ?? 0
         let minutes = (policy?["minutes"] as? NSNumber)?.intValue ?? 0
         guard isModernBlock, perDay > 0 else {
-            override = OverrideStatus(perDay: perDay, minutes: minutes)
+            assign(\.override, OverrideStatus(perDay: perDay, minutes: minutes))
             lastStatus = nil
             return
         }
@@ -273,14 +317,14 @@ final class AppModel: ObservableObject {
             let shown = max(0, s.remaining - (nowUptime - s.uptime))
             // `active` mirrors the daemon's flag (Obj-C keeps Use disabled while lastActive_,
             // even if interpolation already reached 0); the countdown only shows while shown > 0.
-            override = OverrideStatus(perDay: s.perDay, minutes: minutes, remainingToday: s.remainingToday,
-                                      active: s.active, activeRemainingSecs: (s.active && shown > 0) ? shown : nil,
-                                      checking: false)
+            assign(\.override, OverrideStatus(perDay: s.perDay, minutes: minutes, remainingToday: s.remainingToday,
+                                              active: s.active, activeRemainingSecs: (s.active && shown > 0) ? shown : nil,
+                                              checking: false))
             return
         }
         let remaining = (state?["remainingToday"] as? NSNumber)?.intValue ?? 0
-        override = OverrideStatus(perDay: perDay, minutes: minutes, remainingToday: remaining,
-                                  active: false, activeRemainingSecs: nil, checking: true)
+        assign(\.override, OverrideStatus(perDay: perDay, minutes: minutes, remainingToday: remaining,
+                                          active: false, activeRemainingSecs: nil, checking: true))
     }
 
     // MARK: - Navigation
@@ -368,7 +412,7 @@ final class AppModel: ObservableObject {
 
     private func showAllowlistWarningIfNeeded() {
         // Verbatim port of DomainListWindowController.m -showAllowlistWarning.
-        let ud = UserDefaults.standard
+        let ud = defaults
         guard !ud.bool(forKey: "WhitelistAlertSuppress") else { return }
         let alert = NSAlert()
         alert.messageText = NSLocalizedString("Are you sure you want an allowlist block?", comment: "Allowlist block confirmation prompt")
@@ -383,37 +427,44 @@ final class AppModel: ObservableObject {
         }
     }
 
-    // MARK: - Running-block actions (results come back as display strings; nil = success)
+    // MARK: - Running-block actions
 
+    /// Display text for an error; nil when there's nothing to show (no error, or auth cancel).
     static func message(for error: Error?) -> String? {
         guard let ns = error as NSError? else { return nil }
         return SCUIUtilities.displayableError(ns)?.localizedDescription
     }
 
-    func addToRunningBlock(_ raw: String, completion: @escaping (String?) -> Void) {
-        guard live, let ac = appController else { completion(nil); return }
+    static func result(for error: Error?) -> ActionResult {
+        guard error != nil else { return .ok }
+        guard let msg = message(for: error) else { return .cancelled }
+        return .failed(msg)
+    }
+
+    func addToRunningBlock(_ raw: String, completion: @escaping (ActionResult) -> Void) {
+        guard live, let ac = appController else { completion(.cancelled); return }
         // AppController guarantees completion on the main queue.
         ac.addEntries(toRunningBlock: raw) { [weak self] error in
             MainActor.assumeIsolated {
                 self?.reload()
-                completion(AppModel.message(for: error))
+                completion(AppModel.result(for: error))
             }
         }
     }
 
-    func extendBlock(minutes: Int, completion: @escaping (String?) -> Void) {
-        guard live, let ac = appController else { completion(nil); return }
+    func extendBlock(minutes: Int, completion: @escaping (ActionResult) -> Void) {
+        guard live, let ac = appController else { completion(.cancelled); return }
         // AppController guarantees completion on the main queue.
         ac.extendRunningBlock(byMinutes: minutes) { [weak self] error in
             MainActor.assumeIsolated {
                 self?.reload()
-                completion(AppModel.message(for: error))
+                completion(AppModel.result(for: error))
             }
         }
     }
 
-    func invokeOverride(completion: @escaping (String?) -> Void) {
-        guard live, let xpc = appController?.xpc else { completion(nil); return }
+    func invokeOverride(completion: @escaping (ActionResult) -> Void) {
+        guard live, let xpc = appController?.xpc else { completion(.cancelled); return }
         xpc.invokeOverride { [weak self] _, _, error in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -421,12 +472,13 @@ final class AppModel: ObservableObject {
                 self.lastStatus = nil
                 self.statusInFlight = false
                 self.refreshOverride()
-                completion(AppModel.message(for: error))
+                completion(AppModel.result(for: error))
             }
         }
     }
 
     func stopBlockManually() {
+        guard live else { return }
         appController?.stopBlockManually()
     }
 
@@ -440,7 +492,7 @@ final class AppModel: ObservableObject {
                 guard let self else { return }
                 if let error = error as NSError? {
                     if SCMiscUtilities.errorIsAuthCanceled(error) { self.pop(); return }
-                    self.tedium.error = error.code == 321
+                    self.tedium.error = (error.domain == kSelfControlErrorDomain && error.code == 321)
                         ? NSLocalizedString("No block is running.", comment: "tedium override: no block running error")
                         : (AppModel.message(for: error) ?? error.localizedDescription)
                     return
@@ -459,7 +511,7 @@ final class AppModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self else { return }
                 if let error = error as NSError? {
-                    switch error.code {
+                    switch error.domain == kSelfControlErrorDomain ? error.code : 0 {
                     case 322:
                         self.tedium.blockRemoved = true
                     case 323:
