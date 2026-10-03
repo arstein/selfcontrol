@@ -16,17 +16,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window.title = "SelfControl"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        // An empty unified toolbar makes the titlebar 52pt tall, so the traffic
-        // lights sit centered in our 52pt header (Theme.headerHeight).
-        window.toolbar = NSToolbar(identifier: "SelfControlMainToolbar")
-        window.toolbarStyle = .unified
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = Theme.bgNSColor
         window.contentMinSize = NSSize(width: Theme.windowWidth, height: Theme.windowMinHeight)
         window.contentMaxSize = NSSize(width: Theme.windowWidth, height: 4000)
         super.init(window: window)
 
-        window.contentView = MainHostingView(rootView: AnyView(RootView().environmentObject(model)))
+        window.contentView = NSHostingView(rootView: RootView().environmentObject(model))
+        // Clicks on SwiftUI controls inside the title-bar band never arrive (AppKit treats
+        // that band as window chrome), so the header sits BELOW it; RootView reserves this
+        // much empty, natively draggable space for the traffic lights.
+        model.titlebarHeight = max(28, window.frame.height - window.contentLayoutRect.height)
         window.delegate = self
         if !window.setFrameUsingName("SelfControlMainWindow") { window.center() }
         window.setFrameAutosaveName("SelfControlMainWindow")
@@ -52,12 +52,4 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
-}
-
-/// The window's SwiftUI host. NSHostingView answers every hit test itself (even for
-/// controls nested inside it) and reports mouseDownCanMoveWindow == true, so in the
-/// title-bar band AppKit turned clicks on the header's buttons into window drags.
-/// Refuse that here; the header's empty space starts drags explicitly (WindowDragArea).
-final class MainHostingView: NSHostingView<AnyView> {
-    override var mouseDownCanMoveWindow: Bool { false }
 }

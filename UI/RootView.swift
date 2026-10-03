@@ -7,6 +7,8 @@ struct RootView: View {
         ZStack(alignment: .top) {
             Theme.bg.ignoresSafeArea()
             VStack(spacing: 0) {
+                // traffic lights live here; empty title-bar space drags the window natively
+                Color.clear.frame(height: model.titlebarHeight)
                 HeaderBar()
                 ZStack {
                     if let route = model.path.last {
@@ -68,20 +70,6 @@ struct RootView: View {
 
 /// 52pt header aligned with the traffic lights: Back + title on pushed cards,
 /// centered status + settings on the root card.
-/// Empty header space drags the window (the host refuses AppKit's automatic
-/// title-bar drag so the header's buttons can receive clicks - see MainHostingView).
-struct WindowDragArea: View {
-    var body: some View {
-        Color.clear
-            .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0).onChanged { _ in
-                guard let event = NSApp.currentEvent, event.type == .leftMouseDown || event.type == .leftMouseDragged,
-                      let window = NSApp.keyWindow else { return }
-                window.performDrag(with: event)
-            })
-    }
-}
-
 struct HeaderBar: View {
     @EnvironmentObject var model: AppModel
 
@@ -102,6 +90,7 @@ struct HeaderBar: View {
                 Text(title(for: route)).font(.system(size: 14, weight: .semibold))
                 Spacer()
             } else {
+                Color.clear.frame(width: 30, height: 30)   // balances the Settings button so the status stays centered
                 Spacer()
                 HStack(spacing: 7) {
                     Circle().fill(statusColor).frame(width: 8, height: 8)
@@ -121,10 +110,8 @@ struct HeaderBar: View {
                 .accessibilityLabel(Text("Settings"))
             }
         }
-        .padding(.leading, Theme.trafficLightInset)
-        .padding(.trailing, Theme.inset)
+        .padding(.horizontal, Theme.inset)
         .frame(height: Theme.headerHeight)
-        .background(WindowDragArea())
     }
 
     private func title(for route: Route) -> String {

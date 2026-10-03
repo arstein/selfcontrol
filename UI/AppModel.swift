@@ -80,6 +80,9 @@ final class AppModel: ObservableObject {
 
     @Published var tedium = TediumState()
 
+    /// Height of the window's (transparent) title bar; the header is laid out below it.
+    @Published var titlebarHeight: CGFloat = 32
+
     /// Fixed "now" for previews/snapshots so end-time text is deterministic.
     var nowOverride: Date? = nil
     var now: Date { nowOverride ?? Date() }

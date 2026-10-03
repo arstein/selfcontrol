@@ -27,8 +27,7 @@ enum Theme {
 
     static let windowWidth: CGFloat = 380
     static let windowMinHeight: CGFloat = 600
-    static let headerHeight: CGFloat = 52       // matches the unified-toolbar titlebar so traffic lights center
-    static let trafficLightInset: CGFloat = 78  // leading space reserved for the traffic lights
+    static let headerHeight: CGFloat = 44       // header row, laid out below the title bar
     static let inset: CGFloat = 14
     static let cardRadius: CGFloat = 12
     static let gap: CGFloat = 12
