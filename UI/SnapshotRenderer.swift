@@ -19,6 +19,9 @@ final class SnapshotRenderer: NSObject {
         for (name, model) in states() {
             render(RootView().environmentObject(model), to: url.appendingPathComponent("\(name).png"))
         }
+        for (name, dialog) in dialogs() {
+            renderDialog(dialog, to: url.appendingPathComponent("\(name).png"))
+        }
         return true
     }
 
@@ -64,6 +67,46 @@ final class SnapshotRenderer: NSObject {
                 m.editableEntries = (1...30).map { "site\($0).example.com" }
             }),
         ]
+    }
+
+    /// The SCDialog card (not the modal run), with the same copy as the live call sites.
+    @MainActor private static func dialogs() -> [(String, DialogContent)] {
+        let ok = NSLocalizedString("OK", comment: "OK button")
+        return [
+            ("19-dialog-allowlist", DialogContent(
+                title: NSLocalizedString("Block everything except your list?", comment: "Allowlist block confirmation prompt"),
+                message: NSLocalizedString("Only the sites you list will work — that includes email, chat and other apps that use the internet. Sites that load images or scripts from elsewhere may break.", comment: "allowlist block explanation"),
+                buttons: [ok], primaryIndex: 0, cancelIndex: 0, defaultIndex: 0,
+                suppressionTitle: NSLocalizedString("Don't show this again", comment: "allowlist warning suppression checkbox"),
+                onButton: { _, _ in })),
+            ("20-dialog-long-block", DialogContent(
+                title: String(format: NSLocalizedString("Start a block for %@?", comment: "Long block warning title"), "3 days"),
+                message: NSLocalizedString("You won't be able to end it early, even if you've blocked something you need. If your list is new, try a short block first.", comment: "Long block warning message"),
+                buttons: [NSLocalizedString("Cancel", comment: "Button to cancel a long block"), NSLocalizedString("Start Block", comment: "Button to start a long block despite warnings")],
+                primaryIndex: 1, cancelIndex: 0, defaultIndex: 0,
+                suppressionTitle: NSLocalizedString("Don't warn me about long blocks", comment: "Long block warning suppression checkbox"),
+                onButton: { _, _ in })),
+            ("21-dialog-error", DialogContent(
+                title: SCErr.error(withCode: 401).localizedDescription, message: nil,
+                buttons: [ok], primaryIndex: 0, cancelIndex: 0, defaultIndex: 0, suppressionTitle: nil,
+                onButton: { _, _ in })),
+        ]
+    }
+
+    /// Renders a dialog card at its natural height on the window background color.
+    @MainActor private static func renderDialog(_ dialog: DialogContent, to url: URL) {
+        let view = dialog.padding(Dialog.margin).background(Color(nsColor: Theme.bgNSColor))
+        let host = NSHostingView(rootView: view)
+        host.frame = NSRect(origin: .zero, size: host.fittingSize)
+        let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return }
+        host.cacheDisplay(in: host.bounds, to: rep)
+        let out = rep.converting(to: .sRGB, renderingIntent: .default) ?? rep
+        try? out.representation(using: .png, properties: [:])?.write(to: url)
     }
 
     /// Renders through a real NSHostingView in an offscreen window so AppKit-backed

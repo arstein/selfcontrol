@@ -419,18 +419,15 @@ final class AppModel: ObservableObject {
     }
 
     private func showAllowlistWarningIfNeeded() {
-        // Verbatim port of DomainListWindowController.m -showAllowlistWarning.
+        // Port of DomainListWindowController.m -showAllowlistWarning.
         let ud = defaults
         guard !ud.bool(forKey: "WhitelistAlertSuppress") else { return }
-        let alert = NSAlert()
-        alert.messageText = NSLocalizedString("Are you sure you want an allowlist block?", comment: "Allowlist block confirmation prompt")
-        alert.addButton(withTitle: NSLocalizedString("OK", comment: "OK button"))
-        alert.informativeText = NSLocalizedString("An allowlist block means that everything on the internet BESIDES your specified list will be blocked.  This includes the web, email, SSH, and anything else your computer accesses via the internet.  This can cause unexpected behavior. If a web site requires resources such as images or scripts from a site that is not on your allowlist, the site may not work properly.", comment: "allowlist block explanation")
-        alert.showsSuppressionButton = true
-
-        alert.runModal()
-
-        if alert.suppressionButton?.state == .on {
+        let result = Dialog.run(title: NSLocalizedString("Block everything except your list?", comment: "Allowlist block confirmation prompt"),
+                                message: NSLocalizedString("Only the sites you list will work — that includes email, chat and other apps that use the internet. Sites that load images or scripts from elsewhere may break.", comment: "allowlist block explanation"),
+                                buttons: [NSLocalizedString("OK", comment: "OK button")],
+                                primaryIndex: 0, cancelIndex: 0, defaultIndex: 0,
+                                suppressionTitle: NSLocalizedString("Don't show this again", comment: "allowlist warning suppression checkbox"))
+        if result.suppressionChecked {
             ud.set(true, forKey: "WhitelistAlertSuppress")
         }
     }
@@ -501,7 +498,7 @@ final class AppModel: ObservableObject {
                 if let error = error as NSError? {
                     if SCMiscUtilities.errorIsAuthCanceled(error) { self.pop(); return }
                     self.tedium.error = (error.domain == kSelfControlErrorDomain && error.code == 321)
-                        ? NSLocalizedString("No block is running.", comment: "tedium override: no block running error")
+                        ? NSLocalizedString("There's no block to unlock.", comment: "tedium override: no block running error")
                         : (AppModel.message(for: error) ?? error.localizedDescription)
                     return
                 }
@@ -524,7 +521,7 @@ final class AppModel: ObservableObject {
                         self.tedium.blockRemoved = true
                     case 323:
                         self.tedium.started = false
-                        self.tedium.error = NSLocalizedString("The challenge was lost (SelfControl restarted). Open Emergency Unlock again to start over.", comment: "tedium override: challenge lost message")
+                        self.tedium.error = NSLocalizedString("SelfControl restarted, so your progress was reset. Start again to continue.", comment: "tedium override: challenge lost message")
                     default:
                         self.tedium.error = AppModel.message(for: error)
                     }

@@ -7,6 +7,14 @@
 
 #import "SCUIUtilities.h"
 #import <SystemConfiguration/SystemConfiguration.h>
+// SCDialog lives in the app's Swift code; this file is also compiled into the
+// Swift-less SelfControl Killer target, which falls back to the system error sheet.
+#if __has_include("SelfControl-Swift.h")
+#import "SelfControl-Swift.h"
+#define SC_HAS_DIALOG 1
+#else
+#define SC_HAS_DIALOG 0
+#endif
 
 @implementation SCUIUtilities
 
@@ -46,26 +54,29 @@
         return NO;
     }
 
-    NSAlert* alert = [[NSAlert alloc] init];
-    [alert setMessageText: NSLocalizedString(@"Restart Firefox", "FireFox browser restart prompt")];
-    [alert setInformativeText:NSLocalizedString(@"SelfControl's block may not work properly in Firefox until you restart the browser. Do you want to quit Firefox now?", @"Message explaining Firefox restart requirement")];
-    [alert addButtonWithTitle: NSLocalizedString(@"Quit Firefox", @"Button to quit Firefox")];
-    [alert addButtonWithTitle: NSLocalizedString(@"Continue Without Restart", "Button to decline restarting Firefox")];
-    alert.showsSuppressionButton = YES;
-
-    NSModalResponse modalResponse = [alert runModal];
-    if (alert.suppressionButton.state == NSControlStateValueOn) {
+#if SC_HAS_DIALOG
+    // Not Now answers Esc and Return; quitting Firefox needs an explicit click.
+    SCDialogResult* result = [SCDialog runWithTitle: NSLocalizedString(@"Restart Firefox?", @"FireFox browser restart prompt")
+                                            message: NSLocalizedString(@"Firefox may not respect the block until it restarts.", @"Message explaining Firefox restart requirement")
+                                            buttons: @[NSLocalizedString(@"Not Now", @"Button to decline restarting Firefox"),
+                                                       NSLocalizedString(@"Quit Firefox", @"Button to quit Firefox")]
+                                       primaryIndex: 1
+                                        cancelIndex: 0
+                                       defaultIndex: 0
+                                   suppressionTitle: NSLocalizedString(@"Don't ask again", @"Firefox restart prompt suppression checkbox")];
+    if (result.suppressionChecked) {
         // no more warnings, they say
         [defaults setBool: YES forKey: RESTART_FF_SUPPRESSION_KEY];
     }
-    if (modalResponse == NSAlertFirstButtonReturn) {
+    if (result.buttonIndex == 1) {
         for (NSRunningApplication* ff in runningFF) {
             [ff terminate];
         }
         
         return YES;
     }
-    
+#endif
+
     return NO;
 }
 
@@ -94,9 +105,18 @@
     if (shown == nil) return;
 
     // always present errors on the main thread since it's a UI task
-    [NSApp performSelectorOnMainThread: @selector(presentError:)
-                            withObject: shown
-                         waitUntilDone: YES];
+    void (^present)(void) = ^{
+#if SC_HAS_DIALOG
+        [SCDialog showError: shown];
+#else
+        [NSApp presentError: shown];
+#endif
+    };
+    if ([NSThread isMainThread]) {
+        present();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), present);
+    }
 }
 
 @end

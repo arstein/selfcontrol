@@ -84,11 +84,8 @@
 	}
 
 	if([defaults_ boolForKey: @"VerifyInternetConnection"] && ![SCUIUtilities networkConnectionIsAvailable]) {
-		NSAlert* networkUnavailableAlert = [[NSAlert alloc] init];
-		[networkUnavailableAlert setMessageText: NSLocalizedString(@"No network connection detected", "No network connection detected message")];
-		[networkUnavailableAlert setInformativeText:NSLocalizedString(@"A block cannot be started without a working network connection.  You can override this setting in Settings.", @"Message when network connection is unavailable")];
-		[networkUnavailableAlert addButtonWithTitle: NSLocalizedString(@"OK", "OK button")];
-        [networkUnavailableAlert runModal];
+        [SCDialog informWithTitle: NSLocalizedString(@"You're offline", @"No network connection when starting a block: title")
+                          message: NSLocalizedString(@"SelfControl needs an internet connection to start a block. You can turn this check off in Settings.", @"No network connection when starting a block: message")];
 		return;
 	}
 
@@ -126,19 +123,20 @@
         return YES;
     }
 
-    NSAlert* alert = [[NSAlert alloc] init];
-    alert.messageText = NSLocalizedString(@"That's a long block!", "Long block warning title");
-    alert.informativeText = [NSString stringWithFormat: NSLocalizedString(@"Remember that once you start the block, you can't turn it back off until the timer expires in %@ - even if you accidentally blocked a site you need. Consider starting a shorter block first, to test your list and make sure everything's working properly.", @"Long block warning message"), [SCDurationSlider timeSliderDisplayStringFromNumberOfMinutes: blockDuration]];
-    [alert addButtonWithTitle: NSLocalizedString(@"Cancel", @"Button to cancel a long block")];
-    [alert addButtonWithTitle: NSLocalizedString(@"Start Block Anyway", "Button to start a long block despite warnings")];
-    alert.showsSuppressionButton = YES;
-
-    NSModalResponse modalResponse = [alert runModal];
-    if (alert.suppressionButton.state == NSControlStateValueOn) {
+    // Cancel answers both Esc and Return: Return must never start an irreversible block.
+    SCDialogResult* result = [SCDialog runWithTitle: [NSString stringWithFormat: NSLocalizedString(@"Start a block for %@?", @"Long block warning title"), [SCDurationSlider timeSliderDisplayStringFromNumberOfMinutes: blockDuration]]
+                                            message: NSLocalizedString(@"You won't be able to end it early, even if you've blocked something you need. If your list is new, try a short block first.", @"Long block warning message")
+                                            buttons: @[NSLocalizedString(@"Cancel", @"Button to cancel a long block"),
+                                                       NSLocalizedString(@"Start Block", @"Button to start a long block despite warnings")]
+                                       primaryIndex: 1
+                                        cancelIndex: 0
+                                       defaultIndex: 0
+                                   suppressionTitle: NSLocalizedString(@"Don't warn me about long blocks", @"Long block warning suppression checkbox")];
+    if (result.suppressionChecked) {
         // no more warnings, they say
         [self->defaults_ setBool: YES forKey: LONG_BLOCK_SUPPRESSION_KEY];
     }
-    if (modalResponse == NSAlertFirstButtonReturn) {
+    if (result.buttonIndex != 1) {
         return NO;
     }
     
@@ -178,8 +176,8 @@
         // (but we can't send it from the selfcontrold process, because it's running as root)
         NSUserNotificationCenter* userNoteCenter = [NSUserNotificationCenter defaultUserNotificationCenter];
         NSUserNotification* endedNote = [NSUserNotification new];
-        endedNote.title = @"Your SelfControl block has ended!";
-        endedNote.informativeText = @"All sites are now accessible.";
+        endedNote.title = NSLocalizedString(@"Block finished", @"Block-ended notification title");
+        endedNote.informativeText = NSLocalizedString(@"All sites are reachable again.", @"Block-ended notification message");
         [userNoteCenter deliverNotification: endedNote];
     }
 
@@ -337,18 +335,6 @@
     [self retitleMenuItems];
 
 	[self refreshUserInterface];
-    
-    NSOperatingSystemVersion minRequiredVersion = (NSOperatingSystemVersion){10,10,0}; // Yosemite
-    NSString* minRequiredVersionString = @"10.10 (Yosemite)";
-	if (![[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion: minRequiredVersion]) {
-		NSLog(@"ERROR: Unsupported version for SelfControl");
-        [SCSentry captureMessage: @"Unsupported operating system version"];
-		NSAlert* unsupportedVersionAlert = [[NSAlert alloc] init];
-		[unsupportedVersionAlert setMessageText: NSLocalizedString(@"Unsupported version", nil)];
-        [unsupportedVersionAlert setInformativeText: [NSString stringWithFormat: NSLocalizedString(@"This version of SelfControl only supports Mac OS X version %@ or higher. To download a version for older operating systems, please go to www.selfcontrolapp.com", nil), minRequiredVersionString]];
-		[unsupportedVersionAlert addButtonWithTitle: NSLocalizedString(@"OK", nil)];
-		[unsupportedVersionAlert runModal];
-	}
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
@@ -639,11 +625,11 @@
         return;
     }
     if ([defaults_ boolForKey: @"VerifyInternetConnection"] && ![SCUIUtilities networkConnectionIsAvailable]) {
-        finish([self uiErrorWithDescription: NSLocalizedString(@"No network connection detected", "No network connection detected message")]);
+        finish([self uiErrorWithDescription: NSLocalizedString(@"You're offline — connect to add a site.", @"add-site error when offline")]);
         return;
     }
     if (self.modifyingBlock) {
-        finish([self uiErrorWithDescription: NSLocalizedString(@"Another change to this block is still in progress.", @"busy modifying block")]);
+        finish([self uiErrorWithDescription: NSLocalizedString(@"Still saving your last change — try again in a moment.", @"busy modifying block")]);
         return;
     }
     self.modifyingBlock = YES;
@@ -690,7 +676,7 @@
     if (![SCUIUtilities blockIsRunning]) { finish([SCErr errorWithCode: 103]); return; }
     if (![SCBlockUtilities modernBlockIsRunning]) { finish([SCErr errorWithCode: 306]); return; }
     if (self.modifyingBlock) {
-        finish([self uiErrorWithDescription: NSLocalizedString(@"Another change to this block is still in progress.", @"busy modifying block")]);
+        finish([self uiErrorWithDescription: NSLocalizedString(@"Still saving your last change — try again in a moment.", @"busy modifying block")]);
         return;
     }
     self.modifyingBlock = YES;
@@ -815,11 +801,8 @@
     
     if (helperRefusedUnverifiedExpiry) {
         NSLog(@"WARNING: Killer helper refused to clear the block because network time did not confirm expiry");
-        NSAlert* alert = [[NSAlert alloc] init];
-        [alert setMessageText: NSLocalizedString(@"Block not cleared", @"Title when the killer helper refuses to clear an unexpired block")];
-        [alert setInformativeText: NSLocalizedString(@"SelfControl couldn't verify the block has expired. Network time is required to clear a block, and a block can only be cleared once its full duration has passed. Make sure you're connected to the internet and try again after the timer runs out. You can find the log file, named SelfControl-Killer.log, in your Documents folder.", @"Message when the killer helper refuses to clear a block because network time did not confirm it has expired")];
-        [alert addButtonWithTitle: NSLocalizedString(@"OK", @"OK button")];
-        [alert runModal];
+        [SCDialog informWithTitle: NSLocalizedString(@"Block not cleared", @"Title when the killer helper refuses to clear an unexpired block")
+                          message: NSLocalizedString(@"SelfControl couldn't confirm the block has finished. Connect to the internet and try again once the timer has run out. (Details: SelfControl-Killer.log in Documents.)", @"Message when the killer helper refuses to clear a block because network time did not confirm it has expired")];
         return;
     }
 
@@ -837,11 +820,8 @@
         [SCSentry captureError: err];
         [SCUIUtilities presentError: err];
     } else {
-        NSAlert* alert = [[NSAlert alloc] init];
-        [alert setMessageText: @"Success!"];
-        [alert setInformativeText:@"The block was cleared successfully.  You can find the log file, named SelfControl-Killer.log, in your Documents folder. If you're still having issues, please check out the SelfControl FAQ on GitHub."];
-        [alert addButtonWithTitle: @"OK"];
-        [alert runModal];
+        [SCDialog informWithTitle: NSLocalizedString(@"Block cleared", @"Title when a block was cleared manually")
+                          message: NSLocalizedString(@"All sites are reachable again. (Details: SelfControl-Killer.log in Documents.)", @"Message when a block was cleared manually")];
     }
 }
 

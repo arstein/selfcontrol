@@ -197,7 +197,7 @@
         case SMAppServiceStatusRequiresApproval:
             NSLog(@"Daemon registration requires approval in System Settings; opening it");
             [SMAppService openSystemSettingsLoginItems];
-            callback([SCErr errorWithCode: 500 subDescription: @"SelfControl's helper needs your approval in System Settings > General > Login Items. Enable it, then try again."]);
+            callback([SCErr errorWithCode: 500 subDescription: @"turn on SelfControl in System Settings › General › Login Items, then try again."]);
             return;
 
         default:
@@ -213,7 +213,7 @@
     if (daemonService.status == SMAppServiceStatusRequiresApproval) {
         NSLog(@"Daemon registration requires approval in System Settings; opening it");
         [SMAppService openSystemSettingsLoginItems];
-        callback([SCErr errorWithCode: 500 subDescription: @"SelfControl's helper needs your approval in System Settings > General > Login Items. Enable it, then try again."]);
+        callback([SCErr errorWithCode: 500 subDescription: @"turn on SelfControl in System Settings › General › Login Items, then try again."]);
         return;
     }
 

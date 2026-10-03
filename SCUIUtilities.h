@@ -27,10 +27,9 @@ NS_ASSUME_NONNULL_BEGIN
 // (nil input, or an auth-cancel).
 + (nullable NSError*)displayableError:(nullable NSError*)err;
 
-// presents an error via a popup in the app
-// this is mostly just a pass-through to [NSApp presentError:],
-// but it first checks if the error is in the SelfControl domain
-// and if so tries to fill in additional error fields
+// presents an error via a popup in the app (SCDialog, on the main thread),
+// after filtering it through displayableError: (nothing is shown for nil
+// or auth-cancel errors)
 + (void)presentError:(NSError*)err;
 
 @end
