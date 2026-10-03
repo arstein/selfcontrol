@@ -44,6 +44,7 @@ struct OverridesView: View {
                     } else {
                         Text(NSLocalizedString("Each day you’ll get", comment: "")).font(.system(size: 12, weight: .medium)).foregroundColor(Theme.sub)
                         PillsView(states: OverridePills.states(perDay: perDay, remainingToday: perDay, activeFraction: nil, pendingSpend: false), width: 40)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         Group {
                             if perDay == 1 {
                                 Text(String(format: NSLocalizedString("1 break of %ld minutes", comment: "override preview, one per day"), minutes))

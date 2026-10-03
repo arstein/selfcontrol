@@ -8,6 +8,8 @@ struct RestrictionsView: View {
     @State private var busy = false
     @State private var hovered: String? = nil
     @State private var listHeight: CGFloat = 0
+    @State private var importNote: String? = nil
+    @State private var importNoteToken = 0
 
     private var blocking: Bool { model.isBlockRunning }
 
@@ -63,6 +65,11 @@ struct RestrictionsView: View {
                 .onPreferenceChange(ListHeightKey.self) { listHeight = $0 }
             }
             .layoutPriority(-1)
+
+            if let importNote {
+                Text(importNote).font(.system(size: 12)).foregroundColor(Theme.warning).padding(.horizontal, 2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Text(caption).font(.system(size: 11)).foregroundColor(Theme.sub).padding(.horizontal, 2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -145,7 +152,16 @@ struct RestrictionsView: View {
         Button(NSLocalizedString("From File…", comment: "")) { (NSApp.delegate as? AppController)?.open(nil) }
     }
 
-    private func importList(_ hosts: [Any]?) { model.importHosts((hosts ?? []).compactMap { $0 as? String }) }
+    private func importList(_ hosts: [Any]?) {
+        let skipped = model.importHosts((hosts ?? []).compactMap { $0 as? String })
+        importNoteToken += 1
+        let token = importNoteToken
+        importNote = HostValidity.skippedNote(count: skipped)
+        guard importNote != nil else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+            if importNoteToken == token { importNote = nil }
+        }
+    }
 
     private func add() {
         guard !busy else { return }   // Return in the field bypasses the button's .disabled
@@ -156,6 +172,11 @@ struct RestrictionsView: View {
         if !blocking {
             if model.addEditableEntries(text) { input = "" }
             else { error = NSLocalizedString("That doesn’t look like a site address.", comment: "") }
+            return
+        }
+        // Validate before asking for authorization; add nothing if any entry is invalid.
+        guard model.isAcceptableEntry(text) else {
+            error = NSLocalizedString("That doesn’t look like a site address.", comment: "")
             return
         }
         busy = true

@@ -1,12 +1,8 @@
 import SwiftUI
+import AppKit
 
 struct ReadyView: View {
     @EnvironmentObject var model: AppModel
-
-    private let presets: [(minutes: Int, label: String)] = [
-        (30, "30m"), (60, "1h"), (120, "2h"), (240, "4h"), (480, "8h"),
-        (1440, "1 day"), (2880, "2 days"), (10080, "1 week"),
-    ]
 
     var body: some View {
         VStack(spacing: Theme.gap) {
@@ -68,15 +64,66 @@ struct ReadyView: View {
                 DurationSlider(minutes: Binding(get: { model.blockDurationMinutes }, set: { model.setBlockDuration($0) }),
                                scale: model.durationScale)
                     .disabled(model.isAddingBlock)
-                HStack(spacing: 2) {
-                    ForEach(presets.filter { $0.minutes <= model.maxBlockLengthMinutes }, id: \.minutes) { preset in
-                        Button(preset.label) { model.setBlockDuration(preset.minutes) }
-                            .buttonStyle(ChipButtonStyle(selected: preset.minutes == model.blockDurationMinutes))
-                    }
-                }
-                .padding(.horizontal, -6)
-                .disabled(model.isAddingBlock)
+                DurationTicks(maxMinutes: model.maxBlockLengthMinutes, scale: model.durationScale,
+                              selectedMinutes: model.blockDurationMinutes) { model.setBlockDuration($0) }
+                    .disabled(model.isAddingBlock)
+                    .padding(.top, -4)
             }
         }
+    }
+}
+
+/// Tick marks + tappable labels at their true slider positions (1h, 8h, 1 day, 1 week, max).
+private struct DurationTicks: View {
+    let maxMinutes: Int
+    let scale: DurationScale
+    let selectedMinutes: Int
+    let select: (Int) -> Void
+
+    private static let labelPadding: CGFloat = 3
+    private static let font = NSFont.systemFont(ofSize: 12)
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = Double(geo.size.width)
+            let anchors = TickLayout.anchors(maxMinutes: maxMinutes)
+            let positions = anchors.map { scale.position(for: $0.minutes) }
+            let widths = anchors.map { Double(Self.labelWidth($0.label)) }
+            let placed = TickLayout.visibleTicks(anchors: anchors, positions: positions, labelWidths: widths, trackWidth: w, minGap: 6)
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(anchors.enumerated()), id: \.offset) { i, _ in
+                    Rectangle().fill(Theme.faint)
+                        .frame(width: 1, height: 4)
+                        .position(x: CGFloat(min(max(positions[i] * w, 0.5), w - 0.5)), y: 2)
+                }
+                ForEach(placed, id: \.index) { p in
+                    let tick = anchors[p.index]
+                    Button(tick.label) { select(tick.minutes) }
+                        .buttonStyle(TickLabelStyle(selected: tick.minutes == selectedMinutes))
+                        .frame(width: CGFloat(widths[p.index]))
+                        .position(x: CGFloat(p.labelCenter), y: 15)
+                }
+            }
+        }
+        .frame(height: 24)
+    }
+
+    private static func labelWidth(_ label: String) -> CGFloat {
+        ceil((label as NSString).size(withAttributes: [.font: font]).width) + labelPadding * 2
+    }
+}
+
+private struct TickLabelStyle: ButtonStyle {
+    var selected = false
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12, weight: selected ? .medium : .regular))
+            .lineLimit(1)
+            .fixedSize()
+            .foregroundColor(selected ? Theme.chipSelectedText : Theme.sub)
+            .frame(maxWidth: .infinity)
+            .frame(height: 18)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }

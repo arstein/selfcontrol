@@ -101,13 +101,16 @@ struct ExtendSheet: View {
 
     var body: some View {
         BottomSheet(title: NSLocalizedString("Extend this block?", comment: "")) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("+" + DurationText.short(minutes: minutes)).font(.system(size: 28, weight: .light).monospacedDigit())
-                Spacer()
+            VStack(alignment: .leading, spacing: 2) {
+                Text("+" + DurationText.short(minutes: minutes))
+                    .font(.system(size: 24, weight: .light).monospacedDigit())
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 if let end = model.blockEndDate {
                     Text(String(format: NSLocalizedString("New end: %@", comment: ""),
                                 EndTimePhrase.phrase(for: end.addingTimeInterval(TimeInterval(minutes * 60)), now: model.now)))
                         .font(.system(size: 12)).foregroundColor(Theme.sub)
+                        .lineLimit(1).minimumScaleFactor(0.8)
                 }
             }
             DurationSlider(minutes: $minutes, scale: scale)

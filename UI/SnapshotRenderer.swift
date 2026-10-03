@@ -66,6 +66,30 @@ final class SnapshotRenderer: NSObject {
                 m.path = [.restrictions]
                 m.editableEntries = (1...30).map { "site\($0).example.com" }
             }),
+            ("22-ready-max30d", AppModel.preview { m in
+                m.maxBlockLengthMinutes = 43200
+                m.blockDurationMinutes = 1440
+            }),
+            ("23-ready-max1d", AppModel.preview { m in
+                m.maxBlockLengthMinutes = 1440
+                m.blockDurationMinutes = 480
+            }),
+            ("24-overrides-10", AppModel.preview { m in
+                m.path = [.overrides]
+                m.overridePerDayDefault = 10
+            }),
+            ("25-blocking-10", blocking(86400 + 13187) { m in
+                m.override = OverrideStatus(perDay: 10, minutes: 15, remainingToday: 6, active: true, activeRemainingSecs: 500, checking: false)
+            }),
+            ("26-ready-10", AppModel.preview { $0.overridePerDayDefault = 10 }),
+            ("27-override-confirm-10", blocking(86400 + 13312) { m in
+                m.override = OverrideStatus(perDay: 10, minutes: 15, remainingToday: 7, active: false, activeRemainingSecs: nil, checking: false)
+                m.sheet = .overrideConfirm
+            }),
+            ("28-extend-multiday-1day", blocking(3 * 86400 + 13312) { m in
+                m.maxBlockLengthMinutes = 43200
+                m.sheet = .extend(presetMinutes: 1440)
+            }),
         ]
     }
 

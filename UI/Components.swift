@@ -69,37 +69,97 @@ struct PillsView: View {
     let states: [PillState]
     var width: CGFloat = 26
 
+    private static let gap: CGFloat = 5
+    private static let height: CGFloat = 6
+
+    /// Width when every pill gets its preferred `width`; never more than that is requested.
+    private var idealWidth: CGFloat {
+        CGFloat(PillLayout.totalWidth(pillWidth: Double(width), count: states.count, gap: Double(Self.gap)))
+    }
+
     var body: some View {
-        HStack(spacing: 5) {
-            ForEach(Array(states.enumerated()), id: \.offset) { _, state in
-                pill(state)
-            }
+        // Takes min(proposed, ideal) width, so a large count can never widen its container;
+        // the Canvas then shrinks the pills (or falls back to one segmented bar) to fit.
+        CappedWidthLayout(ideal: idealWidth, height: Self.height) {
+            Canvas { ctx, size in draw(in: &ctx, size: size) }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
     }
 
-    @ViewBuilder private func pill(_ state: PillState) -> some View {
+    private func draw(in ctx: inout GraphicsContext, size: CGSize) {
+        let count = states.count
+        guard count > 0, size.width > 0 else { return }
+        let h = size.height
+        if let w = PillLayout.pillWidth(preferred: Double(width), available: Double(size.width), count: count, gap: Double(Self.gap)) {
+            let pw = CGFloat(w)
+            for (i, state) in states.enumerated() {
+                let rect = CGRect(x: CGFloat(i) * (pw + Self.gap), y: 0, width: pw, height: h)
+                drawPill(state, in: rect, ctx: &ctx)
+            }
+        } else {
+            // Too narrow for separate pills: one capsule bar split into segments by 1pt gaps.
+            let segGap: CGFloat = 1
+            let sw = max(0, (size.width - segGap * CGFloat(count - 1)) / CGFloat(count))
+            var bar = ctx
+            bar.clip(to: Capsule().path(in: CGRect(origin: .zero, size: size)))
+            for (i, state) in states.enumerated() {
+                let rect = CGRect(x: CGFloat(i) * (sw + segGap), y: 0, width: sw, height: h)
+                drawSegment(state, in: rect, ctx: &bar)
+            }
+        }
+    }
+
+    private func drawPill(_ state: PillState, in rect: CGRect, ctx: inout GraphicsContext) {
+        let shape = Capsule().path(in: rect)
         switch state {
         case .available:
-            Capsule().fill(Theme.green).frame(width: width, height: 6)
+            ctx.fill(shape, with: .color(Theme.green))
         case .used:
-            Capsule().fill(Theme.track).frame(width: width, height: 6)
+            ctx.fill(shape, with: .color(Theme.track))
         case .using(let fraction):
-            ZStack(alignment: .leading) {
-                Capsule().fill(Theme.greenTrack)
-                Capsule().fill(Theme.green).frame(width: width * fraction)
-            }
-            .frame(width: width, height: 6)
-            .clipShape(Capsule())
+            var inner = ctx
+            inner.clip(to: shape)
+            inner.fill(Path(rect), with: .color(Theme.greenTrack))
+            inner.fill(Capsule().path(in: CGRect(x: rect.minX, y: rect.minY, width: rect.width * fraction, height: rect.height)), with: .color(Theme.green))
         case .pending:
-            Capsule().strokeBorder(Theme.green, lineWidth: 1.5).frame(width: width, height: 6)
+            ctx.stroke(Capsule().path(in: rect.insetBy(dx: 0.75, dy: 0.75)), with: .color(Theme.green), lineWidth: 1.5)
+        }
+    }
+
+    private func drawSegment(_ state: PillState, in rect: CGRect, ctx: inout GraphicsContext) {
+        switch state {
+        case .available:
+            ctx.fill(Path(rect), with: .color(Theme.green))
+        case .used:
+            ctx.fill(Path(rect), with: .color(Theme.track))
+        case .using(let fraction):
+            ctx.fill(Path(rect), with: .color(Theme.greenTrack))
+            ctx.fill(Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width * fraction, height: rect.height)), with: .color(Theme.green))
+        case .pending:
+            ctx.stroke(Path(rect.insetBy(dx: 0.5, dy: 0.5)), with: .color(Theme.green), lineWidth: 1)
         }
     }
 
     private var accessibilityText: String {
         let available = states.filter { $0 == .available }.count
         return String(format: NSLocalizedString("%ld of %ld overrides available", comment: "pills a11y"), available, states.count)
+    }
+}
+
+/// Sizes its single child to min(proposed width, `ideal`) x `height`.
+/// Reports `ideal` (not more) when the proposal is unspecified.
+private struct CappedWidthLayout: Layout {
+    let ideal: CGFloat
+    let height: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let proposed = proposal.width ?? ideal
+        return CGSize(width: max(0, min(proposed, ideal)), height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for s in subviews { s.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size)) }
     }
 }
 

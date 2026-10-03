@@ -195,9 +195,25 @@ enum OverridePills {
 
 enum HostValidity {
     private static let ipPattern = "^([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
-    private static let hostPattern = "^([a-zA-Z0-9]([a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,6}$"
+    // Labels may contain underscores (SCMiscUtilities cleanBlocklistEntry keeps them);
+    // TLD is 2-63 letters or a punycode "xn--" label.
+    private static let hostPattern = "^([a-zA-Z0-9_]([a-zA-Z0-9_\\-]{0,61}[a-zA-Z0-9_])?\\.)+([a-zA-Z]{2,63}|xn--[a-zA-Z0-9\\-]{1,59})$"
 
-    /// Mirrors the legacy "highlight invalid hosts" rules exactly (including their quirks).
+    /// Splits entries into those that pass `isValid` and those that don't, preserving order.
+    static func partition(_ entries: [String]) -> (valid: [String], invalid: [String]) {
+        var valid: [String] = [], invalid: [String] = []
+        for e in entries { if isValid(e) { valid.append(e) } else { invalid.append(e) } }
+        return (valid, invalid)
+    }
+
+    /// Inline note after an import skipped invalid entries; nil when nothing was skipped.
+    static func skippedNote(count: Int) -> String? {
+        guard count > 0 else { return nil }
+        if count == 1 { return NSLocalizedString("Skipped 1 entry that isn’t a valid address.", comment: "import skipped one invalid entry") }
+        return String(format: NSLocalizedString("Skipped %ld entries that aren’t valid addresses.", comment: "import skipped N invalid entries"), count)
+    }
+
+    /// Legacy "highlight invalid hosts" rules, widened for long/punycode TLDs and underscores.
     static func isValid(_ raw: String) -> Bool {
         var str = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if str.isEmpty { return true }
@@ -248,5 +264,109 @@ enum OverridePolicyLimits {
     static func previousMinutes(_ m: Int) -> Int {
         let prev = m > 5 ? ((m - 1) / 5) * 5 : m - 1
         return min(max(prev, minutesRange.lowerBound), minutesRange.upperBound)
+    }
+}
+
+
+// MARK: - Duration slider tick labels
+
+struct DurationTick: Equatable {
+    let minutes: Int
+    let label: String
+    /// Higher wins when two labels collide.
+    let priority: Int
+}
+
+enum TickLayout {
+    struct Placed: Equatable {
+        let index: Int
+        /// Unclamped x of the anchor on the track (where the tick mark goes).
+        let tickX: Double
+        /// Label centre, clamped so the label stays inside the track.
+        let labelCenter: Double
+    }
+
+    /// 1h, 8h, 1 day, 1 week (each only below the max), then the max itself.
+    /// If the max equals an anchor, that anchor stands in for it (with max priority).
+    static func anchors(maxMinutes: Int) -> [DurationTick] {
+        let maxM = max(1, maxMinutes)
+        let fixed: [(minutes: Int, label: String, priority: Int)] = [
+            (60, NSLocalizedString("1h", comment: "slider tick: 1 hour"), 2),
+            (480, NSLocalizedString("8h", comment: "slider tick: 8 hours"), 1),
+            (1440, NSLocalizedString("1 day", comment: "slider tick: 1 day"), 3),
+            (10080, NSLocalizedString("1 week", comment: "slider tick: 1 week"), 0),
+        ]
+        let maxPriority = 4
+        var result = fixed.filter { $0.minutes < maxM }.map { DurationTick(minutes: $0.minutes, label: $0.label, priority: $0.priority) }
+        // 1 week only counts as an anchor when it's below the max; otherwise the max label covers it.
+        if let same = fixed.first(where: { $0.minutes == maxM }), same.minutes != 10080 {
+            result.append(DurationTick(minutes: maxM, label: same.label, priority: maxPriority))
+        } else {
+            result.append(DurationTick(minutes: maxM, label: DurationText.short(minutes: maxM), priority: maxPriority))
+        }
+        return result
+    }
+
+    /// Places labels at `positions` (0...1) along a track of `trackWidth`, clamping the
+    /// ends inside the track and hiding lower-priority labels that come within `minGap`.
+    /// Returns the visible ticks in anchor order.
+    static func visibleTicks(anchors: [DurationTick], positions: [Double], labelWidths: [Double],
+                             trackWidth: Double, minGap: Double) -> [Placed] {
+        let n = min(anchors.count, positions.count, labelWidths.count)
+        guard n > 0, trackWidth > 0 else { return [] }
+        var candidates: [Placed] = []
+        for i in 0..<n {
+            let x = min(max(positions[i], 0), 1) * trackWidth
+            let half = min(labelWidths[i], trackWidth) / 2
+            candidates.append(Placed(index: i, tickX: x, labelCenter: min(max(x, half), trackWidth - half)))
+        }
+        let order = (0..<n).sorted { anchors[$0].priority != anchors[$1].priority ? anchors[$0].priority > anchors[$1].priority : $0 < $1 }
+        var accepted: [Placed] = []
+        for i in order {
+            let c = candidates[i]
+            let lo = c.labelCenter - labelWidths[i] / 2, hi = c.labelCenter + labelWidths[i] / 2
+            let clashes = accepted.contains { a in
+                let alo = a.labelCenter - labelWidths[a.index] / 2, ahi = a.labelCenter + labelWidths[a.index] / 2
+                return lo < ahi + minGap && alo < hi + minGap
+            }
+            if !clashes { accepted.append(c) }
+        }
+        return accepted.sorted { $0.index < $1.index }
+    }
+}
+
+// MARK: - Override pill fitting
+
+enum PillLayout {
+    static let minimumPillWidth = 6.0
+
+    /// Width per pill so `count` pills fit in `available`; nil means draw one continuous bar.
+    static func pillWidth(preferred: Double, available: Double, count: Int, gap: Double) -> Double? {
+        guard count > 0 else { return preferred }
+        let fit = (available - gap * Double(count - 1)) / Double(count)
+        let w = min(preferred, fit)
+        return w < minimumPillWidth ? nil : w
+    }
+
+    static func totalWidth(pillWidth: Double, count: Int, gap: Double) -> Double {
+        count > 0 ? pillWidth * Double(count) + gap * Double(count - 1) : 0
+    }
+}
+
+// MARK: - "Longest block allowed" custom value, in days
+
+enum MaxLengthDays {
+    static let range = 1...30
+
+    /// Prefill: whole days, rounded up, within 1-30.
+    static func days(fromMinutes m: Int) -> Int {
+        min(max(Int((Double(m) / 1440).rounded(.up)), range.lowerBound), range.upperBound)
+    }
+
+    /// Whole number of days in 1-30 -> minutes; nil if the input isn't one.
+    static func minutes(fromInput text: String) -> Int? {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, t.allSatisfy({ $0.isASCII && $0.isNumber }), let d = Int(t), range.contains(d) else { return nil }
+        return d * 1440
     }
 }

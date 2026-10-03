@@ -139,6 +139,7 @@ struct BlockingView: View {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 7) {
                         PillsView(states: OverridePills.states(perDay: o.perDay, remainingToday: o.remainingToday, activeFraction: fraction, pendingSpend: false))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(o.remainingToday == 1 ? NSLocalizedString("1 override left today", comment: "")
                                  : String(format: NSLocalizedString("%ld overrides left today", comment: ""), o.remainingToday))

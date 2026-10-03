@@ -4,7 +4,6 @@ import AppKit
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
     @AppStorage("EvaluateCommonSubdomains") private var commonSubdomains = true
-    @AppStorage("AllowLocalNetworks") private var allowLocal = true
     @AppStorage("ClearCaches") private var clearCaches = true
     @AppStorage("IncludeLinkedDomains") private var linkedDomains = true
     @AppStorage("VerifyInternetConnection") private var verifyInternet = true
@@ -31,8 +30,6 @@ struct SettingsView: View {
                     .padding(.horizontal, 14).padding(.vertical, 9)
                     RowDivider()
                     toggle(NSLocalizedString("Block common subdomains", comment: ""), $commonSubdomains)
-                    RowDivider()
-                    toggle(NSLocalizedString("Allow local networks", comment: ""), $allowLocal)
                     RowDivider()
                     toggle(NSLocalizedString("Clear browser cache on start", comment: ""), $clearCaches)
                     RowDivider()
@@ -86,7 +83,7 @@ struct SettingsView: View {
             }
             Divider()
             Button(NSLocalizedString("Custom…", comment: "")) {
-                customMaxText = "\(model.maxBlockLengthMinutes)"
+                customMaxText = "\(MaxLengthDays.days(fromMinutes: model.maxBlockLengthMinutes))"
                 showCustomMax = true
             }
         } label: {
@@ -97,9 +94,9 @@ struct SettingsView: View {
         .valuePill()
         .popover(isPresented: $showCustomMax, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(NSLocalizedString("Longest block, in minutes (1–43200)", comment: "")).font(.system(size: 12))
+                Text(NSLocalizedString("Longest block, in days (1–30)", comment: "")).font(.system(size: 12))
                 HStack {
-                    TextField("1440", text: $customMaxText).frame(width: 90)
+                    TextField("7", text: $customMaxText).frame(width: 90)
                         .onSubmit(applyCustomMax)
                     Button(NSLocalizedString("Set", comment: ""), action: applyCustomMax).keyboardShortcut(.defaultAction)
                 }
@@ -109,9 +106,9 @@ struct SettingsView: View {
     }
 
     private func applyCustomMax() {
-        if let m = Int(customMaxText.trimmingCharacters(in: .whitespaces)) {
-            model.setMaxBlockLength(m)
-        }
+        // Whole days 1–30, stored in minutes; invalid input leaves the popover open.
+        guard let m = MaxLengthDays.minutes(fromInput: customMaxText) else { NSSound.beep(); return }
+        model.setMaxBlockLength(m)
         showCustomMax = false
     }
 

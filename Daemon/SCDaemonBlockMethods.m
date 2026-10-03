@@ -266,9 +266,11 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         NSLog(@"WARNING: Active blocklist has removed items; these will not be updated. Removed items are %@", removed);
     }
     
+    // Argument order matches SCHelperToolUtilities installBlockRulesFromSettings
+    // (these two were previously swapped).
     BlockManager* blockManager = [[BlockManager alloc] initAsAllowlist: [settings boolForKey: @"ActiveBlockAsWhitelist"]
-                                                            allowLocal: [settings boolForKey: @"EvaluateCommonSubdomains"]
-                                               includeCommonSubdomains: [settings boolForKey: @"AllowLocalNetworks"]
+                                                            allowLocal: [settings boolForKey: @"AllowLocalNetworks"]
+                                               includeCommonSubdomains: [settings boolForKey: @"EvaluateCommonSubdomains"]
                                                   includeLinkedDomains: [settings boolForKey: @"IncludeLinkedDomains"]];
     [blockManager enterAppendMode];
     [blockManager addBlockEntriesFromStrings: added];

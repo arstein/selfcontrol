@@ -176,6 +176,128 @@ final class UIFormattingTests: XCTestCase {
         XCTAssertTrue(HostValidity.isValid("  "))  // blank rows are never highlighted
     }
 
+    func testHostValidityLongAndPunycodeTLDs() {
+        XCTAssertTrue(HostValidity.isValid("studio.photography"))
+        XCTAssertTrue(HostValidity.isValid("example.xn--p1ai"))
+        XCTAssertTrue(HostValidity.isValid("example.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijk")) // 63-letter TLD
+        XCTAssertFalse(HostValidity.isValid("example.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijkl")) // 64
+        XCTAssertFalse(HostValidity.isValid("example.c"))
+        XCTAssertFalse(HostValidity.isValid("example.c0m"))
+    }
+    func testHostValidityUnderscores() {
+        XCTAssertTrue(HostValidity.isValid("_dmarc.example.com"))
+        XCTAssertTrue(HostValidity.isValid("my_host.example.com"))
+    }
+    func testHostValidityStillRejects() {
+        XCTAssertFalse(HostValidity.isValid("*"))
+        XCTAssertFalse(HostValidity.isValid("reddit"))
+        XCTAssertFalse(HostValidity.isValid("photography.com/16"))
+        XCTAssertTrue(HostValidity.isValid("10.0.0.0/16"))
+        XCTAssertTrue(HostValidity.isValid("example.photography:443"))
+        XCTAssertTrue(HostValidity.isValid(":25"))
+    }
+    func testHostValidityPartition() {
+        let p = HostValidity.partition(["a.com", "nodot", "b.org", "*"])
+        XCTAssertEqual(p.valid, ["a.com", "b.org"])
+        XCTAssertEqual(p.invalid, ["nodot", "*"])
+    }
+    func testSkippedImportNote() {
+        XCTAssertNil(HostValidity.skippedNote(count: 0))
+        XCTAssertEqual(HostValidity.skippedNote(count: 1), "Skipped 1 entry that isn’t a valid address.")
+        XCTAssertEqual(HostValidity.skippedNote(count: 2), "Skipped 2 entries that aren’t valid addresses.")
+    }
+
+    // MARK: TickLayout
+    func testTickAnchorsThirtyDays() {
+        let a = TickLayout.anchors(maxMinutes: 43200)
+        XCTAssertEqual(a.map(\.minutes), [60, 480, 1440, 10080, 43200])
+        XCTAssertEqual(a.map(\.label), ["1h", "8h", "1 day", "1 week", "30 days"])
+    }
+    func testTickAnchorsOneDay() {
+        let a = TickLayout.anchors(maxMinutes: 1440)
+        XCTAssertEqual(a.map(\.minutes), [60, 480, 1440])
+        XCTAssertEqual(a.map(\.label), ["1h", "8h", "1 day"])
+        // the 1-day anchor is the maximum, so it carries the max priority
+        XCTAssertEqual(a[2].priority, a.map(\.priority).max())
+    }
+    func testTickAnchorsOneWeekIsMax() {
+        let a = TickLayout.anchors(maxMinutes: 10080)
+        XCTAssertEqual(a.map(\.minutes), [60, 480, 1440, 10080])
+        XCTAssertEqual(a.last?.label, "7 days")
+    }
+    func testTickAnchorsSmallMax() {
+        XCTAssertEqual(TickLayout.anchors(maxMinutes: 30).map(\.label), ["30 min"])
+        XCTAssertEqual(TickLayout.anchors(maxMinutes: 120).map(\.label), ["1h", "2 hr"])
+    }
+    func testTickPriorityOrder() {
+        let a = TickLayout.anchors(maxMinutes: 43200)
+        let byPriority = a.sorted { $0.priority > $1.priority }.map(\.label)
+        XCTAssertEqual(byPriority, ["30 days", "1 day", "1h", "8h", "1 week"])
+    }
+    func testTickClampsEnds() {
+        let a = TickLayout.anchors(maxMinutes: 1440)
+        let placed = TickLayout.visibleTicks(anchors: a, positions: [0.0, 0.5, 1.0], labelWidths: [20, 20, 40], trackWidth: 300, minGap: 6)
+        XCTAssertEqual(placed.map(\.index), [0, 1, 2])
+        XCTAssertEqual(placed[0].labelCenter, 10, accuracy: 1e-9)   // clamped from 0
+        XCTAssertEqual(placed[0].tickX, 0, accuracy: 1e-9)
+        XCTAssertEqual(placed[1].labelCenter, 150, accuracy: 1e-9)
+        XCTAssertEqual(placed[2].labelCenter, 280, accuracy: 1e-9)  // clamped from 300
+        XCTAssertEqual(placed[2].tickX, 300, accuracy: 1e-9)
+    }
+    func testTickCollisionHidesLowerPriority() {
+        let a = TickLayout.anchors(maxMinutes: 43200) // 1h, 8h, 1 day, 1 week, 30 days
+        // 1 week sits 30pt from 30 days; 8h sits right next to 1h
+        let placed = TickLayout.visibleTicks(anchors: a, positions: [0.2, 0.25, 0.7, 0.9, 1.0],
+                                             labelWidths: [20, 20, 36, 40, 44], trackWidth: 300, minGap: 6)
+        // 1h centre 60 [50,70]; 8h centre 75 [65,85] -> overlaps 1h, hidden
+        // 1 week centre 270 [250,290]; 30 days clamped to 278 [256,300] -> hidden
+        XCTAssertEqual(placed.map(\.index), [0, 2, 4])
+    }
+    func testTickGapIsRespected() {
+        let a = TickLayout.anchors(maxMinutes: 1440)
+        // labels 20pt wide; edges 4pt apart (< 6) -> lower priority (8h) hidden
+        var placed = TickLayout.visibleTicks(anchors: a, positions: [0.3, 0.38, 1.0], labelWidths: [20, 20, 30], trackWidth: 300, minGap: 6)
+        XCTAssertEqual(placed.map(\.index), [0, 2])
+        // 8pt apart -> both shown
+        placed = TickLayout.visibleTicks(anchors: a, positions: [0.3, 0.3933333333, 1.0], labelWidths: [20, 20, 30], trackWidth: 300, minGap: 6)
+        XCTAssertEqual(placed.map(\.index), [0, 1, 2])
+    }
+
+    // MARK: PillLayout
+    func testPillWidthPrefersPreferred() {
+        XCTAssertEqual(PillLayout.pillWidth(preferred: 26, available: 300, count: 3, gap: 5), 26)
+    }
+    func testPillWidthShrinksToFit() {
+        // 10 pills, 9 gaps of 5 = 45; (300 - 45) / 10 = 25.5
+        XCTAssertEqual(PillLayout.pillWidth(preferred: 40, available: 300, count: 10, gap: 5)!, 25.5, accuracy: 1e-9)
+    }
+    func testPillWidthFallsBackToBar() {
+        // (100 - 45) / 10 = 5.5 < 6 -> continuous bar
+        XCTAssertNil(PillLayout.pillWidth(preferred: 16, available: 100, count: 10, gap: 5))
+        XCTAssertEqual(PillLayout.pillWidth(preferred: 16, available: 105, count: 10, gap: 5)!, 6, accuracy: 1e-9)
+    }
+    func testPillTotalWidth() {
+        XCTAssertEqual(PillLayout.totalWidth(pillWidth: 16, count: 3, gap: 5), 58)
+        XCTAssertEqual(PillLayout.totalWidth(pillWidth: 16, count: 0, gap: 5), 0)
+    }
+
+    // MARK: MaxLengthDays
+    func testMaxLengthDaysPrefill() {
+        XCTAssertEqual(MaxLengthDays.days(fromMinutes: 1440), 1)
+        XCTAssertEqual(MaxLengthDays.days(fromMinutes: 1441), 2)
+        XCTAssertEqual(MaxLengthDays.days(fromMinutes: 60), 1)
+        XCTAssertEqual(MaxLengthDays.days(fromMinutes: 43200), 30)
+    }
+    func testMaxLengthDaysParse() {
+        XCTAssertEqual(MaxLengthDays.minutes(fromInput: "7"), 10080)
+        XCTAssertEqual(MaxLengthDays.minutes(fromInput: " 30 "), 43200)
+        XCTAssertEqual(MaxLengthDays.minutes(fromInput: "1"), 1440)
+        XCTAssertNil(MaxLengthDays.minutes(fromInput: "0"))
+        XCTAssertNil(MaxLengthDays.minutes(fromInput: "31"))
+        XCTAssertNil(MaxLengthDays.minutes(fromInput: "1.5"))
+        XCTAssertNil(MaxLengthDays.minutes(fromInput: "abc"))
+    }
+
     // MARK: OverridePolicyLimits
     func testOverrideMinuteSteps() {
         XCTAssertEqual(OverridePolicyLimits.nextMinutes(1), 2)

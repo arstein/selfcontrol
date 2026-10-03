@@ -380,11 +380,22 @@ final class AppModel: ObservableObject {
 
     // MARK: - Restrictions (not blocking)
 
-    /// Returns false if nothing usable was entered.
+    /// What `raw` becomes once cleaned (the real cleaner when live; trimmed + lowercased in snapshots).
+    func cleanedEntries(_ raw: String) -> [String] {
+        live ? (SCMiscUtilities.cleanBlocklistEntry(raw) ?? []) : [raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()].filter { !$0.isEmpty }
+    }
+
+    /// True if `raw` cleans to at least one entry and every cleaned entry is a valid address.
+    func isAcceptableEntry(_ raw: String) -> Bool {
+        let cleaned = cleanedEntries(raw)
+        return !cleaned.isEmpty && HostValidity.partition(cleaned).invalid.isEmpty
+    }
+
+    /// Returns false (and adds nothing) if nothing usable was entered or any entry is invalid.
     @discardableResult
     func addEditableEntries(_ raw: String) -> Bool {
-        let cleaned = live ? (SCMiscUtilities.cleanBlocklistEntry(raw) ?? []) : [raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()].filter { !$0.isEmpty }
-        guard !cleaned.isEmpty else { return false }
+        let cleaned = cleanedEntries(raw)
+        guard !cleaned.isEmpty, HostValidity.partition(cleaned).invalid.isEmpty else { return false }
         var list = editableEntries
         for e in cleaned where !list.contains(e) { list.append(e) }
         saveEditable(list)
@@ -395,10 +406,14 @@ final class AppModel: ObservableObject {
         saveEditable(editableEntries.filter { $0 != entry })
     }
 
-    func importHosts(_ hosts: [String]) {
+    /// Adds only the valid hosts; returns how many were skipped as invalid.
+    @discardableResult
+    func importHosts(_ hosts: [String]) -> Int {
+        let split = HostValidity.partition(hosts)
         var list = editableEntries
-        for h in hosts where !list.contains(h) { list.append(h) }
+        for h in split.valid where !list.contains(h) { list.append(h) }
         saveEditable(list)
+        return split.invalid.count
     }
 
     private func saveEditable(_ list: [String]) {
