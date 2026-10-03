@@ -79,8 +79,16 @@ final class NoWindowDragHostingView<Content: View>: NSHostingView<Content> {
 struct NoWindowDrag<Content: View>: NSViewRepresentable {
     let content: Content
     init(@ViewBuilder _ content: () -> Content) { self.content = content() }
-    func makeNSView(context: Context) -> NoWindowDragHostingView<Content> { NoWindowDragHostingView(rootView: content) }
-    func updateNSView(_ view: NoWindowDragHostingView<Content>, context: Context) { view.rootView = content }
+    // The nested host sits under the title bar, so it would inherit a top safe-area inset
+    // the height of the title bar and push its content down out of view. Opt out of it.
+    func makeNSView(context: Context) -> NoWindowDragHostingView<AnyView> {
+        let view = NoWindowDragHostingView(rootView: AnyView(content.ignoresSafeArea()))
+        if #available(macOS 13.3, *) { view.safeAreaRegions = [] }
+        return view
+    }
+    func updateNSView(_ view: NoWindowDragHostingView<AnyView>, context: Context) {
+        view.rootView = AnyView(content.ignoresSafeArea())
+    }
 }
 
 struct HeaderBar: View {
