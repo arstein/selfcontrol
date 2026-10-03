@@ -108,17 +108,23 @@ struct RestrictionsView: View {
                 .help(invalid ? NSLocalizedString("This doesn’t look like a valid host or IP address.", comment: "") : "")
             Spacer()
             if entry.contains("/") { Text(NSLocalizedString("IP range", comment: "")).font(.system(size: 11)).foregroundColor(Theme.sub) }
-            if !blocking && hovered == entry {
+            if !blocking {
+                // Always reserve the button's 22pt slot so rows don't change height on hover.
                 Button { model.removeEditableEntry(entry) } label: {
                     Image(systemName: "minus").font(.system(size: 9, weight: .bold))
                         .frame(width: 22, height: 22).background(Color(hex: 0x4A4A52)).clipShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
+                .opacity(hovered == entry ? 1 : 0)
+                .allowsHitTesting(hovered == entry)
                 .accessibilityLabel(Text(String(format: NSLocalizedString("Remove %@", comment: ""), entry)))
             }
         }
+        .frame(minHeight: 22)
         .padding(.horizontal, 14).padding(.vertical, 9)
         .background(hovered == entry && !blocking ? Color(hex: 0x33333A) : Color.clear)
+        .contentShape(Rectangle())   // hover/click anywhere on the row, including the empty middle
         .onHover { inside in hovered = inside ? entry : (hovered == entry ? nil : hovered) }
         .contextMenu {
             if !blocking { Button(NSLocalizedString("Remove", comment: "")) { model.removeEditableEntry(entry) } }

@@ -322,6 +322,8 @@
         // a block is already running, so make sure FirstBlockStarted is true
         [defaults_ setBool: YES forKey: @"FirstBlockStarted"];
     }
+    // The UI is dark-only (spec §5): make alerts, open/save panels and menus match the window.
+    NSApp.appearance = [NSAppearance appearanceNamed: NSAppearanceNameDarkAqua];
     self.mainWindowController = [[MainWindowController alloc] initWithLiveModel: YES];
     [self.mainWindowController showWindow: nil];
     [self.mainWindowController startTicking];

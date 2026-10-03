@@ -289,11 +289,11 @@ struct CompactStepper: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            Button(action: decrement) { Text("−").frame(width: 30, height: 28) }
+            Button(action: decrement) { Text("−").frame(width: 30, height: 28).contentShape(Rectangle()) }
                 .buttonStyle(.plain).disabled(!canDecrement)
                 .accessibilityLabel(Text("Decrease \(label)"))
             Text(value).font(.system(size: 13, weight: .semibold).monospacedDigit()).frame(minWidth: 28)
-            Button(action: increment) { Text("+").frame(width: 30, height: 28) }
+            Button(action: increment) { Text("+").frame(width: 30, height: 28).contentShape(Rectangle()) }
                 .buttonStyle(.plain).disabled(!canIncrement)
                 .accessibilityLabel(Text("Increase \(label)"))
         }

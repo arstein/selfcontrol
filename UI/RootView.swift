@@ -20,6 +20,12 @@ struct RootView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .clipped()
             }
+            if !model.path.isEmpty && model.sheet == nil {
+                Button("") { model.pop() }
+                    .keyboardShortcut(.cancelAction)
+                    .opacity(0).frame(width: 0, height: 0).allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
             if let sheet = model.sheet {
                 Color.black.opacity(0.55)
                     .ignoresSafeArea()
@@ -62,21 +68,41 @@ struct RootView: View {
 
 /// 52pt header aligned with the traffic lights: Back + title on pushed cards,
 /// centered status + settings on the root card.
+/// SwiftUI controls placed in the title-bar band must live in a view that refuses
+/// window drags. NSHostingView reports mouseDownCanMoveWindow == true (it isn't
+/// opaque), so AppKit turns clicks in the title bar over plain SwiftUI content into
+/// window drags and the buttons never fire. Empty header space stays draggable.
+final class NoWindowDragHostingView<Content: View>: NSHostingView<Content> {
+    override var mouseDownCanMoveWindow: Bool { false }
+}
+
+struct NoWindowDrag<Content: View>: NSViewRepresentable {
+    let content: Content
+    init(@ViewBuilder _ content: () -> Content) { self.content = content() }
+    func makeNSView(context: Context) -> NoWindowDragHostingView<Content> { NoWindowDragHostingView(rootView: content) }
+    func updateNSView(_ view: NoWindowDragHostingView<Content>, context: Context) { view.rootView = content }
+}
+
 struct HeaderBar: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
         HStack(spacing: 10) {
             if let route = model.path.last {
-                Button { model.pop() } label: {
-                    Image(systemName: "chevron.left").font(.system(size: 12, weight: .bold))
-                        .frame(width: 28, height: 28)
-                        .background(Theme.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                NoWindowDrag {
+                    Button { model.pop() } label: {
+                        Image(systemName: "chevron.left").font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Theme.text)
+                            .frame(width: 28, height: 28)
+                            .background(Theme.card)
+                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .focusable(false)
+                    .accessibilityLabel(Text("Back"))
                 }
-                .buttonStyle(.plain)
-                .keyboardShortcut(model.sheet == nil ? .cancelAction : nil)
-                .accessibilityLabel(Text("Back"))
+                .frame(width: 28, height: 28)
                 Text(title(for: route)).font(.system(size: 14, weight: .semibold))
                 Spacer()
             } else {
@@ -86,13 +112,20 @@ struct HeaderBar: View {
                     Text(statusText).font(.system(size: 13, weight: .semibold)).lineLimit(1)
                 }
                 Spacer()
-                Button { model.push(.settings) } label: {
-                    Image(systemName: "slider.horizontal.3").font(.system(size: 14)).foregroundColor(Theme.sub)
-                        .frame(width: 30, height: 30)
+                let settingsEnabled = !model.isAddingBlock
+                NoWindowDrag {
+                    Button { model.push(.settings) } label: {
+                        Image(systemName: "slider.horizontal.3").font(.system(size: 14))
+                            .foregroundColor(settingsEnabled ? Theme.sub : Theme.faint)
+                            .frame(width: 30, height: 30)
+                            .contentShape(Rectangle())   // whole 30x30 box is clickable, not just the icon strokes
+                    }
+                    .buttonStyle(.plain)
+                    .focusable(false)                    // no blue keyboard-focus ring on launch
+                    .disabled(!settingsEnabled)
+                    .accessibilityLabel(Text("Settings"))
                 }
-                .buttonStyle(.plain)
-                .disabled(model.isAddingBlock)
-                .accessibilityLabel(Text("Settings"))
+                .frame(width: 30, height: 30)
             }
         }
         .padding(.leading, Theme.trafficLightInset)
