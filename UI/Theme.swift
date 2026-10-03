@@ -6,6 +6,7 @@ enum Theme {
     static let bg = Color(hex: 0x1F1F23)
     static let card = Color(hex: 0x2A2A2F)
     static let cardRaised = Color(hex: 0x3C3C43)   // secondary buttons
+    static let valuePill = Color(hex: 0x3A3A41)    // settings value buttons
     static let chipSelected = Color(hex: 0x3A2419)
     static let chipSelectedBorder = Color(hex: 0x6B3A24)
     static let chipSelectedText = Color(hex: 0xF4C3A8)

@@ -242,6 +242,13 @@
 }
 
 - (void)applicationWillFinishLaunching:(NSNotification *)notification {
+#if DEBUG
+    // Snapshot mode must never fall through into the real launch (LetsMove, SCSettings,
+    // XPC, daemon), so exit whenever the flag is present, even if rendering failed.
+    if ([NSProcessInfo.processInfo.arguments containsObject: @"-SCRenderSnapshots"]) {
+        exit([SCSnapshotRenderer runIfRequested] ? 0 : 1);
+    }
+#endif
     // For test runs, we don't want to pop up the dialog to move to the Applications folder, as it breaks the tests
     if (NSProcessInfo.processInfo.environment[@"XCTestConfigurationFilePath"] == nil) {
         PFMoveToApplicationsFolderIfNecessary();

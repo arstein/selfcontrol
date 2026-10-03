@@ -13,7 +13,9 @@ struct EmergencyUnlockView: View {
     var body: some View {
         let t = model.tedium
         VStack(alignment: .leading, spacing: Theme.gap) {
-            Text(String(format: NSLocalizedString("Ends the whole block, even offline. Type each digit as it appears. It takes about %ld minutes on purpose.", comment: ""), max(1, minutesEstimate)))
+            Text(minutesEstimate <= 1
+                 ? NSLocalizedString("Ends the whole block, even offline. Type each digit as it appears. It takes about a minute on purpose.", comment: "")
+                 : String(format: NSLocalizedString("Ends the whole block, even offline. Type each digit as it appears. It takes about %ld minutes on purpose.", comment: ""), minutesEstimate))
                 .foregroundColor(Theme.sub).lineSpacing(3).padding(.horizontal, 2)
                 .fixedSize(horizontal: false, vertical: true)
 

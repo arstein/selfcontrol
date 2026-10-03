@@ -7,6 +7,7 @@ struct RestrictionsView: View {
     @State private var error: String? = nil
     @State private var busy = false
     @State private var hovered: String? = nil
+    @State private var listHeight: CGFloat = 0
 
     private var blocking: Bool { model.isBlockRunning }
 
@@ -52,18 +53,27 @@ struct RestrictionsView: View {
                                 .foregroundColor(Theme.sub).padding(14).frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+                    .background(GeometryReader { g in
+                        Color.clear.preference(key: ListHeightKey.self, value: g.size.height)
+                    })
                 }
+                // hug the rows; scroll only once they outgrow the window
+                .frame(maxHeight: listHeight > 0 ? listHeight : nil)
+                .onPreferenceChange(ListHeightKey.self) { listHeight = $0 }
             }
-            .frame(maxHeight: .infinity, alignment: .top)
+            .layoutPriority(-1)
 
             Text(caption).font(.system(size: 11)).foregroundColor(Theme.sub).padding(.horizontal, 2)
                 .fixedSize(horizontal: false, vertical: true)
 
+            Spacer(minLength: 0)
+
             HStack {
                 if !blocking {
-                    Menu(NSLocalizedString("Import…", comment: "")) { importItems }
-                        .menuStyle(.borderlessButton).fixedSize()
-                        .foregroundColor(Theme.sub)
+                    Menu { importItems } label: {
+                        Text(NSLocalizedString("Import…", comment: "")).font(.system(size: 12)).foregroundColor(Theme.sub)
+                    }
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 }
                 Button(NSLocalizedString("Export…", comment: "")) { (NSApp.delegate as? AppController)?.save(nil) }
                     .buttonStyle(.plain).foregroundColor(Theme.sub).font(.system(size: 12))
@@ -148,4 +158,9 @@ struct RestrictionsView: View {
             }
         }
     }
+}
+
+private struct ListHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }

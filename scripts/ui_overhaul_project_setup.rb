@@ -48,6 +48,12 @@ end
 app.build_configurations.each do |config|
   config.build_settings['SWIFT_VERSION'] = '5.0'
   config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = 'SelfControl-Bridging-Header.h'
+  # Task 11: the app target defined no DEBUG flag, so `#if DEBUG` code (the snapshot
+  # renderer and its AppController hook) was silently compiled out of Debug builds.
+  if config.name == 'Debug'
+    config.build_settings['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] = 'DEBUG $(inherited)'
+    config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = ['DEBUG=1', '$(inherited)']
+  end
 end
 
 # --- Task 10: remove the legacy window controllers -----------------------------

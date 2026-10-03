@@ -94,6 +94,7 @@ struct SettingsView: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .valuePill()
         .popover(isPresented: $showCustomMax, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(NSLocalizedString("Longest block, in minutes (1–43200)", comment: "")).font(.system(size: 12))
@@ -127,6 +128,7 @@ struct SettingsView: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .valuePill()
     }
 
     /// Port of PreferencesGeneralViewController -soundSelectionChanged: (preview + errors 310/311).
@@ -148,5 +150,15 @@ struct SettingsView: View {
             SCSentry.captureError(err)
             SCUIUtilities.presentError(err)
         }
+    }
+}
+
+private extension View {
+    /// Mock E-Settings value button: 24pt pill, #3a3a41, radius 6.
+    func valuePill() -> some View {
+        self.padding(.horizontal, 8)
+            .frame(height: 24)
+            .background(Theme.valuePill)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }

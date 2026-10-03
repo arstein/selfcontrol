@@ -10,6 +10,7 @@
 		02B493DE881C5AF9B7D27D29 /* SCMinutesValueTransformer.m in Sources */ = {isa = PBXBuildFile; fileRef = AB08B8166109BB41FB60297D /* SCMinutesValueTransformer.m */; };
 		0C9F4B971321BEAF47EA415A /* SCTediumChallenge.m in Sources */ = {isa = PBXBuildFile; fileRef = 79957742827112D9CEEDAC30 /* SCTediumChallenge.m */; };
 		10986712ABECC1EE090FED87 /* BlockingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6479EB6CF190B8EFEE10956C /* BlockingView.swift */; };
+		182B84EA79FCC6488EBC1D39 /* SnapshotRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 275DAEC954CBFC5808FEC632 /* SnapshotRenderer.swift */; };
 		1B2E23F29C9745ECE6481B58 /* SCMinutesValueTransformer.m in Sources */ = {isa = PBXBuildFile; fileRef = AB08B8166109BB41FB60297D /* SCMinutesValueTransformer.m */; };
 		1D6F3A5DF697E575B95E6389 /* SCTediumChallenge.m in Sources */ = {isa = PBXBuildFile; fileRef = 79957742827112D9CEEDAC30 /* SCTediumChallenge.m */; };
 		21AF92BBCF4D26FE4A2D0F6D /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91292ED313D37246F4C032E2 /* Components.swift */; };
@@ -579,6 +580,7 @@
 		22D9F1DE631F3AD0CAFAFD03 /* Pods-SelfControl.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SelfControl.debug.xcconfig"; path = "Pods/Target Support Files/Pods-SelfControl/Pods-SelfControl.debug.xcconfig"; sourceTree = "<group>"; };
 		2384F381B90DE174C0E08A23 /* OverridesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OverridesView.swift; sourceTree = "<group>"; };
 		24BCCBD83CF1A852BA8F875B /* MainWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainWindowController.swift; sourceTree = "<group>"; };
+		275DAEC954CBFC5808FEC632 /* SnapshotRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnapshotRenderer.swift; sourceTree = "<group>"; };
 		29B97316FDCFA39411CA2CEA /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		29B97324FDCFA39411CA2CEA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = /System/Library/Frameworks/AppKit.framework; sourceTree = "<absolute>"; };
 		29B97325FDCFA39411CA2CEA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = /System/Library/Frameworks/Foundation.framework; sourceTree = "<absolute>"; };
@@ -1676,6 +1678,7 @@
 				6479EB6CF190B8EFEE10956C /* BlockingView.swift */,
 				69A871EF1511ACFE38C668EE /* Sheets.swift */,
 				0E40DB90D392659CD8444EFC /* EmergencyUnlockView.swift */,
+				275DAEC954CBFC5808FEC632 /* SnapshotRenderer.swift */,
 			);
 			name = UI;
 			path = UI;
@@ -3773,6 +3776,7 @@
 				10986712ABECC1EE090FED87 /* BlockingView.swift in Sources */,
 				CC08565F008428EAD5C3104B /* Sheets.swift in Sources */,
 				366DEB8F625314B5483C99A7 /* EmergencyUnlockView.swift in Sources */,
+				182B84EA79FCC6488EBC1D39 /* SnapshotRenderer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4069,6 +4073,10 @@
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = SelfControl_Prefix.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "$(HOME)/Applications";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
@@ -4076,6 +4084,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "org.eyebeam.${PRODUCT_NAME:identifier}";
 				PRODUCT_NAME = SelfControl;
 				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OBJC_BRIDGING_HEADER = "SelfControl-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
