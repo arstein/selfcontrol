@@ -32,6 +32,7 @@
 #import "SCBlockFileReaderWriter.h"
 #import "SCUIUtilities.h"
 #import "SCTediumWindowController.h"
+#import "SelfControl-Swift.h"
 
 @interface AppController () {}
 
