@@ -24,6 +24,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (NSString*)blockTeaserStringWithMaxLength:(NSInteger)maxStringLen;
 
+// Returns the error as it should be shown to the user (re-localizing daemon
+// errors that lacked our .strings), or nil if it shouldn't be shown at all
+// (nil input, or an auth-cancel).
++ (nullable NSError*)displayableError:(nullable NSError*)err;
+
 // presents an error via a popup in the app
 // this is mostly just a pass-through to [NSApp presentError:],
 // but it first checks if the error is in the SelfControl domain

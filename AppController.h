@@ -142,4 +142,23 @@
 // -validateMenuItem:) while a block is running.
 - (IBAction)openTediumOverride:(id)sender;
 
+#pragma mark - Actions for the SwiftUI window (completion is always called on the main queue)
+
+// Serializes block modifications (add entries / extend). Shared by old + new UI.
+@property (nonatomic, strong, readonly) NSLock* modifyBlockLock;
+
+// Adds cleaned entries from rawInput to the RUNNING block via the daemon's
+// updateBlocklist. Mirrors -addToBlockList:lock: but returns errors instead of
+// presenting them (no-block 102, legacy 303, allowlist 305, invalid input,
+// no network, busy, or the daemon's error).
+- (void)addEntriesToRunningBlock:(NSString*)rawInput completion:(void (^)(NSError* _Nullable error))completion;
+
+// Extends the RUNNING block. Mirrors -extendBlockTime:lock: (clamped to
+// MaxBlockLength; daemon still enforces its 24h-per-call cap, error 309).
+- (void)extendRunningBlockByMinutes:(NSInteger)minutes completion:(void (^)(NSError* _Nullable error))completion;
+
+// The manual "Stuck? Stop block manually" flow (SCKillerHelper), moved here
+// from TimerWindowController unchanged. Main thread only; shows its own alerts.
+- (void)stopBlockManually;
+
 @end

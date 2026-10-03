@@ -157,21 +157,25 @@
     return [SCBlockUtilities anyBlockIsRunning] || [SCBlockUtilities blockRulesFoundOnSystem];
 }
 
-+ (void)presentError:(NSError*)err {
-    if (err == nil) return;
-
++ (nullable NSError*)displayableError:(nullable NSError*)err {
+    if (err == nil) return nil;
     // When errors are generated in the daemon, they generally don't have access to the localized .strings
     // files which are in our bundle, so the errors won't have a proper localized description.
     if ([err.domain isEqualToString: kSelfControlErrorDomain] && [err.userInfo[@"SCDescriptionNotFound"] boolValue]) {
         err = [SCErr errorWithCode: err.code];
     }
-    
     // we don't present auth cancelled errors, since they generally don't indicate a "real" problem
-    if ([SCMiscUtilities errorIsAuthCanceled: err]) return;
-    
+    if ([SCMiscUtilities errorIsAuthCanceled: err]) return nil;
+    return err;
+}
+
++ (void)presentError:(NSError*)err {
+    NSError* shown = [SCUIUtilities displayableError: err];
+    if (shown == nil) return;
+
     // always present errors on the main thread since it's a UI task
     [NSApp performSelectorOnMainThread: @selector(presentError:)
-                            withObject: err
+                            withObject: shown
                          waitUntilDone: YES];
 }
 

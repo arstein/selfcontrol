@@ -38,6 +38,7 @@
 
 @property (atomic, strong, readwrite) SCXPCClient* xpc;
 @property (nonatomic, strong) SCTediumWindowController* tediumWindowController;
+@property (nonatomic, strong, readwrite) NSLock* modifyBlockLock;
 
 @end
 
@@ -64,6 +65,7 @@ static void* AppControllerMaxBlockLengthContext = &AppControllerMaxBlockLengthCo
 		// method alter the blockIsOn variable atomically (will no longer be necessary once we can
 		// use properties).
 		refreshUILock_ = [[NSLock alloc] init];
+		self.modifyBlockLock = [[NSLock alloc] init];
 	}
 
 	return self;
@@ -888,6 +890,247 @@ static void* AppControllerMaxBlockLengthContext = &AppControllerMaxBlockLengthCo
         return [SCBlockUtilities modernBlockIsRunning];
     }
     return YES;
+}
+
+#pragma mark - Actions for the SwiftUI window
+
+- (NSError*)uiErrorWithDescription:(NSString*)description {
+    return [NSError errorWithDomain: kSelfControlErrorDomain code: -1 userInfo: @{ NSLocalizedDescriptionKey: description }];
+}
+
+- (void)addEntriesToRunningBlock:(NSString*)rawInput completion:(void (^)(NSError* _Nullable error))completion {
+    void (^finish)(NSError*) = ^(NSError* err) {
+        dispatch_async(dispatch_get_main_queue(), ^{ completion(err); });
+    };
+
+    if (![SCUIUtilities blockIsRunning]) { finish([SCErr errorWithCode: 102]); return; }
+    if (![SCBlockUtilities modernBlockIsRunning]) { finish([SCErr errorWithCode: 303]); return; }
+    if ([settings_ boolForKey: @"ActiveBlockAsWhitelist"]) { finish([SCErr errorWithCode: 305]); return; }
+
+    NSArray<NSString*>* cleanedEntries = [SCMiscUtilities cleanBlocklistEntry: rawInput];
+    if (cleanedEntries.count == 0) {
+        finish([self uiErrorWithDescription: NSLocalizedString(@"That doesn't look like a site address.", @"add-site error for unusable input")]);
+        return;
+    }
+    if ([defaults_ boolForKey: @"VerifyInternetConnection"] && ![SCUIUtilities networkConnectionIsAvailable]) {
+        finish([self uiErrorWithDescription: NSLocalizedString(@"No network connection detected", "No network connection detected message")]);
+        return;
+    }
+    if (![self.modifyBlockLock tryLock]) {
+        finish([self uiErrorWithDescription: NSLocalizedString(@"Another change to this block is still in progress.", @"busy modifying block")]);
+        return;
+    }
+
+    // Note we RETRIEVE the latest list from settings (ActiveBlocklist), but we SET the new list in defaults
+    // since the helper daemon should be the only one changing ActiveBlocklist
+    NSMutableArray* list = [[settings_ valueForKey: @"ActiveBlocklist"] mutableCopy] ?: [NSMutableArray array];
+    for (NSString* entry in cleanedEntries) {
+        if (![list containsObject: entry]) [list addObject: entry];
+    }
+    [defaults_ setValue: list forKey: @"Blocklist"];
+
+    // we're about to launch a helper tool which will read settings, so make sure the ones on disk are valid
+    [settings_ synchronizeSettings];
+    [defaults_ synchronize];
+
+    [self.xpc refreshConnectionAndRun:^{
+        [self.xpc updateBlocklist: list reply:^(NSError * _Nonnull error) {
+            if (error == nil) {
+                [SCSentry addBreadcrumb: @"Blocklist updated successfully" category:@"app"];
+            }
+            [self.modifyBlockLock unlock];
+            finish(error);
+        }];
+    }];
+}
+
+- (void)extendRunningBlockByMinutes:(NSInteger)minutes completion:(void (^)(NSError* _Nullable error))completion {
+    void (^finish)(NSError*) = ^(NSError* err) {
+        dispatch_async(dispatch_get_main_queue(), ^{ completion(err); });
+    };
+
+    NSInteger maxBlockLength = [defaults_ integerForKey: @"MaxBlockLength"];
+    if (minutes < 1) { finish(nil); return; }
+    if (minutes > maxBlockLength) minutes = maxBlockLength;
+
+    if (![SCUIUtilities blockIsRunning]) { finish([SCErr errorWithCode: 103]); return; }
+    if (![SCBlockUtilities modernBlockIsRunning]) { finish([SCErr errorWithCode: 306]); return; }
+    if (![self.modifyBlockLock tryLock]) {
+        finish([self uiErrorWithDescription: NSLocalizedString(@"Another change to this block is still in progress.", @"busy modifying block")]);
+        return;
+    }
+
+    NSDate* oldBlockEndDate = [settings_ valueForKey: @"BlockEndDate"];
+    NSDate* newBlockEndDate = [oldBlockEndDate dateByAddingTimeInterval: (minutes * 60)];
+
+    // we're about to launch a helper tool which will read settings, so make sure the ones on disk are valid
+    [settings_ synchronizeSettings];
+    [defaults_ synchronize];
+
+    [self.xpc refreshConnectionAndRun:^{
+        // Before we try to extend the block, make sure the block time didn't run out (or is about to run out) in the meantime
+        if ([SCBlockUtilities currentBlockIsExpired] || [oldBlockEndDate timeIntervalSinceNow] < 1) {
+            [self.modifyBlockLock unlock];
+            finish(nil);
+            return;
+        }
+        [self.xpc updateBlockEndDate: newBlockEndDate reply:^(NSError * _Nonnull error) {
+            if (error == nil) {
+                [SCSentry addBreadcrumb: @"App extended block duration successfully" category:@"app"];
+            }
+            [self.modifyBlockLock unlock];
+            finish(error);
+        }];
+    }];
+}
+
+#pragma mark - Manual block stop (moved from TimerWindowController)
+
+- (void)stopBlockManually {
+	AuthorizationRef authorizationRef;
+	char* helperToolPath = [self selfControlKillerHelperToolPathUTF8String];
+	NSUInteger helperToolPathSize = strlen(helperToolPath);
+	AuthorizationItem right = {
+		kAuthorizationRightExecute,
+		helperToolPathSize,
+		helperToolPath,
+		0
+	};
+	AuthorizationRights authRights = {
+		1,
+		&right
+	};
+	AuthorizationFlags myFlags = kAuthorizationFlagDefaults |
+	kAuthorizationFlagExtendRights |
+	kAuthorizationFlagInteractionAllowed;
+	OSStatus status;
+
+	status = AuthorizationCreate (&authRights,
+								  kAuthorizationEmptyEnvironment,
+								  myFlags,
+								  &authorizationRef);
+
+	if(status) {
+        if (status != AUTH_CANCELLED_STATUS) {
+            NSError* err = [SCErr errorWithCode: 501];
+            [SCSentry captureError: err];
+        }
+        return;
+	}
+    
+    // we're about to launch a helper tool which will read settings, so make sure the ones on disk are valid
+    [settings_ synchronizeSettings];
+
+	char uidString[10];
+	snprintf(uidString, sizeof(uidString), "%d", getuid());
+
+    NSDate* keyDate = [NSDate date];
+    NSString* killerKey = [SCMiscUtilities killerKeyForDate: keyDate];
+    NSString* keyDateString = [[NSISO8601DateFormatter new] stringFromDate: keyDate];
+    
+	char* args[] = { (char*)[killerKey UTF8String], (char*)[keyDateString UTF8String], uidString, NULL };
+    
+    FILE* pipe = NULL;
+	status = AuthorizationExecuteWithPrivileges(authorizationRef,
+												helperToolPath,
+												kAuthorizationFlagDefaults,
+												args,
+												&pipe);
+    
+	if(status) {
+		NSLog(@"WARNING: Authorized execution of helper tool returned failure status code %d", status);
+
+        /// AUTH_CANCELLED_STATUS just means auth is cancelled, not really an "error" per se
+        if (status != AUTH_CANCELLED_STATUS) {
+            NSError* err = [SCErr errorWithCode: 400];
+            [SCSentry captureError: err];
+            [SCUIUtilities presentError: err];
+        }
+
+		return;
+	}
+
+    // read until the pipe finishes so we wait for execution to end before we
+    // show the modal (this also helps make the focus ordering better).
+    // Keep the output: the helper reports a refusal on stdout, since its exit
+    // status isn't available to us through AuthorizationExecuteWithPrivileges.
+    NSMutableData* helperOutput = [NSMutableData data];
+    if (pipe != NULL) {
+        char buffer[256];
+        for (;;) {
+            ssize_t bytesRead = read(fileno(pipe), buffer, sizeof(buffer));
+            if (bytesRead < 0 && errno == EINTR) continue;
+            if (bytesRead < 1) break;
+            [helperOutput appendBytes: buffer length: (NSUInteger)bytesRead];
+        }
+        fclose(pipe);
+    }
+    NSString* helperOutputString = [[NSString alloc] initWithData: helperOutput encoding: NSUTF8StringEncoding];
+    BOOL helperRefusedUnverifiedExpiry = [helperOutputString containsString: SCKillerExpiryNotVerifiedMarker];
+        
+    // reload settings so the timer window knows the block is done
+    [[SCSettings sharedSettings] reloadSettings];
+        
+    // update the UI _before_ we run the alert,
+    // so the main window doesn't steal the focus from the alert
+    // (and after we've synced settings so we know things have changed)
+    [self refreshUserInterface];
+    
+    if (helperRefusedUnverifiedExpiry) {
+        NSLog(@"WARNING: Killer helper refused to clear the block because network time did not confirm expiry");
+        NSAlert* alert = [[NSAlert alloc] init];
+        [alert setMessageText: NSLocalizedString(@"Block not cleared", @"Title when the killer helper refuses to clear an unexpired block")];
+        [alert setInformativeText: NSLocalizedString(@"SelfControl couldn't verify the block has expired. Network time is required to clear a block, and a block can only be cleared once its full duration has passed. Make sure you're connected to the internet and try again after the timer runs out. You can find the log file, named SelfControl-Killer.log, in your Documents folder.", @"Message when the killer helper refuses to clear a block because network time did not confirm it has expired")];
+        [alert addButtonWithTitle: NSLocalizedString(@"OK", @"OK button")];
+        [alert runModal];
+        return;
+    }
+
+    // send some debug info to Sentry to help us track this issue
+    // detailed logs disabled for now because the best current method might collect user PII we don't want
+    [SCSentry captureMessage: @"User manually cleared SelfControl block from the timer window"];
+    //    [SCSentry captureMessage: @"User manually cleared SelfControl block from the timer window" withScopeBlock:^(SentryScope * _Nonnull scope) {
+    //        SentryAttachment* fileAttachment = [[SentryAttachment alloc] initWithPath: [@"~/Documents/SelfControl-Killer.log" stringByExpandingTildeInPath]];
+    //        [scope addAttachment: fileAttachment];
+    //    }];
+    
+    if ([SCBlockUtilities anyBlockIsRunning]) {
+        // ruh roh! the block wasn't cleared successfully, since it's still running
+        NSError* err = [SCErr errorWithCode: 401];
+        [SCSentry captureError: err];
+        [SCUIUtilities presentError: err];
+    } else {
+        NSAlert* alert = [[NSAlert alloc] init];
+        [alert setMessageText: @"Success!"];
+        [alert setInformativeText:@"The block was cleared successfully.  You can find the log file, named SelfControl-Killer.log, in your Documents folder. If you're still having issues, please check out the SelfControl FAQ on GitHub."];
+        [alert addButtonWithTitle: @"OK"];
+        [alert runModal];
+    }
+}
+
+- (NSString*)selfControlKillerHelperToolPath {
+	static NSString* path;
+
+	// Cache the path so it doesn't have to be searched for again.
+	if(!path) {
+		NSBundle* thisBundle = [NSBundle mainBundle];
+		path = [thisBundle pathForAuxiliaryExecutable: @"SCKillerHelper"];
+	}
+
+	return path;
+}
+- (char*)selfControlKillerHelperToolPathUTF8String {
+	static char* path;
+
+	// Cache the converted path so it doesn't have to be converted again
+	if(!path) {
+		path = malloc(512);
+		[[self selfControlKillerHelperToolPath] getCString: path
+												 maxLength: 512
+												  encoding: NSUTF8StringEncoding];
+	}
+
+	return path;
 }
 
 @end
