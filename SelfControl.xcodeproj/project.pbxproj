@@ -22,6 +22,7 @@
 		4D0D506CC517333BF9CD146F /* UIFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */; };
 		5941ECCB595C6A24D26172AD /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		5D3D3DC07F2795ED3633C9DF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0355C8DA4854E076651125A6 /* Theme.swift */; };
+		608D0EAAF1296FC01E12B6D6 /* Placeholders.swift in Sources */ = {isa = PBXBuildFile; fileRef = D752C2F3FD14C089B76C2475 /* Placeholders.swift */; };
 		6123D11BFFE3AEC36F930820 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F941664451CD7AE1E9AEC3AF /* AppModel.swift */; };
 		6454DA2A7A6335132C3D719E /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		6C06F1F2B32371963ACB0211 /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
@@ -35,6 +36,7 @@
 		87A35CA1E461AF70A4D7B1BB /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		8D11072D0486CEB800E47090 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 29B97316FDCFA39411CA2CEA /* main.m */; settings = {ATTRIBUTES = (); }; };
 		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
+		8FB3051EE943A154B6643BF5 /* ReadyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBEC298B5A830138C0CF54E4 /* ReadyView.swift */; };
 		8FCE76A275EF0E41D798B362 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		959FF31ED90D48B5701E9F7B /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
 		9B15BF4E00EECEB86DBF2FC5 /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
@@ -44,6 +46,7 @@
 		B1AF949839F9E22BE3E5903D /* SCTediumChallengeTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 29E44D5F5FCD376C118031D1 /* SCTediumChallengeTests.m */; };
 		B64189553CF928AD8540FEEC /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
 		B821A91801D5240FC20CDE2E /* SCTrustedClockTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 2CB195EBF6CA0498C15AA308 /* SCTrustedClockTests.m */; };
+		BA633B5A855633C2F27A6513 /* OverridesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2384F381B90DE174C0E08A23 /* OverridesView.swift */; };
 		BC46BB551807FC1DC7EABD25 /* org.eyebeam.selfcontrold.plist in Copy Daemon Launchd Plist */ = {isa = PBXBuildFile; fileRef = CB8086D524837734004B88BD /* org.eyebeam.selfcontrold.plist */; };
 		C6FBB989ECD3EAFF5046741D /* SCEnforcementDecisionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3BC40DCB86D4ECF8D096D80B /* SCEnforcementDecisionTests.m */; };
 		CB0385E119D77051004614B6 /* PreferencesAdvancedViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = CB0385DD19D77051004614B6 /* PreferencesAdvancedViewController.xib */; };
@@ -240,9 +243,12 @@
 		CBED7D9925ABB911003080D6 /* selfcontrol-cli in Copy Executable Helper Tools */ = {isa = PBXBuildFile; fileRef = CBA2AFD20F39EC12005AFEBE /* selfcontrol-cli */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		CBEE50C10F48C21F00F5DF1C /* TimerWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = CBEE50C00F48C21F00F5DF1C /* TimerWindowController.m */; };
 		CBF3B574217BADD7006D5F52 /* SCSettings.m in Sources */ = {isa = PBXBuildFile; fileRef = CBF3B573217BADD7006D5F52 /* SCSettings.m */; };
+		CD3869C3948F3BB09B72C5DE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFC721367A641277356D798 /* SettingsView.swift */; };
 		CF3F309ED00220E6467F6729 /* UIFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C9867E1F58D960865388A88 /* UIFormattingTests.swift */; };
 		D98418C988816F0EF6D32A60 /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		DBCFF19180FC5BDFC625F9C3 /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
+		E208D5E51B5B922B227EE41F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7390D2155D9E8B35951C20 /* RootView.swift */; };
+		E58FA2C6C1CFE887E6C8AC23 /* MainWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24BCCBD83CF1A852BA8F875B /* MainWindowController.swift */; };
 		E68F98CB917A5EED6A2F9104 /* SCBlockEndVerifier.m in Sources */ = {isa = PBXBuildFile; fileRef = D5E8B4627CAD0BF0737808C7 /* SCBlockEndVerifier.m */; };
 		F5B8CBEE19EE21C30026F3A5 /* SCTimeIntervalFormatter.m in Sources */ = {isa = PBXBuildFile; fileRef = F5B8CBED19EE21C30026F3A5 /* SCTimeIntervalFormatter.m */; };
 		F8731D3D3C341D85079D588B /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
@@ -577,6 +583,8 @@
 		174D6F8397D738597F061C4B /* SCTrustedClock.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTrustedClock.m; sourceTree = "<group>"; };
 		1A6B721D82C89E70F4BBAE29 /* SCTediumChallenge.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTediumChallenge.h; sourceTree = "<group>"; };
 		22D9F1DE631F3AD0CAFAFD03 /* Pods-SelfControl.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SelfControl.debug.xcconfig"; path = "Pods/Target Support Files/Pods-SelfControl/Pods-SelfControl.debug.xcconfig"; sourceTree = "<group>"; };
+		2384F381B90DE174C0E08A23 /* OverridesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OverridesView.swift; sourceTree = "<group>"; };
+		24BCCBD83CF1A852BA8F875B /* MainWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainWindowController.swift; sourceTree = "<group>"; };
 		29B97316FDCFA39411CA2CEA /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		29B97324FDCFA39411CA2CEA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = /System/Library/Frameworks/AppKit.framework; sourceTree = "<absolute>"; };
 		29B97325FDCFA39411CA2CEA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = /System/Library/Frameworks/Foundation.framework; sourceTree = "<absolute>"; };
@@ -1528,11 +1536,15 @@
 		CBEE50C00F48C21F00F5DF1C /* TimerWindowController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TimerWindowController.m; sourceTree = "<group>"; };
 		CBF3B572217BADD7006D5F52 /* SCSettings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SCSettings.h; sourceTree = "<group>"; };
 		CBF3B573217BADD7006D5F52 /* SCSettings.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SCSettings.m; sourceTree = "<group>"; };
+		CFFC721367A641277356D798 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		D5E8B4627CAD0BF0737808C7 /* SCBlockEndVerifier.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCBlockEndVerifier.m; sourceTree = "<group>"; };
+		D752C2F3FD14C089B76C2475 /* Placeholders.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Placeholders.swift; sourceTree = "<group>"; };
+		DBEC298B5A830138C0CF54E4 /* ReadyView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReadyView.swift; sourceTree = "<group>"; };
 		DCEA07FD085A8419CC837CD7 /* SCOverrideDecisionTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCOverrideDecisionTests.m; sourceTree = "<group>"; };
 		DE940A49BEB89B14CE248C70 /* SCSNTPClient.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCSNTPClient.h; sourceTree = "<group>"; };
 		E1F7BCA713EE399F88364AED /* SCOverrideConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCOverrideConfig.h; sourceTree = "<group>"; };
 		E25AED702A43C0333219553C /* SCOverrideDecision.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCOverrideDecision.m; sourceTree = "<group>"; };
+		EC7390D2155D9E8B35951C20 /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		EF40A558EA4A4D4E9BD3D7E6 /* SCSNTPClientTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCSNTPClientTests.m; sourceTree = "<group>"; };
 		F5A71400B896E293C975CD07 /* SCTediumConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTediumConfig.h; sourceTree = "<group>"; };
 		F5B8CBEC19EE21C30026F3A5 /* SCTimeIntervalFormatter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SCTimeIntervalFormatter.h; sourceTree = "<group>"; };
@@ -1722,6 +1734,12 @@
 				B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */,
 				F941664451CD7AE1E9AEC3AF /* AppModel.swift */,
 				91292ED313D37246F4C032E2 /* Components.swift */,
+				24BCCBD83CF1A852BA8F875B /* MainWindowController.swift */,
+				2384F381B90DE174C0E08A23 /* OverridesView.swift */,
+				D752C2F3FD14C089B76C2475 /* Placeholders.swift */,
+				DBEC298B5A830138C0CF54E4 /* ReadyView.swift */,
+				EC7390D2155D9E8B35951C20 /* RootView.swift */,
+				CFFC721367A641277356D798 /* SettingsView.swift */,
 			);
 			name = UI;
 			path = UI;
@@ -3816,6 +3834,12 @@
 				4D0D506CC517333BF9CD146F /* UIFormatting.swift in Sources */,
 				6123D11BFFE3AEC36F930820 /* AppModel.swift in Sources */,
 				21AF92BBCF4D26FE4A2D0F6D /* Components.swift in Sources */,
+				E58FA2C6C1CFE887E6C8AC23 /* MainWindowController.swift in Sources */,
+				BA633B5A855633C2F27A6513 /* OverridesView.swift in Sources */,
+				608D0EAAF1296FC01E12B6D6 /* Placeholders.swift in Sources */,
+				8FB3051EE943A154B6643BF5 /* ReadyView.swift in Sources */,
+				E208D5E51B5B922B227EE41F /* RootView.swift in Sources */,
+				CD3869C3948F3BB09B72C5DE /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
