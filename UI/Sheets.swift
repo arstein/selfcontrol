@@ -60,6 +60,7 @@ struct OverrideConfirmSheet: View {
                 Button(NSLocalizedString("Cancel", comment: "")) { model.sheet = nil }
                     .buttonStyle(SecondaryButtonStyle(height: 40, fullWidth: true))
                     .keyboardShortcut(.cancelAction)
+                    .disabled(busy)
                 Button {
                     busy = true
                     error = nil
@@ -82,6 +83,8 @@ struct OverrideConfirmSheet: View {
                 .disabled(busy)
             }
         }
+        .onChange(of: busy) { model.sheetBusy = $0 }
+        .onDisappear { model.sheetBusy = false }
     }
 }
 
@@ -123,6 +126,7 @@ struct ExtendSheet: View {
                 Button(NSLocalizedString("Cancel", comment: "")) { model.sheet = nil }
                     .buttonStyle(SecondaryButtonStyle(height: 40, fullWidth: true))
                     .keyboardShortcut(.cancelAction)
+                    .disabled(busy)
                 Button {
                     busy = true
                     error = nil
@@ -145,6 +149,8 @@ struct ExtendSheet: View {
                 .disabled(busy)
             }
         }
+        .onChange(of: busy) { model.sheetBusy = $0 }
+        .onDisappear { model.sheetBusy = false }
         .onAppear { minutes = scale.snap(minutes) }
     }
 }

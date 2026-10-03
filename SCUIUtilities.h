@@ -22,8 +22,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (BOOL)promptBrowserRestartIfNecessary;
 
-+ (NSString*)blockTeaserStringWithMaxLength:(NSInteger)maxStringLen;
-
 // Returns the error as it should be shown to the user (re-localizing daemon
 // errors that lacked our .strings), or nil if it shouldn't be shown at all
 // (nil input, or an auth-cancel).

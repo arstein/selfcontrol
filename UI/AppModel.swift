@@ -51,6 +51,8 @@ final class AppModel: ObservableObject {
     // Navigation
     @Published var path: [Route] = []
     @Published var sheet: SheetKind? = nil
+    /// Set by a sheet while its daemon call is in flight; the sheet can't be dismissed then.
+    @Published var sheetBusy = false
 
     // Block state
     @Published var isBlockRunning = false
@@ -330,6 +332,9 @@ final class AppModel: ObservableObject {
     // MARK: - Navigation
 
     func push(_ route: Route) {
+        // No edits while a block is starting: installBlock reads the restrictions
+        // and override settings from defaults only after the auth prompt.
+        if isAddingBlock && route != .emergencyUnlock { return }
         if path.last != route { path.append(route) }
     }
 

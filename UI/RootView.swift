@@ -23,7 +23,7 @@ struct RootView: View {
             if let sheet = model.sheet {
                 Color.black.opacity(0.55)
                     .ignoresSafeArea()
-                    .onTapGesture { model.sheet = nil }
+                    .onTapGesture { if !model.sheetBusy { model.sheet = nil } }
                     .transition(.opacity)
                 VStack { Spacer(); sheetView(sheet) }
                     .transition(.move(edge: .bottom))
@@ -91,6 +91,7 @@ struct HeaderBar: View {
                         .frame(width: 30, height: 30)
                 }
                 .buttonStyle(.plain)
+                .disabled(model.isAddingBlock)
                 .accessibilityLabel(Text("Settings"))
             }
         }

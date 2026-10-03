@@ -23,19 +23,20 @@ struct RestrictionsView: View {
                          selected: model.shownAllowlist, enabled: !blocking) { model.setAllowlist(true) }
             }
 
-            if addAllowed {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        SCTextField(placeholder: NSLocalizedString("Add a site, e.g. reddit.com", comment: ""), text: $input, onSubmit: add)
-                        Button(NSLocalizedString("Add", comment: ""), action: add)
-                            .buttonStyle(PrimaryButtonStyle())
-                            .frame(width: 64)
-                            .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || busy)
-                    }
-                    if let error {
-                        Text(error).font(.system(size: 12)).foregroundColor(Theme.danger)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+            // Spec §6.2: shown disabled (not hidden) when the running block can't take additions.
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    SCTextField(placeholder: NSLocalizedString("Add a site, e.g. reddit.com", comment: ""), text: $input, onSubmit: add)
+                        .disabled(!addAllowed)
+                    Button(NSLocalizedString("Add", comment: ""), action: add)
+                        .buttonStyle(PrimaryButtonStyle())
+                        .frame(width: 64)
+                        .disabled(!addAllowed || input.trimmingCharacters(in: .whitespaces).isEmpty || busy)
+                }
+                .opacity(addAllowed ? 1 : 0.5)
+                if addAllowed, let error {
+                    Text(error).font(.system(size: 12)).foregroundColor(Theme.danger)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -94,6 +95,7 @@ struct RestrictionsView: View {
     private var caption: String {
         if !blocking { return NSLocalizedString("Entries cover their common subdomains (www. etc.) when that setting is on.", comment: "") }
         if model.isLegacyBlock { return NSLocalizedString("This block was started by an older version of SelfControl, so sites can’t be added to it.", comment: "") }
+        if !model.isModernBlock { return NSLocalizedString("This block can’t be changed from here.", comment: "") }
         if model.isActiveAllowlist { return NSLocalizedString("Sites can’t be added to an allowlist block.", comment: "") }
         return NSLocalizedString("Sites can be added during a block, never removed.", comment: "")
     }
@@ -140,6 +142,8 @@ struct RestrictionsView: View {
     private func importList(_ hosts: [Any]?) { model.importHosts((hosts ?? []).compactMap { $0 as? String }) }
 
     private func add() {
+        guard !busy else { return }   // Return in the field bypasses the button's .disabled
+        guard addAllowed else { return }
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         error = nil

@@ -54,7 +54,7 @@ struct EmergencyUnlockView: View {
                     Group {
                         switch t.flash {
                         case .wrong?:
-                            Text(String(format: NSLocalizedString("Wrong — −%d", comment: "tedium override: wrong digit penalty message"), Int(SC_TEDIUM_WRONG_ENTRY_PENALTY)))
+                            Text(String(format: NSLocalizedString("Wrong — −%ld", comment: "tedium override: wrong digit penalty message"), Int(SC_TEDIUM_WRONG_ENTRY_PENALTY)))
                                 .foregroundColor(Theme.danger)
                         case .tooFast?:
                             Text(NSLocalizedString("(too fast — ignored)", comment: "tedium override: entry ignored for arriving too fast"))
@@ -77,7 +77,7 @@ struct EmergencyUnlockView: View {
                                 .font(.system(size: 12).monospacedDigit()).foregroundColor(Theme.sub)
                         }
                         ProgressBar(fraction: t.required > 0 ? Double(t.progress) / Double(t.required) : 0, height: 6)
-                        Text(String(format: NSLocalizedString("A wrong digit takes away %d. You can leave this screen; progress is kept for 10 minutes.", comment: ""), Int(SC_TEDIUM_WRONG_ENTRY_PENALTY)))
+                        Text(String(format: NSLocalizedString("A wrong digit takes away %ld. You can leave this screen; progress is kept for 10 minutes.", comment: ""), Int(SC_TEDIUM_WRONG_ENTRY_PENALTY)))
                             .font(.system(size: 11)).foregroundColor(Theme.sub).fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -87,9 +87,11 @@ struct EmergencyUnlockView: View {
         .padding(.horizontal, Theme.inset)
         .padding(.top, 4)
         .onAppear {
-            if !model.tedium.started { model.beginTedium() }
+            // every appear: cheap, and resumes the daemon's session (as the old window did)
+            model.beginTedium()
             focused = true
         }
+        .onChange(of: model.tedium.started) { if $0 { focused = true } }
     }
 
     private func submit() {

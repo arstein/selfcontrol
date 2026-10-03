@@ -86,7 +86,7 @@
 	if([defaults_ boolForKey: @"VerifyInternetConnection"] && ![SCUIUtilities networkConnectionIsAvailable]) {
 		NSAlert* networkUnavailableAlert = [[NSAlert alloc] init];
 		[networkUnavailableAlert setMessageText: NSLocalizedString(@"No network connection detected", "No network connection detected message")];
-		[networkUnavailableAlert setInformativeText:NSLocalizedString(@"A block cannot be started without a working network connection.  You can override this setting in Preferences.", @"Message when network connection is unavailable")];
+		[networkUnavailableAlert setInformativeText:NSLocalizedString(@"A block cannot be started without a working network connection.  You can override this setting in Settings.", @"Message when network connection is unavailable")];
 		[networkUnavailableAlert addButtonWithTitle: NSLocalizedString(@"OK", "OK button")];
         [networkUnavailableAlert runModal];
 		return;
@@ -318,6 +318,10 @@
     // the one window (SwiftUI). blockIsOn starts out correct - there's no more
     // window-swap trick; the window shows Ready or Blocking from live state.
     blockIsOn = [SCUIUtilities blockIsRunning];
+    if (blockIsOn) {
+        // a block is already running, so make sure FirstBlockStarted is true
+        [defaults_ setBool: YES forKey: @"FirstBlockStarted"];
+    }
     self.mainWindowController = [[MainWindowController alloc] initWithLiveModel: YES];
     [self.mainWindowController showWindow: nil];
     [self.mainWindowController startTicking];
@@ -521,6 +525,9 @@
 }
 
 - (BOOL)application:(NSApplication*)theApplication openFile:(NSString*)filename {
+    // installBlock reads the restrictions from defaults only after the auth
+    // prompt, so an import while a block is starting would land in that block.
+    if (self.addingBlock) return NO;
     return [self openSavedBlockFileAtURL: [NSURL fileURLWithPath: filename]];
 }
 
@@ -589,6 +596,14 @@
         // Match the daemon's own gate (SCDaemonBlockMethods rejects the
         // challenge with error 321 unless a modern block is running).
         return [SCBlockUtilities modernBlockIsRunning];
+    }
+    // No edits while a block is starting: installBlock reads Blocklist,
+    // BlockAsWhitelist and the override settings only after the auth prompt.
+    if (self.addingBlock &&
+        (menuItem.action == @selector(showDomainList:) ||
+         menuItem.action == @selector(openPreferences:) ||
+         menuItem.action == @selector(open:))) {
+        return NO;
     }
     return YES;
 }

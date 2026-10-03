@@ -22,7 +22,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window.toolbarStyle = .unified
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = Theme.bgNSColor
-        window.isMovableByWindowBackground = true
         window.contentMinSize = NSSize(width: Theme.windowWidth, height: Theme.windowMinHeight)
         window.contentMaxSize = NSSize(width: Theme.windowWidth, height: 4000)
         super.init(window: window)

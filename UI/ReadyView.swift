@@ -17,6 +17,8 @@ struct ReadyView: View {
                        action: { model.push(.restrictions) }) {
                     Text("\(model.editableEntries.count)").foregroundColor(Theme.sub)
                 }
+                .disabled(model.isAddingBlock)
+                .opacity(model.isAddingBlock ? 0.5 : 1)
                 RowDivider()
                 NavRow(title: NSLocalizedString("Overrides", comment: "row"),
                        subtitle: model.overridePerDayDefault == 0 ? NSLocalizedString("Off", comment: "overrides off") : nil,
@@ -25,6 +27,8 @@ struct ReadyView: View {
                                                            remainingToday: model.overridePerDayDefault,
                                                            activeFraction: nil, pendingSpend: false), width: 16)
                 }
+                .disabled(model.isAddingBlock)
+                .opacity(model.isAddingBlock ? 0.5 : 1)
             }
             Spacer(minLength: 0)
             VStack(spacing: 8) {

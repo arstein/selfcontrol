@@ -32,7 +32,8 @@ struct BlockingView: View {
     }
 
     private var restrictionsSubtitle: String {
-        if model.isLegacyBlock { return RestrictionsSummary.subtitle(entries: model.shownEntries, isAllowlist: model.shownAllowlist) }
+        // legacy, or rules present with no modern/legacy block: can't be added to
+        if !model.isModernBlock { return RestrictionsSummary.subtitle(entries: model.shownEntries, isAllowlist: model.shownAllowlist) }
         if model.isActiveAllowlist { return RestrictionsSummary.subtitle(entries: model.shownEntries, isAllowlist: true) }
         return String(format: NSLocalizedString("%@ · add more any time", comment: "e.g. 'Blocking 7 sites · add more any time'"),
                       RestrictionsSummary.headline(count: model.shownEntries.count, isAllowlist: false))
@@ -133,16 +134,25 @@ struct BlockingView: View {
         let fraction: Double? = model.overrideRunning ? (o.activeRemainingSecs ?? 0) / Double(max(1, o.minutes * 60)) : nil
         return Card(padding: 14) {
             HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 7) {
-                    PillsView(states: OverridePills.states(perDay: o.perDay, remainingToday: o.remainingToday, activeFraction: fraction, pendingSpend: false))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(o.remainingToday == 1 ? NSLocalizedString("1 override left today", comment: "")
-                             : String(format: NSLocalizedString("%ld overrides left today", comment: ""), o.remainingToday))
-                            .fontWeight(.medium)
-                        Text(overridesSubtitle).font(.system(size: 12)).foregroundColor(Theme.sub)
+                // Non-button area opens the (read-only during a block) Overrides card;
+                // the Use button keeps its own action.
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 7) {
+                        PillsView(states: OverridePills.states(perDay: o.perDay, remainingToday: o.remainingToday, activeFraction: fraction, pendingSpend: false))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(o.remainingToday == 1 ? NSLocalizedString("1 override left today", comment: "")
+                                 : String(format: NSLocalizedString("%ld overrides left today", comment: ""), o.remainingToday))
+                                .fontWeight(.medium)
+                            Text(overridesSubtitle).font(.system(size: 12)).foregroundColor(Theme.sub)
+                        }
                     }
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundColor(Theme.faint)
                 }
-                Spacer()
+                .contentShape(Rectangle())
+                .onTapGesture { model.push(.overrides) }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { model.push(.overrides) }
                 Button(NSLocalizedString("Use", comment: "use override")) { model.sheet = .overrideConfirm }
                     .buttonStyle(SecondaryButtonStyle())
                     .disabled(!canUseOverride)
