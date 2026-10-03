@@ -27,12 +27,12 @@
 "303" = "SelfControl couldn't update the blocklist because the current block was started with an older version of SelfControl.";
 "304" = "SelfControl couldn't add to the blocklist because no block is currently running.";
 "305" = "SelfControl won't add to the blocklist because the current block uses an allowlist.";
-"306" = "SelfControl could't extend the block duration bcecause the current block was started with an older version of SelfControl.";
+"306" = "SelfControl couldn't extend the block duration because the current block was started with an older version of SelfControl.";
 "307" = "SelfControl couldn't extend the block duration because no block is currently running.";
 "308" = "SelfControl won't update the block to end at an earlier date - it can only be extended.";
 "309" = "SelfControl won't extend the block by more than 24 hours at a time.";
 "310" = "There was an error switching alert sounds because that sound name is unknown.";
-"310" = "There was an error switching alert sounds because the system couldn't find that sound.";
+"311" = "There was an error switching alert sounds because the system couldn't find that sound.";
 "320" = "SelfControl is busy — try again in a moment.";
 "321" = "No block is running.";
 "322" = "The block is no longer running.";
