@@ -16,6 +16,7 @@
 		2F9989BADDC99A606C164352 /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		30A5008975210B30439A05ED /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		30F48D88C3698773586040F6 /* UIFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */; };
+		366DEB8F625314B5483C99A7 /* EmergencyUnlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E40DB90D392659CD8444EFC /* EmergencyUnlockView.swift */; };
 		3919D4424655243AEB8401CB /* SCBlockEndVerifierTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3A97FA0F4A3962A08CFEBC17 /* SCBlockEndVerifierTests.m */; };
 		4053EE283E702AA169E1963F /* SCOverrideDecisionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = DCEA07FD085A8419CC837CD7 /* SCOverrideDecisionTests.m */; };
 		43BFC7D307281885BF4CEF00 /* SCMinutesValueTransformerTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 895BEE3423889EBCCFFD10F9 /* SCMinutesValueTransformerTests.m */; };
@@ -24,7 +25,6 @@
 		4D0D506CC517333BF9CD146F /* UIFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */; };
 		5941ECCB595C6A24D26172AD /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		5D3D3DC07F2795ED3633C9DF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0355C8DA4854E076651125A6 /* Theme.swift */; };
-		608D0EAAF1296FC01E12B6D6 /* Placeholders.swift in Sources */ = {isa = PBXBuildFile; fileRef = D752C2F3FD14C089B76C2475 /* Placeholders.swift */; };
 		6123D11BFFE3AEC36F930820 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F941664451CD7AE1E9AEC3AF /* AppModel.swift */; };
 		6454DA2A7A6335132C3D719E /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		6C06F1F2B32371963ACB0211 /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
@@ -582,6 +582,7 @@
 /* Begin PBXFileReference section */
 		0355C8DA4854E076651125A6 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		059062A034C96FE43805638D /* SCEnforcementDecision.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCEnforcementDecision.h; sourceTree = "<group>"; };
+		0E40DB90D392659CD8444EFC /* EmergencyUnlockView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmergencyUnlockView.swift; sourceTree = "<group>"; };
 		1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = /System/Library/Frameworks/Cocoa.framework; sourceTree = "<absolute>"; };
 		174D6F8397D738597F061C4B /* SCTrustedClock.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTrustedClock.m; sourceTree = "<group>"; };
 		1A6B721D82C89E70F4BBAE29 /* SCTediumChallenge.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTediumChallenge.h; sourceTree = "<group>"; };
@@ -1544,7 +1545,6 @@
 		CBF3B573217BADD7006D5F52 /* SCSettings.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SCSettings.m; sourceTree = "<group>"; };
 		CFFC721367A641277356D798 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		D5E8B4627CAD0BF0737808C7 /* SCBlockEndVerifier.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCBlockEndVerifier.m; sourceTree = "<group>"; };
-		D752C2F3FD14C089B76C2475 /* Placeholders.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Placeholders.swift; sourceTree = "<group>"; };
 		DBEC298B5A830138C0CF54E4 /* ReadyView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReadyView.swift; sourceTree = "<group>"; };
 		DCEA07FD085A8419CC837CD7 /* SCOverrideDecisionTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCOverrideDecisionTests.m; sourceTree = "<group>"; };
 		DE940A49BEB89B14CE248C70 /* SCSNTPClient.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCSNTPClient.h; sourceTree = "<group>"; };
@@ -1742,13 +1742,13 @@
 				91292ED313D37246F4C032E2 /* Components.swift */,
 				24BCCBD83CF1A852BA8F875B /* MainWindowController.swift */,
 				2384F381B90DE174C0E08A23 /* OverridesView.swift */,
-				D752C2F3FD14C089B76C2475 /* Placeholders.swift */,
 				DBEC298B5A830138C0CF54E4 /* ReadyView.swift */,
 				EC7390D2155D9E8B35951C20 /* RootView.swift */,
 				CFFC721367A641277356D798 /* SettingsView.swift */,
 				6101B237ACEA2EE24946BE6F /* RestrictionsView.swift */,
 				6479EB6CF190B8EFEE10956C /* BlockingView.swift */,
 				69A871EF1511ACFE38C668EE /* Sheets.swift */,
+				0E40DB90D392659CD8444EFC /* EmergencyUnlockView.swift */,
 			);
 			name = UI;
 			path = UI;
@@ -3845,13 +3845,13 @@
 				21AF92BBCF4D26FE4A2D0F6D /* Components.swift in Sources */,
 				E58FA2C6C1CFE887E6C8AC23 /* MainWindowController.swift in Sources */,
 				BA633B5A855633C2F27A6513 /* OverridesView.swift in Sources */,
-				608D0EAAF1296FC01E12B6D6 /* Placeholders.swift in Sources */,
 				8FB3051EE943A154B6643BF5 /* ReadyView.swift in Sources */,
 				E208D5E51B5B922B227EE41F /* RootView.swift in Sources */,
 				CD3869C3948F3BB09B72C5DE /* SettingsView.swift in Sources */,
 				4C23974BCD0934E7E1CBFE72 /* RestrictionsView.swift in Sources */,
 				10986712ABECC1EE090FED87 /* BlockingView.swift in Sources */,
 				CC08565F008428EAD5C3104B /* Sheets.swift in Sources */,
+				366DEB8F625314B5483C99A7 /* EmergencyUnlockView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
