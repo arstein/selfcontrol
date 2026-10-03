@@ -13,10 +13,12 @@
 		1D6F3A5DF697E575B95E6389 /* SCTediumChallenge.m in Sources */ = {isa = PBXBuildFile; fileRef = 79957742827112D9CEEDAC30 /* SCTediumChallenge.m */; };
 		2F9989BADDC99A606C164352 /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		30A5008975210B30439A05ED /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
+		30F48D88C3698773586040F6 /* UIFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */; };
 		3919D4424655243AEB8401CB /* SCBlockEndVerifierTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3A97FA0F4A3962A08CFEBC17 /* SCBlockEndVerifierTests.m */; };
 		4053EE283E702AA169E1963F /* SCOverrideDecisionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = DCEA07FD085A8419CC837CD7 /* SCOverrideDecisionTests.m */; };
 		43BFC7D307281885BF4CEF00 /* SCMinutesValueTransformerTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 895BEE3423889EBCCFFD10F9 /* SCMinutesValueTransformerTests.m */; };
 		497952EC6659EC7B55CBA02A /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
+		4D0D506CC517333BF9CD146F /* UIFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */; };
 		5941ECCB595C6A24D26172AD /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		5D3D3DC07F2795ED3633C9DF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0355C8DA4854E076651125A6 /* Theme.swift */; };
 		6454DA2A7A6335132C3D719E /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
@@ -236,6 +238,7 @@
 		CBED7D9925ABB911003080D6 /* selfcontrol-cli in Copy Executable Helper Tools */ = {isa = PBXBuildFile; fileRef = CBA2AFD20F39EC12005AFEBE /* selfcontrol-cli */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		CBEE50C10F48C21F00F5DF1C /* TimerWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = CBEE50C00F48C21F00F5DF1C /* TimerWindowController.m */; };
 		CBF3B574217BADD7006D5F52 /* SCSettings.m in Sources */ = {isa = PBXBuildFile; fileRef = CBF3B573217BADD7006D5F52 /* SCSettings.m */; };
+		CF3F309ED00220E6467F6729 /* UIFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C9867E1F58D960865388A88 /* UIFormattingTests.swift */; };
 		D98418C988816F0EF6D32A60 /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		DBCFF19180FC5BDFC625F9C3 /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
 		E68F98CB917A5EED6A2F9104 /* SCBlockEndVerifier.m in Sources */ = {isa = PBXBuildFile; fileRef = D5E8B4627CAD0BF0737808C7 /* SCBlockEndVerifier.m */; };
@@ -592,6 +595,7 @@
 		753FA509E7CA7437599F493B /* SCSNTPClient.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCSNTPClient.m; sourceTree = "<group>"; };
 		78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCEnforcementDecision.m; sourceTree = "<group>"; };
 		79957742827112D9CEEDAC30 /* SCTediumChallenge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTediumChallenge.m; sourceTree = "<group>"; };
+		7C9867E1F58D960865388A88 /* UIFormattingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UIFormattingTests.swift; sourceTree = "<group>"; };
 		7D7C81EC1475727A3CDDDEC2 /* SCMinutesValueTransformer.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCMinutesValueTransformer.h; sourceTree = "<group>"; };
 		895BEE3423889EBCCFFD10F9 /* SCMinutesValueTransformerTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCMinutesValueTransformerTests.m; sourceTree = "<group>"; };
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -601,6 +605,7 @@
 		AB08B8166109BB41FB60297D /* SCMinutesValueTransformer.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCMinutesValueTransformer.m; sourceTree = "<group>"; };
 		AFFB44E1661C4F0D19201EAE /* SelfControl-Bridging-Header.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "SelfControl-Bridging-Header.h"; sourceTree = "<group>"; };
 		B11FB9056B53F6FFE4C0F01C /* Pods_SelfControl.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SelfControl.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UIFormatting.swift; sourceTree = "<group>"; };
 		B4F9C34D17E5E84AA51B7065 /* Pods-SelfControl-SelfControlTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SelfControl-SelfControlTests.release.xcconfig"; path = "Pods/Target Support Files/Pods-SelfControl-SelfControlTests/Pods-SelfControl-SelfControlTests.release.xcconfig"; sourceTree = "<group>"; };
 		B5A0AEDE218266BBFC603110 /* Pods-SelfControl.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SelfControl.release.xcconfig"; path = "Pods/Target Support Files/Pods-SelfControl/Pods-SelfControl.release.xcconfig"; sourceTree = "<group>"; };
 		B7BC007A204A20A6EB746A87 /* SCTrustedClock.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTrustedClock.h; sourceTree = "<group>"; };
@@ -1710,6 +1715,7 @@
 			isa = PBXGroup;
 			children = (
 				0355C8DA4854E076651125A6 /* Theme.swift */,
+				B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */,
 			);
 			name = UI;
 			path = UI;
@@ -1727,6 +1733,7 @@
 				895BEE3423889EBCCFFD10F9 /* SCMinutesValueTransformerTests.m */,
 				3BC40DCB86D4ECF8D096D80B /* SCEnforcementDecisionTests.m */,
 				DCEA07FD085A8419CC837CD7 /* SCOverrideDecisionTests.m */,
+				7C9867E1F58D960865388A88 /* UIFormattingTests.swift */,
 			);
 			path = SelfControlTests;
 			sourceTree = "<group>";
@@ -3800,6 +3807,7 @@
 				B64189553CF928AD8540FEEC /* SCEnforcementDecision.m in Sources */,
 				5941ECCB595C6A24D26172AD /* SCOverrideDecision.m in Sources */,
 				5D3D3DC07F2795ED3633C9DF /* Theme.swift in Sources */,
+				4D0D506CC517333BF9CD146F /* UIFormatting.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3838,6 +3846,8 @@
 				C6FBB989ECD3EAFF5046741D /* SCEnforcementDecisionTests.m in Sources */,
 				30A5008975210B30439A05ED /* SCOverrideDecision.m in Sources */,
 				4053EE283E702AA169E1963F /* SCOverrideDecisionTests.m in Sources */,
+				30F48D88C3698773586040F6 /* UIFormatting.swift in Sources */,
+				CF3F309ED00220E6467F6729 /* UIFormattingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
