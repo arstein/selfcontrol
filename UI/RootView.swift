@@ -68,26 +68,17 @@ struct RootView: View {
 
 /// 52pt header aligned with the traffic lights: Back + title on pushed cards,
 /// centered status + settings on the root card.
-/// SwiftUI controls placed in the title-bar band must live in a view that refuses
-/// window drags. NSHostingView reports mouseDownCanMoveWindow == true (it isn't
-/// opaque), so AppKit turns clicks in the title bar over plain SwiftUI content into
-/// window drags and the buttons never fire. Empty header space stays draggable.
-final class NoWindowDragHostingView<Content: View>: NSHostingView<Content> {
-    override var mouseDownCanMoveWindow: Bool { false }
-}
-
-struct NoWindowDrag<Content: View>: NSViewRepresentable {
-    let content: Content
-    init(@ViewBuilder _ content: () -> Content) { self.content = content() }
-    // The nested host sits under the title bar, so it would inherit a top safe-area inset
-    // the height of the title bar and push its content down out of view. Opt out of it.
-    func makeNSView(context: Context) -> NoWindowDragHostingView<AnyView> {
-        let view = NoWindowDragHostingView(rootView: AnyView(content.ignoresSafeArea()))
-        if #available(macOS 13.3, *) { view.safeAreaRegions = [] }
-        return view
-    }
-    func updateNSView(_ view: NoWindowDragHostingView<AnyView>, context: Context) {
-        view.rootView = AnyView(content.ignoresSafeArea())
+/// Empty header space drags the window (the host refuses AppKit's automatic
+/// title-bar drag so the header's buttons can receive clicks - see MainHostingView).
+struct WindowDragArea: View {
+    var body: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0).onChanged { _ in
+                guard let event = NSApp.currentEvent, event.type == .leftMouseDown || event.type == .leftMouseDragged,
+                      let window = NSApp.keyWindow else { return }
+                window.performDrag(with: event)
+            })
     }
 }
 
@@ -97,20 +88,17 @@ struct HeaderBar: View {
     var body: some View {
         HStack(spacing: 10) {
             if let route = model.path.last {
-                NoWindowDrag {
-                    Button { model.pop() } label: {
-                        Image(systemName: "chevron.left").font(.system(size: 12, weight: .bold))
-                            .foregroundColor(Theme.text)
-                            .frame(width: 28, height: 28)
-                            .background(Theme.card)
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .focusable(false)
-                    .accessibilityLabel(Text("Back"))
+                Button { model.pop() } label: {
+                    Image(systemName: "chevron.left").font(.system(size: 12, weight: .bold))
+                        .foregroundColor(Theme.text)
+                        .frame(width: 28, height: 28)
+                        .background(Theme.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                        .contentShape(Rectangle())
                 }
-                .frame(width: 28, height: 28)
+                .buttonStyle(.plain)
+                .focusable(false)
+                .accessibilityLabel(Text("Back"))
                 Text(title(for: route)).font(.system(size: 14, weight: .semibold))
                 Spacer()
             } else {
@@ -121,24 +109,22 @@ struct HeaderBar: View {
                 }
                 Spacer()
                 let settingsEnabled = !model.isAddingBlock
-                NoWindowDrag {
-                    Button { model.push(.settings) } label: {
-                        Image(systemName: "slider.horizontal.3").font(.system(size: 14))
-                            .foregroundColor(settingsEnabled ? Theme.sub : Theme.faint)
-                            .frame(width: 30, height: 30)
-                            .contentShape(Rectangle())   // whole 30x30 box is clickable, not just the icon strokes
-                    }
-                    .buttonStyle(.plain)
-                    .focusable(false)                    // no blue keyboard-focus ring on launch
-                    .disabled(!settingsEnabled)
-                    .accessibilityLabel(Text("Settings"))
+                Button { model.push(.settings) } label: {
+                    Image(systemName: "slider.horizontal.3").font(.system(size: 14))
+                        .foregroundColor(settingsEnabled ? Theme.sub : Theme.faint)
+                        .frame(width: 30, height: 30)
+                        .contentShape(Rectangle())   // whole 30x30 box is clickable, not just the icon strokes
                 }
-                .frame(width: 30, height: 30)
+                .buttonStyle(.plain)
+                .focusable(false)                    // no blue keyboard-focus ring on launch
+                .disabled(!settingsEnabled)
+                .accessibilityLabel(Text("Settings"))
             }
         }
         .padding(.leading, Theme.trafficLightInset)
         .padding(.trailing, Theme.inset)
         .frame(height: Theme.headerHeight)
+        .background(WindowDragArea())
     }
 
     private func title(for route: Route) -> String {
