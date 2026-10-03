@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		02B493DE881C5AF9B7D27D29 /* SCMinutesValueTransformer.m in Sources */ = {isa = PBXBuildFile; fileRef = AB08B8166109BB41FB60297D /* SCMinutesValueTransformer.m */; };
 		0C9F4B971321BEAF47EA415A /* SCTediumChallenge.m in Sources */ = {isa = PBXBuildFile; fileRef = 79957742827112D9CEEDAC30 /* SCTediumChallenge.m */; };
+		10986712ABECC1EE090FED87 /* BlockingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6479EB6CF190B8EFEE10956C /* BlockingView.swift */; };
 		1B2E23F29C9745ECE6481B58 /* SCMinutesValueTransformer.m in Sources */ = {isa = PBXBuildFile; fileRef = AB08B8166109BB41FB60297D /* SCMinutesValueTransformer.m */; };
 		1D6F3A5DF697E575B95E6389 /* SCTediumChallenge.m in Sources */ = {isa = PBXBuildFile; fileRef = 79957742827112D9CEEDAC30 /* SCTediumChallenge.m */; };
 		21AF92BBCF4D26FE4A2D0F6D /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91292ED313D37246F4C032E2 /* Components.swift */; };
@@ -244,6 +245,7 @@
 		CBED7D9925ABB911003080D6 /* selfcontrol-cli in Copy Executable Helper Tools */ = {isa = PBXBuildFile; fileRef = CBA2AFD20F39EC12005AFEBE /* selfcontrol-cli */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		CBEE50C10F48C21F00F5DF1C /* TimerWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = CBEE50C00F48C21F00F5DF1C /* TimerWindowController.m */; };
 		CBF3B574217BADD7006D5F52 /* SCSettings.m in Sources */ = {isa = PBXBuildFile; fileRef = CBF3B573217BADD7006D5F52 /* SCSettings.m */; };
+		CC08565F008428EAD5C3104B /* Sheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69A871EF1511ACFE38C668EE /* Sheets.swift */; };
 		CD3869C3948F3BB09B72C5DE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFC721367A641277356D798 /* SettingsView.swift */; };
 		CF3F309ED00220E6467F6729 /* UIFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C9867E1F58D960865388A88 /* UIFormattingTests.swift */; };
 		D98418C988816F0EF6D32A60 /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
@@ -603,7 +605,9 @@
 		61ABD3209F87AF240A040533 /* SCOverrideDecision.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCOverrideDecision.h; sourceTree = "<group>"; };
 		640D40CB16D6E962003034B3 /* it */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/Localizable.strings; sourceTree = "<group>"; };
 		640D40CC16D6E962003034B3 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		6479EB6CF190B8EFEE10956C /* BlockingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BlockingView.swift; sourceTree = "<group>"; };
 		677AFCACBB571EC535202ABD /* SCEnforcementConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCEnforcementConfig.h; sourceTree = "<group>"; };
+		69A871EF1511ACFE38C668EE /* Sheets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Sheets.swift; sourceTree = "<group>"; };
 		753FA509E7CA7437599F493B /* SCSNTPClient.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCSNTPClient.m; sourceTree = "<group>"; };
 		78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCEnforcementDecision.m; sourceTree = "<group>"; };
 		79957742827112D9CEEDAC30 /* SCTediumChallenge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTediumChallenge.m; sourceTree = "<group>"; };
@@ -1743,6 +1747,8 @@
 				EC7390D2155D9E8B35951C20 /* RootView.swift */,
 				CFFC721367A641277356D798 /* SettingsView.swift */,
 				6101B237ACEA2EE24946BE6F /* RestrictionsView.swift */,
+				6479EB6CF190B8EFEE10956C /* BlockingView.swift */,
+				69A871EF1511ACFE38C668EE /* Sheets.swift */,
 			);
 			name = UI;
 			path = UI;
@@ -3844,6 +3850,8 @@
 				E208D5E51B5B922B227EE41F /* RootView.swift in Sources */,
 				CD3869C3948F3BB09B72C5DE /* SettingsView.swift in Sources */,
 				4C23974BCD0934E7E1CBFE72 /* RestrictionsView.swift in Sources */,
+				10986712ABECC1EE090FED87 /* BlockingView.swift in Sources */,
+				CC08565F008428EAD5C3104B /* Sheets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
