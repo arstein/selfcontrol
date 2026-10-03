@@ -21,6 +21,7 @@
 		4D0D506CC517333BF9CD146F /* UIFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */; };
 		5941ECCB595C6A24D26172AD /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		5D3D3DC07F2795ED3633C9DF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0355C8DA4854E076651125A6 /* Theme.swift */; };
+		6123D11BFFE3AEC36F930820 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F941664451CD7AE1E9AEC3AF /* AppModel.swift */; };
 		6454DA2A7A6335132C3D719E /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		6C06F1F2B32371963ACB0211 /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
 		70E0BC5BC8C667E1F27070CB /* Pods_SelfControl_SelfControlTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C0C3522F0A52062B1A4A44A2 /* Pods_SelfControl_SelfControlTests.framework */; };
@@ -1534,6 +1535,7 @@
 		F5A71400B896E293C975CD07 /* SCTediumConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTediumConfig.h; sourceTree = "<group>"; };
 		F5B8CBEC19EE21C30026F3A5 /* SCTimeIntervalFormatter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SCTimeIntervalFormatter.h; sourceTree = "<group>"; };
 		F5B8CBED19EE21C30026F3A5 /* SCTimeIntervalFormatter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SCTimeIntervalFormatter.m; sourceTree = "<group>"; };
+		F941664451CD7AE1E9AEC3AF /* AppModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		FE967CA0C67035A80FB3F626 /* Pods-SelfControl-SelfControlTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SelfControl-SelfControlTests.debug.xcconfig"; path = "Pods/Target Support Files/Pods-SelfControl-SelfControlTests/Pods-SelfControl-SelfControlTests.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -1716,6 +1718,7 @@
 			children = (
 				0355C8DA4854E076651125A6 /* Theme.swift */,
 				B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */,
+				F941664451CD7AE1E9AEC3AF /* AppModel.swift */,
 			);
 			name = UI;
 			path = UI;
@@ -3808,6 +3811,7 @@
 				5941ECCB595C6A24D26172AD /* SCOverrideDecision.m in Sources */,
 				5D3D3DC07F2795ED3633C9DF /* Theme.swift in Sources */,
 				4D0D506CC517333BF9CD146F /* UIFormatting.swift in Sources */,
+				6123D11BFFE3AEC36F930820 /* AppModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
