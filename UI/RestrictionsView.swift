@@ -65,7 +65,7 @@ struct RestrictionsView: View {
                         .menuStyle(.borderlessButton).fixedSize()
                         .foregroundColor(Theme.sub)
                 }
-                Button(NSLocalizedString("Export…", comment: "")) { NSApp.sendAction(Selector(("save:")), to: nil, from: nil) }
+                Button(NSLocalizedString("Export…", comment: "")) { (NSApp.delegate as? AppController)?.save(nil) }
                     .buttonStyle(.plain).foregroundColor(Theme.sub).font(.system(size: 12))
                 Spacer()
                 Text(model.shownEntries.count == 1 ? NSLocalizedString("1 site", comment: "")
@@ -124,7 +124,7 @@ struct RestrictionsView: View {
         Button(NSLocalizedString("Incoming Mail Servers (Thunderbird)", comment: "")) { importList(HostImporter.incomingMailHostnamesFromThunderbird()) }
         Button(NSLocalizedString("Outgoing Mail Servers (Thunderbird)", comment: "")) { importList(HostImporter.outgoingMailHostnamesFromThunderbird()) }
         Divider()
-        Button(NSLocalizedString("From File…", comment: "")) { NSApp.sendAction(Selector(("open:")), to: nil, from: nil) }
+        Button(NSLocalizedString("From File…", comment: "")) { (NSApp.delegate as? AppController)?.open(nil) }
     }
 
     private func importList(_ hosts: [Any]?) { model.importHosts((hosts ?? []).compactMap { $0 as? String }) }

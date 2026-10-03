@@ -20,35 +20,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Forward declaration to avoid compiler weirdness
-@class TimerWindowController;
 @class SCXPCClient;
+@class MainWindowController;
 
 #import <Cocoa/Cocoa.h>
-#import "DomainListWindowController.h"
-#import "TimerWindowController.h"
 #import <Security/Security.h>
 #import <SystemConfiguration/SCNetwork.h>
 #import <unistd.h>
 #import "SCSettings.h"
-#import "SCDurationSlider.h"
 
-// The main controller for the SelfControl app, which includes several methods
-// to handle command flow and acts as delegate for the initial window.
+// The main controller for the SelfControl app: app delegate, daemon connection,
+// block start/modify actions, and owner of the single SwiftUI window.
 @interface AppController : NSObject <NSApplicationDelegate> {
-	IBOutlet SCDurationSlider* blockDurationSlider_;
-	IBOutlet NSTextField* blockSliderTimeDisplayLabel_;
-    IBOutlet NSTextField* blocklistTeaserLabel_;
-	IBOutlet NSButton* submitButton_;
-	IBOutlet NSWindow* initialWindow_;
-
-	IBOutlet NSMenuItem* domainListMenuItem_;
-    IBOutlet NSMenuItem* editBlocklistMenuItem_;
-    
-	IBOutlet NSButton* editBlocklistButton_;
-	IBOutlet DomainListWindowController* domainListWindowController_;
-	IBOutlet TimerWindowController* timerWindowController_;
-	NSWindowController* preferencesWindowController_;
 	NSUserDefaults* defaults_;
     SCSettings* settings_;
 	NSLock* refreshUILock_;
@@ -58,14 +41,12 @@
 
 @property (assign) BOOL addingBlock;
 
-// Shared daemon XPC connection. Exposed read-only so other app-side window
-// controllers (e.g. SCTediumWindowController) can reuse the same connection
-// instead of opening their own.
+// Shared daemon XPC connection. Exposed read-only so the SwiftUI window
+// (AppModel) can reuse the same connection instead of opening its own.
 @property (atomic, strong, readonly) SCXPCClient* xpc;
 
-// Called when the block duration slider is moved.  Updates the label that gives
-// the block duration in words (hours and minutes).
-- (IBAction)updateTimeSliderDisplay:(id)sender;
+// The single SwiftUI window (UI/MainWindowController.swift).
+@property (nonatomic, strong, readonly) MainWindowController* mainWindowController;
 
 /* // Gets authorization for and then immediately removes the block by calling
  // SelfControl's helper tool with the appropriate arguments.  This can be used
@@ -81,38 +62,13 @@
 // user interface.  Called very often by several parts of the program.
 - (void)refreshUserInterface;
 
-// Called when the "Edit blocklist" button is clicked or the menu item is
-// selected.  Allocates a new DomainListWindowController if necessary and opens
-// the domain blocklist window.  Spawns an alert box if a block is in progress.
+// Menu item: opens the Restrictions card in the main window.
 - (IBAction)showDomainList:(id)sender;
-
-// Allocates a new TimerWindowController if necessary and opens the timer window.
-- (void)showTimerWindow;
-
-// Calls the close method of our TimerWindowController
-- (void)closeTimerWindow;
-
-// Calls the close method of our DomainListWindowController
-- (void)closeDomainList;
-
-// Called by timerWindowController_ after its sheet returns, to add a specified
-// host to the blocklist (and refresh the block to use the new blocklist).  Launches
-// a new thread with addToBlocklist:
-- (void)addToBlockList:(NSString*)host lock:(NSLock*)lock;
-
-// Called by timerWindowController_ after its sheet returns, to add a specified
-// number of minutes to the black timer.
-- (void)extendBlockTime:(NSInteger)minutes lock:(NSLock*)lock;
 
 // Gets authorization for and then immediately adds the block by calling
 // SelfControl's helper tool with the appropriate arguments.  Meant to be called
 // as a separate thread.
 - (void)installBlock;
-
-// Gets authorization for and then immediately refreshes the block by calling
-// SelfControl's helper tool with the appropriate arguments.  Meant to be called
-// as a separate thread.
-- (void)updateActiveBlocklist:(NSLock*)lockToUse;
 
 // open preferences panel
 - (IBAction)openPreferences:(id)sender;
@@ -125,21 +81,14 @@
 // Opens an open panel and imports a blocklist, clearing the current one.
 - (IBAction)open:(id)sender;
 
-// Property allows initialWindow to be accessed from TimerWindowController
-// @property (retain, nonatomic, readonly) id initialWindow;
-
-// Changed property to manual accessor for pre-Leopard compatibility
-@property (nonatomic, readonly, strong) id initialWindow;
-
 // opens the SelfControl FAQ in the default browser
 - (IBAction)openFAQ:(id)sender;
 
 // opens the SelfControl Support Hub in the default browser
 - (IBAction)openSupportHub:(id)sender;
 
-// Opens (creating if necessary) the tedium override challenge panel and
-// starts/resumes its daemon-held session. Only enabled (see
-// -validateMenuItem:) while a block is running.
+// Opens the Emergency Unlock (tedium override) card in the main window. Only
+// enabled (see -validateMenuItem:) while a modern block is running.
 - (IBAction)openTediumOverride:(id)sender;
 
 #pragma mark - Actions for the SwiftUI window (completion is always called on the main queue)
@@ -148,17 +97,15 @@
 // by a main-thread-only "modifying block" flag (busy -> error, not queued).
 
 // Adds cleaned entries from rawInput to the RUNNING block via the daemon's
-// updateBlocklist. Mirrors -addToBlockList:lock: but returns errors instead of
-// presenting them (no-block 102, legacy 303, allowlist 305, invalid input,
+// updateBlocklist. Returns errors instead of presenting them (no-block 102, legacy 303, allowlist 305, invalid input,
 // no network, busy, or the daemon's error).
 - (void)addEntriesToRunningBlock:(NSString*)rawInput completion:(void (^)(NSError* _Nullable error))completion;
 
-// Extends the RUNNING block. Mirrors -extendBlockTime:lock: (clamped to
+// Extends the RUNNING block (clamped to
 // MaxBlockLength; daemon still enforces its 24h-per-call cap, error 309).
 - (void)extendRunningBlockByMinutes:(NSInteger)minutes completion:(void (^)(NSError* _Nullable error))completion;
 
-// The manual "Stuck? Stop block manually" flow (SCKillerHelper), moved here
-// from TimerWindowController unchanged. Main thread only; shows its own alerts.
+// The manual "Stuck? Stop block manually" flow (SCKillerHelper). Main thread only; shows its own alerts.
 - (void)stopBlockManually;
 
 @end
