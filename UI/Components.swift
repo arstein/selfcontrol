@@ -297,6 +297,15 @@ struct ProgressBar: View {
 
 // MARK: - Duration slider (custom track + white knob, piecewise scale)
 
+extension View {
+    /// Hides the blue keyboard-focus ring, which otherwise lingers on whatever row or button
+    /// last took focus. Keyboard shortcuts and Tab still work. macOS 13 falls back to the
+    /// per-control `.focusable(false)` calls.
+    @ViewBuilder func noFocusRing() -> some View {
+        if #available(macOS 14.0, *) { focusEffectDisabled() } else { self }
+    }
+}
+
 struct DurationSlider: View {
     @Binding var minutes: Int
     let scale: DurationScale

@@ -55,7 +55,7 @@ final class Dialog: NSObject {
             suppressed = checked
             NSApp.stopModal(withCode: NSApplication.ModalResponse(rawValue: index))
         }
-        let host = NSHostingView(rootView: content.padding(margin))
+        let host = NSHostingView(rootView: content.padding(margin).noFocusRing())
         let size = host.fittingSize
         host.frame = NSRect(origin: .zero, size: size)
         panel.contentView = host

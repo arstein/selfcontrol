@@ -22,7 +22,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window.contentMaxSize = NSSize(width: Theme.windowWidth, height: 4000)
         super.init(window: window)
 
-        window.contentView = NSHostingView(rootView: RootView().environmentObject(model))
+        window.contentView = NSHostingView(rootView: RootView().noFocusRing().environmentObject(model))
         // Clicks on SwiftUI controls inside the title-bar band never arrive (AppKit treats
         // that band as window chrome), so the header sits BELOW it; RootView reserves this
         // much empty, natively draggable space for the traffic lights.
