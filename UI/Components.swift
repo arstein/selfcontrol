@@ -302,27 +302,38 @@ struct DurationSlider: View {
     let scale: DurationScale
     var tint: Color = Theme.accent
 
+    static let knobSize: CGFloat = 22
+
+    /// Knob centre for a scale position. The centre travels between the two
+    /// knob radii, so it sits exactly over a tick drawn at the same x.
+    static func knobCenterX(position: Double, width: CGFloat) -> CGFloat {
+        let r = knobSize / 2
+        return r + CGFloat(min(max(position, 0), 1)) * max(0, width - knobSize)
+    }
+
     var body: some View {
         GeometryReader { geo in
             let width = geo.size.width
-            let pos = scale.position(for: minutes)
+            let center = Self.knobCenterX(position: scale.position(for: minutes), width: width)
             ZStack(alignment: .leading) {
                 Capsule().fill(Theme.track).frame(height: 4)
-                Capsule().fill(tint).frame(width: max(0, width * pos), height: 4)
+                Capsule().fill(tint).frame(width: center, height: 4)
                 Circle()
                     .fill(Color(hex: 0xF5F5F7))
-                    .frame(width: 22, height: 22)
+                    .frame(width: Self.knobSize, height: Self.knobSize)
                     .shadow(color: .black.opacity(0.5), radius: 1.5, y: 1)
-                    .offset(x: min(max(width * pos - 11, 0), width - 22))
+                    .offset(x: center - Self.knobSize / 2)
             }
-            .frame(height: 22)
+            .frame(height: Self.knobSize)
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { value in
-                guard width > 0 else { return }
-                minutes = scale.minutes(at: Double(value.location.x / width))
+                let travel = width - Self.knobSize
+                guard travel > 0 else { return }
+                let p = Double((value.location.x - Self.knobSize / 2) / travel)
+                minutes = scale.minutes(at: min(max(p, 0), 1))
             })
         }
-        .frame(height: 22)
+        .frame(height: Self.knobSize)
         .accessibilityElement()
         .accessibilityLabel(Text("Duration"))
         .accessibilityValue(Text(DurationText.short(minutes: minutes)))

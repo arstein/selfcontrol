@@ -70,6 +70,10 @@ final class SnapshotRenderer: NSObject {
                 m.maxBlockLengthMinutes = 43200
                 m.blockDurationMinutes = 1440
             }),
+            ("22b-ready-at-max", AppModel.preview { m in
+                m.maxBlockLengthMinutes = 43200
+                m.blockDurationMinutes = 43200
+            }),
             ("23-ready-max1d", AppModel.preview { m in
                 m.maxBlockLengthMinutes = 1440
                 m.blockDurationMinutes = 480

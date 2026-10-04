@@ -87,14 +87,15 @@ private struct DurationTicks: View {
         GeometryReader { geo in
             let w = Double(geo.size.width)
             let anchors = TickLayout.anchors(maxMinutes: maxMinutes)
-            let positions = anchors.map { scale.position(for: $0.minutes) }
+            // Tick x matches the knob centre at that duration, as a fraction of the row width.
+            let positions = anchors.map { w > 0 ? Double(DurationSlider.knobCenterX(position: scale.position(for: $0.minutes), width: geo.size.width)) / w : 0 }
             let widths = anchors.map { Double(Self.labelWidth($0.label)) }
             let placed = TickLayout.visibleTicks(anchors: anchors, positions: positions, labelWidths: widths, trackWidth: w, minGap: 6)
             ZStack(alignment: .topLeading) {
                 ForEach(Array(anchors.enumerated()), id: \.offset) { i, _ in
                     Rectangle().fill(Theme.faint)
                         .frame(width: 1, height: 4)
-                        .position(x: CGFloat(min(max(positions[i] * w, 0.5), w - 0.5)), y: 2)
+                        .position(x: CGFloat(positions[i] * w), y: 2)
                 }
                 ForEach(placed, id: \.index) { p in
                     let tick = anchors[p.index]
