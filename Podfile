@@ -6,7 +6,6 @@ platform :osx, minVersion
 
 target "SelfControl" do
     use_frameworks! :linkage => :static
-    pod 'MASPreferences', '~> 1.1.4'
     pod 'FormatterKit/TimeIntervalFormatter', '~> 1.8.0'
     pod 'LetsMove', '~> 1.24'
 

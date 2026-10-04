@@ -9,15 +9,24 @@
 /* Begin PBXBuildFile section */
 		02B493DE881C5AF9B7D27D29 /* SCMinutesValueTransformer.m in Sources */ = {isa = PBXBuildFile; fileRef = AB08B8166109BB41FB60297D /* SCMinutesValueTransformer.m */; };
 		0C9F4B971321BEAF47EA415A /* SCTediumChallenge.m in Sources */ = {isa = PBXBuildFile; fileRef = 79957742827112D9CEEDAC30 /* SCTediumChallenge.m */; };
+		10986712ABECC1EE090FED87 /* BlockingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6479EB6CF190B8EFEE10956C /* BlockingView.swift */; };
+		182B84EA79FCC6488EBC1D39 /* SnapshotRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 275DAEC954CBFC5808FEC632 /* SnapshotRenderer.swift */; };
 		1B2E23F29C9745ECE6481B58 /* SCMinutesValueTransformer.m in Sources */ = {isa = PBXBuildFile; fileRef = AB08B8166109BB41FB60297D /* SCMinutesValueTransformer.m */; };
 		1D6F3A5DF697E575B95E6389 /* SCTediumChallenge.m in Sources */ = {isa = PBXBuildFile; fileRef = 79957742827112D9CEEDAC30 /* SCTediumChallenge.m */; };
+		21AF92BBCF4D26FE4A2D0F6D /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91292ED313D37246F4C032E2 /* Components.swift */; };
 		2F9989BADDC99A606C164352 /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		30A5008975210B30439A05ED /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
+		30F48D88C3698773586040F6 /* UIFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */; };
+		366DEB8F625314B5483C99A7 /* EmergencyUnlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E40DB90D392659CD8444EFC /* EmergencyUnlockView.swift */; };
 		3919D4424655243AEB8401CB /* SCBlockEndVerifierTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3A97FA0F4A3962A08CFEBC17 /* SCBlockEndVerifierTests.m */; };
 		4053EE283E702AA169E1963F /* SCOverrideDecisionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = DCEA07FD085A8419CC837CD7 /* SCOverrideDecisionTests.m */; };
 		43BFC7D307281885BF4CEF00 /* SCMinutesValueTransformerTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 895BEE3423889EBCCFFD10F9 /* SCMinutesValueTransformerTests.m */; };
 		497952EC6659EC7B55CBA02A /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
+		4C23974BCD0934E7E1CBFE72 /* RestrictionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6101B237ACEA2EE24946BE6F /* RestrictionsView.swift */; };
+		4D0D506CC517333BF9CD146F /* UIFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */; };
 		5941ECCB595C6A24D26172AD /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
+		5D3D3DC07F2795ED3633C9DF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0355C8DA4854E076651125A6 /* Theme.swift */; };
+		6123D11BFFE3AEC36F930820 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F941664451CD7AE1E9AEC3AF /* AppModel.swift */; };
 		6454DA2A7A6335132C3D719E /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		6C06F1F2B32371963ACB0211 /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
 		70E0BC5BC8C667E1F27070CB /* Pods_SelfControl_SelfControlTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C0C3522F0A52062B1A4A44A2 /* Pods_SelfControl_SelfControlTests.framework */; };
@@ -30,6 +39,8 @@
 		87A35CA1E461AF70A4D7B1BB /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		8D11072D0486CEB800E47090 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 29B97316FDCFA39411CA2CEA /* main.m */; settings = {ATTRIBUTES = (); }; };
 		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
+		8E08C2790832EE667C1E5AC2 /* SCDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9988E4646DE67C808EAAEB2C /* SCDialog.swift */; };
+		8FB3051EE943A154B6643BF5 /* ReadyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBEC298B5A830138C0CF54E4 /* ReadyView.swift */; };
 		8FCE76A275EF0E41D798B362 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		959FF31ED90D48B5701E9F7B /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
 		9B15BF4E00EECEB86DBF2FC5 /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
@@ -39,10 +50,9 @@
 		B1AF949839F9E22BE3E5903D /* SCTediumChallengeTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 29E44D5F5FCD376C118031D1 /* SCTediumChallengeTests.m */; };
 		B64189553CF928AD8540FEEC /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
 		B821A91801D5240FC20CDE2E /* SCTrustedClockTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 2CB195EBF6CA0498C15AA308 /* SCTrustedClockTests.m */; };
+		BA633B5A855633C2F27A6513 /* OverridesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2384F381B90DE174C0E08A23 /* OverridesView.swift */; };
 		BC46BB551807FC1DC7EABD25 /* org.eyebeam.selfcontrold.plist in Copy Daemon Launchd Plist */ = {isa = PBXBuildFile; fileRef = CB8086D524837734004B88BD /* org.eyebeam.selfcontrold.plist */; };
 		C6FBB989ECD3EAFF5046741D /* SCEnforcementDecisionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3BC40DCB86D4ECF8D096D80B /* SCEnforcementDecisionTests.m */; };
-		CB0385E119D77051004614B6 /* PreferencesAdvancedViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = CB0385DD19D77051004614B6 /* PreferencesAdvancedViewController.xib */; };
-		CB0385E219D77051004614B6 /* PreferencesGeneralViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = CB0385DF19D77051004614B6 /* PreferencesGeneralViewController.xib */; };
 		CB066F6C2652037E0076964D /* HostFileBlocker.m in Sources */ = {isa = PBXBuildFile; fileRef = CBB0AE290FA74566006229B3 /* HostFileBlocker.m */; };
 		CB066F91265203800076964D /* HostFileBlockerSet.m in Sources */ = {isa = PBXBuildFile; fileRef = CB5888B225F6056400B5C64D /* HostFileBlockerSet.m */; };
 		CB066F92265203830076964D /* PacketFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = CBCA91111960D87300AFD20C /* PacketFilter.m */; };
@@ -201,13 +211,10 @@
 		CBB67D5B25D6165B006E4BC9 /* NSString+Indenter.m in Sources */ = {isa = PBXBuildFile; fileRef = CBB67D4725D6165B006E4BC9 /* NSString+Indenter.m */; };
 		CBB67D5C25D6165B006E4BC9 /* NSArray+XPMArgumentsNormalizer.m in Sources */ = {isa = PBXBuildFile; fileRef = CBB67D4825D6165B006E4BC9 /* NSArray+XPMArgumentsNormalizer.m */; };
 		CBB67D5D25D6165B006E4BC9 /* NSDictionary+RubyDescription.m in Sources */ = {isa = PBXBuildFile; fileRef = CBB67D4A25D6165B006E4BC9 /* NSDictionary+RubyDescription.m */; };
-		CBB7DEEA0F53313F00ABF3EA /* DomainListWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = CBB637220F3E296000EBD135 /* DomainListWindowController.m */; };
 		CBBCA14B0F54E1B300C75324 /* org.eyebeam.SelfControl.plist in Resources */ = {isa = PBXBuildFile; fileRef = CB4295C20F53EF8C008E10CA /* org.eyebeam.SelfControl.plist */; };
-		CBBF4E7F1582F7A200E364D9 /* DomainList.xib in Resources */ = {isa = PBXBuildFile; fileRef = CBBF4E7B1582F7A200E364D9 /* DomainList.xib */; };
 		CBBF4E801582F7A200E364D9 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = CBBF4E7D1582F7A200E364D9 /* MainMenu.xib */; };
 		CBBF4E8B1582F8BD00E364D9 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = CBBF4E891582F8BD00E364D9 /* InfoPlist.strings */; };
 		CBBF4E8E1582F8E000E364D9 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = CBBF4E8C1582F8E000E364D9 /* Localizable.strings */; };
-		CBBF4EE515830D7300E364D9 /* TimerWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = CBBF4EE715830D7300E364D9 /* TimerWindow.xib */; };
 		CBC1F4B426070358008E3FA8 /* SCFileWatcher.h in Headers */ = {isa = PBXBuildFile; fileRef = CBC1F4B226070358008E3FA8 /* SCFileWatcher.h */; };
 		CBC1F4B526070358008E3FA8 /* SCFileWatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = CBC1F4B326070358008E3FA8 /* SCFileWatcher.m */; };
 		CBC1F4B626070358008E3FA8 /* SCFileWatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = CBC1F4B326070358008E3FA8 /* SCFileWatcher.m */; };
@@ -220,8 +227,6 @@
 		CBD2677011ED92DE00042CD8 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CB9E90190F397FF6006DE6E4 /* CoreFoundation.framework */; };
 		CBD2677311ED92EF00042CD8 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29B97325FDCFA39411CA2CEA /* Foundation.framework */; };
 		CBD2677511ED92F800042CD8 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
-		CBD4848A19D764440020F949 /* PreferencesGeneralViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = CBD4848819D764440020F949 /* PreferencesGeneralViewController.m */; };
-		CBD4848F19D768C90020F949 /* PreferencesAdvancedViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = CBD4848D19D768C90020F949 /* PreferencesAdvancedViewController.m */; };
 		CBDAB4D22651FDB000A1951C /* BlockManager.m in Sources */ = {isa = PBXBuildFile; fileRef = CB25806116C1FDBE0059C99A /* BlockManager.m */; };
 		CBDAB4F72651FDC900A1951C /* AllowlistScraper.m in Sources */ = {isa = PBXBuildFile; fileRef = CB73615F19E4FDA000E0924F /* AllowlistScraper.m */; };
 		CBDB118C2084239D0010397E /* FirstTime.xib in Resources */ = {isa = PBXBuildFile; fileRef = CBDB118E2084239D0010397E /* FirstTime.xib */; };
@@ -231,16 +236,18 @@
 		CBE2BB5619D10CCC0077124F /* SCKillerHelper in Copy Executable Helper Tools */ = {isa = PBXBuildFile; fileRef = CB9C811B19CFBA8500CDCAE1 /* SCKillerHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		CBE4401B0F4BE0670062A1FE /* ThunderbirdPreferenceParser.m in Sources */ = {isa = PBXBuildFile; fileRef = CBE4401A0F4BE0670062A1FE /* ThunderbirdPreferenceParser.m */; };
 		CBE44FEB19E50900004E9706 /* AllowlistScraper.m in Sources */ = {isa = PBXBuildFile; fileRef = CB73615F19E4FDA000E0924F /* AllowlistScraper.m */; };
-		CBE5C40B0F4D4531003DB900 /* ButtonWithPopupMenu.m in Sources */ = {isa = PBXBuildFile; fileRef = CBE5C40A0F4D4531003DB900 /* ButtonWithPopupMenu.m */; };
 		CBED7D9925ABB911003080D6 /* selfcontrol-cli in Copy Executable Helper Tools */ = {isa = PBXBuildFile; fileRef = CBA2AFD20F39EC12005AFEBE /* selfcontrol-cli */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		CBEE50C10F48C21F00F5DF1C /* TimerWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = CBEE50C00F48C21F00F5DF1C /* TimerWindowController.m */; };
 		CBF3B574217BADD7006D5F52 /* SCSettings.m in Sources */ = {isa = PBXBuildFile; fileRef = CBF3B573217BADD7006D5F52 /* SCSettings.m */; };
+		CC08565F008428EAD5C3104B /* Sheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69A871EF1511ACFE38C668EE /* Sheets.swift */; };
+		CD3869C3948F3BB09B72C5DE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFC721367A641277356D798 /* SettingsView.swift */; };
+		CF3F309ED00220E6467F6729 /* UIFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C9867E1F58D960865388A88 /* UIFormattingTests.swift */; };
 		D98418C988816F0EF6D32A60 /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		DBCFF19180FC5BDFC625F9C3 /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
+		E208D5E51B5B922B227EE41F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7390D2155D9E8B35951C20 /* RootView.swift */; };
+		E58FA2C6C1CFE887E6C8AC23 /* MainWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24BCCBD83CF1A852BA8F875B /* MainWindowController.swift */; };
 		E68F98CB917A5EED6A2F9104 /* SCBlockEndVerifier.m in Sources */ = {isa = PBXBuildFile; fileRef = D5E8B4627CAD0BF0737808C7 /* SCBlockEndVerifier.m */; };
 		F5B8CBEE19EE21C30026F3A5 /* SCTimeIntervalFormatter.m in Sources */ = {isa = PBXBuildFile; fileRef = F5B8CBED19EE21C30026F3A5 /* SCTimeIntervalFormatter.m */; };
 		F8731D3D3C341D85079D588B /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
-		FBD197ACC2128CE56EC19D51 /* SCTediumWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 37A83A9B47C16C99D97DF41C /* SCTediumWindowController.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -565,39 +572,50 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0355C8DA4854E076651125A6 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		059062A034C96FE43805638D /* SCEnforcementDecision.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCEnforcementDecision.h; sourceTree = "<group>"; };
+		0E40DB90D392659CD8444EFC /* EmergencyUnlockView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmergencyUnlockView.swift; sourceTree = "<group>"; };
 		1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = /System/Library/Frameworks/Cocoa.framework; sourceTree = "<absolute>"; };
 		174D6F8397D738597F061C4B /* SCTrustedClock.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTrustedClock.m; sourceTree = "<group>"; };
 		1A6B721D82C89E70F4BBAE29 /* SCTediumChallenge.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTediumChallenge.h; sourceTree = "<group>"; };
 		22D9F1DE631F3AD0CAFAFD03 /* Pods-SelfControl.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SelfControl.debug.xcconfig"; path = "Pods/Target Support Files/Pods-SelfControl/Pods-SelfControl.debug.xcconfig"; sourceTree = "<group>"; };
+		2384F381B90DE174C0E08A23 /* OverridesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OverridesView.swift; sourceTree = "<group>"; };
+		24BCCBD83CF1A852BA8F875B /* MainWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainWindowController.swift; sourceTree = "<group>"; };
+		275DAEC954CBFC5808FEC632 /* SnapshotRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnapshotRenderer.swift; sourceTree = "<group>"; };
 		29B97316FDCFA39411CA2CEA /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		29B97324FDCFA39411CA2CEA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = /System/Library/Frameworks/AppKit.framework; sourceTree = "<absolute>"; };
 		29B97325FDCFA39411CA2CEA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = /System/Library/Frameworks/Foundation.framework; sourceTree = "<absolute>"; };
 		29E44D5F5FCD376C118031D1 /* SCTediumChallengeTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTediumChallengeTests.m; sourceTree = "<group>"; };
 		2CB195EBF6CA0498C15AA308 /* SCTrustedClockTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTrustedClockTests.m; sourceTree = "<group>"; };
 		32CA4F630368D1EE00C91783 /* SelfControl_Prefix.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SelfControl_Prefix.pch; sourceTree = "<group>"; };
-		37A83A9B47C16C99D97DF41C /* SCTediumWindowController.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTediumWindowController.m; sourceTree = "<group>"; };
 		3A97FA0F4A3962A08CFEBC17 /* SCBlockEndVerifierTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCBlockEndVerifierTests.m; sourceTree = "<group>"; };
 		3AFADA24FA5D01009672B151 /* SCBlockEndVerifier.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCBlockEndVerifier.h; sourceTree = "<group>"; };
 		3BC40DCB86D4ECF8D096D80B /* SCEnforcementDecisionTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCEnforcementDecisionTests.m; sourceTree = "<group>"; };
 		3EF418F71CC7F7FA002D99E8 /* nl */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/Localizable.strings; sourceTree = "<group>"; };
 		3EF418F81CC7F7FA002D99E8 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/InfoPlist.strings; sourceTree = "<group>"; };
-		4FEF264D9F935C2C026D2013 /* SCTediumWindowController.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTediumWindowController.h; sourceTree = "<group>"; };
+		6101B237ACEA2EE24946BE6F /* RestrictionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RestrictionsView.swift; sourceTree = "<group>"; };
 		61ABD3209F87AF240A040533 /* SCOverrideDecision.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCOverrideDecision.h; sourceTree = "<group>"; };
 		640D40CB16D6E962003034B3 /* it */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/Localizable.strings; sourceTree = "<group>"; };
 		640D40CC16D6E962003034B3 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		6479EB6CF190B8EFEE10956C /* BlockingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BlockingView.swift; sourceTree = "<group>"; };
 		677AFCACBB571EC535202ABD /* SCEnforcementConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCEnforcementConfig.h; sourceTree = "<group>"; };
+		69A871EF1511ACFE38C668EE /* Sheets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Sheets.swift; sourceTree = "<group>"; };
 		753FA509E7CA7437599F493B /* SCSNTPClient.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCSNTPClient.m; sourceTree = "<group>"; };
 		78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCEnforcementDecision.m; sourceTree = "<group>"; };
 		79957742827112D9CEEDAC30 /* SCTediumChallenge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTediumChallenge.m; sourceTree = "<group>"; };
+		7C9867E1F58D960865388A88 /* UIFormattingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UIFormattingTests.swift; sourceTree = "<group>"; };
 		7D7C81EC1475727A3CDDDEC2 /* SCMinutesValueTransformer.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCMinutesValueTransformer.h; sourceTree = "<group>"; };
 		895BEE3423889EBCCFFD10F9 /* SCMinutesValueTransformerTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCMinutesValueTransformerTests.m; sourceTree = "<group>"; };
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* SelfControl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SelfControl.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		91292ED313D37246F4C032E2 /* Components.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		949F9F8815B32EC6007B8B42 /* zh-Hans */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		949F9F8D15B333A1007B8B42 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		9988E4646DE67C808EAAEB2C /* SCDialog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SCDialog.swift; sourceTree = "<group>"; };
 		AB08B8166109BB41FB60297D /* SCMinutesValueTransformer.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCMinutesValueTransformer.m; sourceTree = "<group>"; };
+		AFFB44E1661C4F0D19201EAE /* SelfControl-Bridging-Header.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "SelfControl-Bridging-Header.h"; sourceTree = "<group>"; };
 		B11FB9056B53F6FFE4C0F01C /* Pods_SelfControl.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SelfControl.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UIFormatting.swift; sourceTree = "<group>"; };
 		B4F9C34D17E5E84AA51B7065 /* Pods-SelfControl-SelfControlTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SelfControl-SelfControlTests.release.xcconfig"; path = "Pods/Target Support Files/Pods-SelfControl-SelfControlTests/Pods-SelfControl-SelfControlTests.release.xcconfig"; sourceTree = "<group>"; };
 		B5A0AEDE218266BBFC603110 /* Pods-SelfControl.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SelfControl.release.xcconfig"; path = "Pods/Target Support Files/Pods-SelfControl/Pods-SelfControl.release.xcconfig"; sourceTree = "<group>"; };
 		B7BC007A204A20A6EB746A87 /* SCTrustedClock.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTrustedClock.h; sourceTree = "<group>"; };
@@ -616,7 +634,6 @@
 		CB25806116C1FDBE0059C99A /* BlockManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BlockManager.m; sourceTree = "<group>"; };
 		CB25806416C237F10059C99A /* NSString+IPAddress.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSString+IPAddress.h"; sourceTree = "<group>"; };
 		CB25806516C237F10059C99A /* NSString+IPAddress.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSString+IPAddress.m"; sourceTree = "<group>"; };
-		CB2E753420BD193200FAF051 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/TimerWindow.strings; sourceTree = "<group>"; };
 		CB32D2AD21902D9D00B8CD68 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		CB40A8670FBC7DE700167727 /* SelfControlBlocklist.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = SelfControlBlocklist.icns; sourceTree = "<group>"; };
 		CB42939A0F53A819008E10CA /* COPYING */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = COPYING; sourceTree = "<group>"; };
@@ -695,8 +712,6 @@
 		CBB1731220F041F4007FCAE9 /* SCMiscUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SCMiscUtilities.h; sourceTree = "<group>"; };
 		CBB1731320F041F4007FCAE9 /* SCMiscUtilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SCMiscUtilities.m; sourceTree = "<group>"; };
 		CBB60BE31F12F19E00DCB597 /* distribution-build.rb */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.ruby; path = "distribution-build.rb"; sourceTree = "<group>"; };
-		CBB637210F3E296000EBD135 /* DomainListWindowController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DomainListWindowController.h; sourceTree = "<group>"; };
-		CBB637220F3E296000EBD135 /* DomainListWindowController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DomainListWindowController.m; sourceTree = "<group>"; };
 		CBB671C925D6141E006E4BC9 /* XPMArgumentPackage_Private.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = XPMArgumentPackage_Private.h; sourceTree = "<group>"; };
 		CBB671CA25D6141E006E4BC9 /* NSScanner+EscapedScanning.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSScanner+EscapedScanning.h"; sourceTree = "<group>"; };
 		CBB671CB25D6141E006E4BC9 /* NSArray+XPMArgumentsNormalizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSArray+XPMArgumentsNormalizer.h"; sourceTree = "<group>"; };
@@ -1437,15 +1452,7 @@
 		CBCA912B1961384600AFD20C /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		CBD4848519D7611F0020F949 /* Podfile */ = {isa = PBXFileReference; lastKnownFileType = text; path = Podfile; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.ruby; };
 		CBD4848619D7611F0020F949 /* TemplateIcon2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = TemplateIcon2x.png; sourceTree = "<group>"; };
-		CBD4848719D764440020F949 /* PreferencesGeneralViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PreferencesGeneralViewController.h; sourceTree = "<group>"; };
-		CBD4848819D764440020F949 /* PreferencesGeneralViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PreferencesGeneralViewController.m; sourceTree = "<group>"; };
-		CBD4848C19D768C90020F949 /* PreferencesAdvancedViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PreferencesAdvancedViewController.h; sourceTree = "<group>"; };
-		CBD4848D19D768C90020F949 /* PreferencesAdvancedViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PreferencesAdvancedViewController.m; sourceTree = "<group>"; };
 		CBDB114F2084225A0010397E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
-		CBDB11502084225A0010397E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/DomainList.xib; sourceTree = "<group>"; };
-		CBDB11512084225A0010397E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/TimerWindow.xib; sourceTree = "<group>"; };
-		CBDB11522084225A0010397E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/PreferencesGeneralViewController.xib; sourceTree = "<group>"; };
-		CBDB11532084225A0010397E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/PreferencesAdvancedViewController.xib; sourceTree = "<group>"; };
 		CBDB11542084225A0010397E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		CBDB1155208422CC0010397E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/MainMenu.strings; sourceTree = "<group>"; };
 		CBDB1156208422FF0010397E /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/MainMenu.strings; sourceTree = "<group>"; };
@@ -1458,74 +1465,28 @@
 		CBDB115D2084231A0010397E /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/MainMenu.strings; sourceTree = "<group>"; };
 		CBDB115E2084231C0010397E /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/MainMenu.strings; sourceTree = "<group>"; };
 		CBDB115F208423200010397E /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/MainMenu.strings; sourceTree = "<group>"; };
-		CBDB11602084232D0010397E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/DomainList.strings; sourceTree = "<group>"; };
-		CBDB1161208423330010397E /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/DomainList.strings; sourceTree = "<group>"; };
-		CBDB1162208423340010397E /* sv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/DomainList.strings; sourceTree = "<group>"; };
-		CBDB1163208423360010397E /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/DomainList.strings; sourceTree = "<group>"; };
-		CBDB1164208423370010397E /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/DomainList.strings"; sourceTree = "<group>"; };
-		CBDB1165208423390010397E /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/DomainList.strings; sourceTree = "<group>"; };
-		CBDB11662084233A0010397E /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/DomainList.strings; sourceTree = "<group>"; };
-		CBDB11672084233C0010397E /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/DomainList.strings"; sourceTree = "<group>"; };
-		CBDB11682084233D0010397E /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/DomainList.strings; sourceTree = "<group>"; };
-		CBDB11692084233F0010397E /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/DomainList.strings; sourceTree = "<group>"; };
-		CBDB116A208423410010397E /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/DomainList.strings; sourceTree = "<group>"; };
-		CBDB116B2084234B0010397E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/TimerWindow.strings; sourceTree = "<group>"; };
-		CBDB116C2084234D0010397E /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/TimerWindow.strings; sourceTree = "<group>"; };
-		CBDB116D2084234F0010397E /* sv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/TimerWindow.strings; sourceTree = "<group>"; };
-		CBDB116E208423510010397E /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/TimerWindow.strings; sourceTree = "<group>"; };
-		CBDB116F208423520010397E /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/TimerWindow.strings"; sourceTree = "<group>"; };
-		CBDB1170208423540010397E /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/TimerWindow.strings; sourceTree = "<group>"; };
-		CBDB1171208423550010397E /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/TimerWindow.strings; sourceTree = "<group>"; };
-		CBDB1172208423570010397E /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/TimerWindow.strings"; sourceTree = "<group>"; };
-		CBDB1173208423580010397E /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/TimerWindow.strings; sourceTree = "<group>"; };
-		CBDB11742084235A0010397E /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/TimerWindow.strings; sourceTree = "<group>"; };
-		CBDB1176208423650010397E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/PreferencesGeneralViewController.strings; sourceTree = "<group>"; };
-		CBDB1177208423670010397E /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/PreferencesGeneralViewController.strings; sourceTree = "<group>"; };
-		CBDB1178208423680010397E /* sv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/PreferencesGeneralViewController.strings; sourceTree = "<group>"; };
-		CBDB11792084236A0010397E /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/PreferencesGeneralViewController.strings; sourceTree = "<group>"; };
-		CBDB117B2084236C0010397E /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/PreferencesGeneralViewController.strings"; sourceTree = "<group>"; };
-		CBDB117C208423750010397E /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/PreferencesGeneralViewController.strings; sourceTree = "<group>"; };
-		CBDB117D208423770010397E /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/PreferencesGeneralViewController.strings; sourceTree = "<group>"; };
-		CBDB117E208423790010397E /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/PreferencesGeneralViewController.strings"; sourceTree = "<group>"; };
-		CBDB117F2084237A0010397E /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/PreferencesGeneralViewController.strings; sourceTree = "<group>"; };
-		CBDB11802084237C0010397E /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/PreferencesGeneralViewController.strings; sourceTree = "<group>"; };
-		CBDB11812084237E0010397E /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/PreferencesGeneralViewController.strings; sourceTree = "<group>"; };
-		CBDB1182208423820010397E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/PreferencesAdvancedViewController.strings; sourceTree = "<group>"; };
-		CBDB1183208423830010397E /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/PreferencesAdvancedViewController.strings; sourceTree = "<group>"; };
-		CBDB1184208423850010397E /* sv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/PreferencesAdvancedViewController.strings; sourceTree = "<group>"; };
-		CBDB1185208423870010397E /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/PreferencesAdvancedViewController.strings; sourceTree = "<group>"; };
-		CBDB1186208423880010397E /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/PreferencesAdvancedViewController.strings; sourceTree = "<group>"; };
-		CBDB1187208423890010397E /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/PreferencesAdvancedViewController.strings; sourceTree = "<group>"; };
-		CBDB11882084238B0010397E /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/PreferencesAdvancedViewController.strings"; sourceTree = "<group>"; };
-		CBDB11892084238C0010397E /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/PreferencesAdvancedViewController.strings; sourceTree = "<group>"; };
-		CBDB118A2084238E0010397E /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/PreferencesAdvancedViewController.strings; sourceTree = "<group>"; };
-		CBDB118B208423900010397E /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/PreferencesAdvancedViewController.strings; sourceTree = "<group>"; };
 		CBDB118D2084239D0010397E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/FirstTime.xib; sourceTree = "<group>"; };
 		CBDB11902084801B0010397E /* da */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = da; path = da.lproj/MainMenu.strings; sourceTree = "<group>"; };
-		CBDB11912084801B0010397E /* da */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = da; path = da.lproj/DomainList.strings; sourceTree = "<group>"; };
-		CBDB11922084801B0010397E /* da */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = da; path = da.lproj/TimerWindow.strings; sourceTree = "<group>"; };
-		CBDB11932084801B0010397E /* da */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = da; path = da.lproj/PreferencesGeneralViewController.strings; sourceTree = "<group>"; };
-		CBDB11942084801B0010397E /* da */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = da; path = da.lproj/PreferencesAdvancedViewController.strings; sourceTree = "<group>"; };
 		CBDB11962084801B0010397E /* da */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = da; path = da.lproj/Localizable.strings; sourceTree = "<group>"; };
 		CBDB11972084801C0010397E /* da */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = da; path = da.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		CBDFFF4B24A07DB300622CEE /* SelfControl.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SelfControl.entitlements; sourceTree = "<group>"; };
 		CBE440190F4BE0670062A1FE /* ThunderbirdPreferenceParser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ThunderbirdPreferenceParser.h; sourceTree = "<group>"; };
 		CBE4401A0F4BE0670062A1FE /* ThunderbirdPreferenceParser.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ThunderbirdPreferenceParser.m; sourceTree = "<group>"; };
-		CBE5C4090F4D4531003DB900 /* ButtonWithPopupMenu.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ButtonWithPopupMenu.h; sourceTree = "<group>"; };
-		CBE5C40A0F4D4531003DB900 /* ButtonWithPopupMenu.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ButtonWithPopupMenu.m; sourceTree = "<group>"; };
-		CBEE50BF0F48C21F00F5DF1C /* TimerWindowController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TimerWindowController.h; sourceTree = "<group>"; };
-		CBEE50C00F48C21F00F5DF1C /* TimerWindowController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TimerWindowController.m; sourceTree = "<group>"; };
 		CBF3B572217BADD7006D5F52 /* SCSettings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SCSettings.h; sourceTree = "<group>"; };
 		CBF3B573217BADD7006D5F52 /* SCSettings.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SCSettings.m; sourceTree = "<group>"; };
+		CFFC721367A641277356D798 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		D5E8B4627CAD0BF0737808C7 /* SCBlockEndVerifier.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCBlockEndVerifier.m; sourceTree = "<group>"; };
+		DBEC298B5A830138C0CF54E4 /* ReadyView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReadyView.swift; sourceTree = "<group>"; };
 		DCEA07FD085A8419CC837CD7 /* SCOverrideDecisionTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCOverrideDecisionTests.m; sourceTree = "<group>"; };
 		DE940A49BEB89B14CE248C70 /* SCSNTPClient.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCSNTPClient.h; sourceTree = "<group>"; };
 		E1F7BCA713EE399F88364AED /* SCOverrideConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCOverrideConfig.h; sourceTree = "<group>"; };
 		E25AED702A43C0333219553C /* SCOverrideDecision.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCOverrideDecision.m; sourceTree = "<group>"; };
+		EC7390D2155D9E8B35951C20 /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		EF40A558EA4A4D4E9BD3D7E6 /* SCSNTPClientTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCSNTPClientTests.m; sourceTree = "<group>"; };
 		F5A71400B896E293C975CD07 /* SCTediumConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTediumConfig.h; sourceTree = "<group>"; };
 		F5B8CBEC19EE21C30026F3A5 /* SCTimeIntervalFormatter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SCTimeIntervalFormatter.h; sourceTree = "<group>"; };
 		F5B8CBED19EE21C30026F3A5 /* SCTimeIntervalFormatter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SCTimeIntervalFormatter.m; sourceTree = "<group>"; };
+		F941664451CD7AE1E9AEC3AF /* AppModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		FE967CA0C67035A80FB3F626 /* Pods-SelfControl-SelfControlTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SelfControl-SelfControlTests.debug.xcconfig"; path = "Pods/Target Support Files/Pods-SelfControl-SelfControlTests/Pods-SelfControl-SelfControlTests.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -1655,6 +1616,8 @@
 				CBB67D3225D6165B006E4BC9 /* ArgumentParser */,
 				CBB60BE41F13441F00DCB597 /* Distribution Build */,
 				DDDC709FF9E9196A96CA7BCF /* Pods */,
+				65A5A4C98A87CC80E51BA8A5 /* UI */,
+				AFFB44E1661C4F0D19201EAE /* SelfControl-Bridging-Header.h */,
 			);
 			name = SelfControl;
 			sourceTree = "<group>";
@@ -1701,6 +1664,29 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		65A5A4C98A87CC80E51BA8A5 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				0355C8DA4854E076651125A6 /* Theme.swift */,
+				B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */,
+				F941664451CD7AE1E9AEC3AF /* AppModel.swift */,
+				91292ED313D37246F4C032E2 /* Components.swift */,
+				24BCCBD83CF1A852BA8F875B /* MainWindowController.swift */,
+				2384F381B90DE174C0E08A23 /* OverridesView.swift */,
+				DBEC298B5A830138C0CF54E4 /* ReadyView.swift */,
+				EC7390D2155D9E8B35951C20 /* RootView.swift */,
+				CFFC721367A641277356D798 /* SettingsView.swift */,
+				6101B237ACEA2EE24946BE6F /* RestrictionsView.swift */,
+				6479EB6CF190B8EFEE10956C /* BlockingView.swift */,
+				69A871EF1511ACFE38C668EE /* Sheets.swift */,
+				0E40DB90D392659CD8444EFC /* EmergencyUnlockView.swift */,
+				275DAEC954CBFC5808FEC632 /* SnapshotRenderer.swift */,
+				9988E4646DE67C808EAAEB2C /* SCDialog.swift */,
+			);
+			name = UI;
+			path = UI;
+			sourceTree = "<group>";
+		};
 		CB0EEF5E20FD8CE00024D27B /* SelfControlTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -1713,6 +1699,7 @@
 				895BEE3423889EBCCFFD10F9 /* SCMinutesValueTransformerTests.m */,
 				3BC40DCB86D4ECF8D096D80B /* SCEnforcementDecisionTests.m */,
 				DCEA07FD085A8419CC837CD7 /* SCOverrideDecisionTests.m */,
+				7C9867E1F58D960865388A88 /* UIFormattingTests.swift */,
 			);
 			path = SelfControlTests;
 			sourceTree = "<group>";
@@ -1750,27 +1737,15 @@
 				CB25806516C237F10059C99A /* NSString+IPAddress.m */,
 				CB81AC2825B909E1006956F7 /* SCUIUtilities.h */,
 				CB81AC2925B909E1006956F7 /* SCUIUtilities.m */,
-				CBE5C4090F4D4531003DB900 /* ButtonWithPopupMenu.h */,
-				CBE5C40A0F4D4531003DB900 /* ButtonWithPopupMenu.m */,
 				CB529BBD0F32B7ED00564FB8 /* AppController.h */,
 				CB529BBE0F32B7ED00564FB8 /* AppController.m */,
 				CB953112262BC64F000C8309 /* SCDurationSlider.h */,
 				CB953113262BC64F000C8309 /* SCDurationSlider.m */,
-				CBD4848719D764440020F949 /* PreferencesGeneralViewController.h */,
-				CBD4848819D764440020F949 /* PreferencesGeneralViewController.m */,
-				CBD4848C19D768C90020F949 /* PreferencesAdvancedViewController.h */,
-				CBD4848D19D768C90020F949 /* PreferencesAdvancedViewController.m */,
-				CBB637210F3E296000EBD135 /* DomainListWindowController.h */,
-				CBB637220F3E296000EBD135 /* DomainListWindowController.m */,
-				CBEE50BF0F48C21F00F5DF1C /* TimerWindowController.h */,
-				CBEE50C00F48C21F00F5DF1C /* TimerWindowController.m */,
 				CBC2F8650F4674E300CF2A42 /* LaunchctlHelper.h */,
 				CBC2F8570F4672FE00CF2A42 /* LaunchctlHelper.m */,
 				CB5DFCB52251DD1F0084CEC2 /* SCConstants.h */,
 				CB5DFCB62251DD1F0084CEC2 /* SCConstants.m */,
 				F5B8CBEB19EE21340026F3A5 /* Formatters */,
-				4FEF264D9F935C2C026D2013 /* SCTediumWindowController.h */,
-				37A83A9B47C16C99D97DF41C /* SCTediumWindowController.m */,
 			);
 			name = "App Classes";
 			sourceTree = "<group>";
@@ -1780,10 +1755,6 @@
 			children = (
 				CBDB118E2084239D0010397E /* FirstTime.xib */,
 				CBBF4E7D1582F7A200E364D9 /* MainMenu.xib */,
-				CBBF4E7B1582F7A200E364D9 /* DomainList.xib */,
-				CBBF4EE715830D7300E364D9 /* TimerWindow.xib */,
-				CB0385DF19D77051004614B6 /* PreferencesGeneralViewController.xib */,
-				CB0385DD19D77051004614B6 /* PreferencesAdvancedViewController.xib */,
 			);
 			name = Interfaces;
 			sourceTree = "<group>";
@@ -3020,6 +2991,7 @@
 				CB74D1062480E506002B2079 /* ShellScript */,
 				CB74D1072480E506002B2079 /* Sources */,
 				CB74D1142480E506002B2079 /* Frameworks */,
+				8C0893BB23742B6F775FED5E /* Resources */,
 			);
 			buildRules = (
 			);
@@ -3054,6 +3026,7 @@
 			buildPhases = (
 				CB9C811719CFBA8500CDCAE1 /* Sources */,
 				CB9C811819CFBA8500CDCAE1 /* Frameworks */,
+				DBB2F2D25542C27477840F23 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -3071,6 +3044,7 @@
 				CB20C5D6245696C500B9D749 /* ShellScript */,
 				CBA2AFCF0F39EC12005AFEBE /* Sources */,
 				CB54D4490F93E32B00AA22E9 /* Frameworks */,
+				D40CFF172C82F759AADFAA5F /* Resources */,
 			);
 			buildRules = (
 			);
@@ -3442,6 +3416,13 @@
 /* End PBXReferenceProxy section */
 
 /* Begin PBXResourcesBuildPhase section */
+		8C0893BB23742B6F775FED5E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8D1107290486CEB800E47090 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -3453,16 +3434,12 @@
 				CB9366E90F85BEF100EF284E /* NSAddTemplate.jpg in Resources */,
 				CBDB118C2084239D0010397E /* FirstTime.xib in Resources */,
 				CB62FC3024B11A4F00ADBC40 /* selfcontrold-Info.plist in Resources */,
-				CBBF4EE515830D7300E364D9 /* TimerWindow.xib in Resources */,
 				CBDFFF4924A0711800622CEE /* org.eyebeam.selfcontrold.plist in Resources */,
-				CB0385E219D77051004614B6 /* PreferencesGeneralViewController.xib in Resources */,
 				CB40A8680FBC7DE700167727 /* SelfControlBlocklist.icns in Resources */,
-				CBBF4E7F1582F7A200E364D9 /* DomainList.xib in Resources */,
 				CBBF4E801582F7A200E364D9 /* MainMenu.xib in Resources */,
 				CBBF4E8B1582F8BD00E364D9 /* InfoPlist.strings in Resources */,
 				CB249FED19D782230087BBB6 /* SelfControlIcon.icns in Resources */,
 				CBBF4E8E1582F8E000E364D9 /* Localizable.strings in Resources */,
-				CB0385E119D77051004614B6 /* PreferencesAdvancedViewController.xib in Resources */,
 				CB1B44BE23B7F1ED00EBA087 /* cheater-background.png in Resources */,
 				CB1465C425B0285300130D2E /* SCError.strings in Resources */,
 			);
@@ -3482,6 +3459,20 @@
 				CB1465C525B0285300130D2E /* SCError.strings in Resources */,
 				CB6840A5247A3E5500E51564 /* SelfControlKillerIcon.icns in Resources */,
 				CB9C810419CFB79700CDCAE1 /* MainMenu.xib in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D40CFF172C82F759AADFAA5F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DBB2F2D25542C27477840F23 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3523,7 +3514,6 @@
 				"${PODS_ROOT}/LetsMove/vi-VN.lproj",
 				"${PODS_ROOT}/LetsMove/zh_CN.lproj",
 				"${PODS_ROOT}/LetsMove/zh_TW.lproj",
-				"${BUILT_PRODUCTS_DIR}/MASPreferences/MASPreferences.framework/en.lproj/MASPreferencesWindow.nib",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputPaths = (
@@ -3555,7 +3545,6 @@
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/vi-VN.lproj",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/zh_CN.lproj",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/zh_TW.lproj",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/MASPreferencesWindow.nib",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -3705,7 +3694,6 @@
 				"${PODS_ROOT}/LetsMove/vi-VN.lproj",
 				"${PODS_ROOT}/LetsMove/zh_CN.lproj",
 				"${PODS_ROOT}/LetsMove/zh_TW.lproj",
-				"${BUILT_PRODUCTS_DIR}/MASPreferences/MASPreferences.framework/en.lproj/MASPreferencesWindow.nib",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputPaths = (
@@ -3737,7 +3725,6 @@
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/vi-VN.lproj",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/zh_CN.lproj",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/zh_TW.lproj",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/MASPreferencesWindow.nib",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -3765,26 +3752,35 @@
 				CB58948025B3FC6D00E9A5C0 /* HostFileBlocker.m in Sources */,
 				F5B8CBEE19EE21C30026F3A5 /* SCTimeIntervalFormatter.m in Sources */,
 				CB81AB8A25B8E6BE006956F7 /* SCBlockEntry.m in Sources */,
-				CBD4848A19D764440020F949 /* PreferencesGeneralViewController.m in Sources */,
 				CB1CA65E25ABA6150084A551 /* SCXPCClient.m in Sources */,
-				CBEE50C10F48C21F00F5DF1C /* TimerWindowController.m in Sources */,
 				CB90BF830F49F430006D202D /* HostImporter.m in Sources */,
 				CB21D0A825BA7B4400236680 /* PacketFilter.m in Sources */,
 				CB5DFCB72251DD1F0084CEC2 /* SCConstants.m in Sources */,
 				CBE4401B0F4BE0670062A1FE /* ThunderbirdPreferenceParser.m in Sources */,
-				CBE5C40B0F4D4531003DB900 /* ButtonWithPopupMenu.m in Sources */,
-				CBD4848F19D768C90020F949 /* PreferencesAdvancedViewController.m in Sources */,
 				CB81A9D025B7C269006956F7 /* SCBlockUtilities.m in Sources */,
-				CBB7DEEA0F53313F00ABF3EA /* DomainListWindowController.m in Sources */,
 				CB953114262BC64F000C8309 /* SCDurationSlider.m in Sources */,
 				CBF3B574217BADD7006D5F52 /* SCSettings.m in Sources */,
 				CB25806616C237F10059C99A /* NSString+IPAddress.m in Sources */,
 				73DF6AEA0FE67BC9EFB97044 /* SCSNTPClient.m in Sources */,
 				A13A7863D1143B206C8C25F1 /* SCTrustedClock.m in Sources */,
-				FBD197ACC2128CE56EC19D51 /* SCTediumWindowController.m in Sources */,
 				02B493DE881C5AF9B7D27D29 /* SCMinutesValueTransformer.m in Sources */,
 				B64189553CF928AD8540FEEC /* SCEnforcementDecision.m in Sources */,
 				5941ECCB595C6A24D26172AD /* SCOverrideDecision.m in Sources */,
+				5D3D3DC07F2795ED3633C9DF /* Theme.swift in Sources */,
+				4D0D506CC517333BF9CD146F /* UIFormatting.swift in Sources */,
+				6123D11BFFE3AEC36F930820 /* AppModel.swift in Sources */,
+				21AF92BBCF4D26FE4A2D0F6D /* Components.swift in Sources */,
+				E58FA2C6C1CFE887E6C8AC23 /* MainWindowController.swift in Sources */,
+				BA633B5A855633C2F27A6513 /* OverridesView.swift in Sources */,
+				8FB3051EE943A154B6643BF5 /* ReadyView.swift in Sources */,
+				E208D5E51B5B922B227EE41F /* RootView.swift in Sources */,
+				CD3869C3948F3BB09B72C5DE /* SettingsView.swift in Sources */,
+				4C23974BCD0934E7E1CBFE72 /* RestrictionsView.swift in Sources */,
+				10986712ABECC1EE090FED87 /* BlockingView.swift in Sources */,
+				CC08565F008428EAD5C3104B /* Sheets.swift in Sources */,
+				366DEB8F625314B5483C99A7 /* EmergencyUnlockView.swift in Sources */,
+				182B84EA79FCC6488EBC1D39 /* SnapshotRenderer.swift in Sources */,
+				8E08C2790832EE667C1E5AC2 /* SCDialog.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3823,6 +3819,8 @@
 				C6FBB989ECD3EAFF5046741D /* SCEnforcementDecisionTests.m in Sources */,
 				30A5008975210B30439A05ED /* SCOverrideDecision.m in Sources */,
 				4053EE283E702AA169E1963F /* SCOverrideDecisionTests.m in Sources */,
+				30F48D88C3698773586040F6 /* UIFormatting.swift in Sources */,
+				CF3F309ED00220E6467F6729 /* UIFormattingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3977,71 +3975,12 @@
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
-		CB0385DD19D77051004614B6 /* PreferencesAdvancedViewController.xib */ = {
-			isa = PBXVariantGroup;
-			children = (
-				CBDB11532084225A0010397E /* Base */,
-				CBDB1182208423820010397E /* de */,
-				CBDB1183208423830010397E /* es */,
-				CBDB1184208423850010397E /* sv */,
-				CBDB1185208423870010397E /* ja */,
-				CBDB1186208423880010397E /* it */,
-				CBDB1187208423890010397E /* tr */,
-				CBDB11882084238B0010397E /* pt-BR */,
-				CBDB11892084238C0010397E /* ko */,
-				CBDB118A2084238E0010397E /* nl */,
-				CBDB118B208423900010397E /* fr */,
-				CBDB11942084801B0010397E /* da */,
-			);
-			name = PreferencesAdvancedViewController.xib;
-			sourceTree = "<group>";
-		};
-		CB0385DF19D77051004614B6 /* PreferencesGeneralViewController.xib */ = {
-			isa = PBXVariantGroup;
-			children = (
-				CBDB11522084225A0010397E /* Base */,
-				CBDB1176208423650010397E /* de */,
-				CBDB1177208423670010397E /* es */,
-				CBDB1178208423680010397E /* sv */,
-				CBDB11792084236A0010397E /* ja */,
-				CBDB117B2084236C0010397E /* zh-Hans */,
-				CBDB117C208423750010397E /* it */,
-				CBDB117D208423770010397E /* tr */,
-				CBDB117E208423790010397E /* pt-BR */,
-				CBDB117F2084237A0010397E /* ko */,
-				CBDB11802084237C0010397E /* nl */,
-				CBDB11812084237E0010397E /* fr */,
-				CBDB11932084801B0010397E /* da */,
-			);
-			name = PreferencesGeneralViewController.xib;
-			sourceTree = "<group>";
-		};
 		CB9C810219CFB79700CDCAE1 /* MainMenu.xib */ = {
 			isa = PBXVariantGroup;
 			children = (
 				CBDB11542084225A0010397E /* Base */,
 			);
 			name = MainMenu.xib;
-			sourceTree = "<group>";
-		};
-		CBBF4E7B1582F7A200E364D9 /* DomainList.xib */ = {
-			isa = PBXVariantGroup;
-			children = (
-				CBDB11502084225A0010397E /* Base */,
-				CBDB11602084232D0010397E /* de */,
-				CBDB1161208423330010397E /* es */,
-				CBDB1162208423340010397E /* sv */,
-				CBDB1163208423360010397E /* ja */,
-				CBDB1164208423370010397E /* zh-Hans */,
-				CBDB1165208423390010397E /* it */,
-				CBDB11662084233A0010397E /* tr */,
-				CBDB11672084233C0010397E /* pt-BR */,
-				CBDB11682084233D0010397E /* ko */,
-				CBDB11692084233F0010397E /* nl */,
-				CBDB116A208423410010397E /* fr */,
-				CBDB11912084801B0010397E /* da */,
-			);
-			name = DomainList.xib;
 			sourceTree = "<group>";
 		};
 		CBBF4E7D1582F7A200E364D9 /* MainMenu.xib */ = {
@@ -4104,26 +4043,6 @@
 			name = Localizable.strings;
 			sourceTree = "<group>";
 		};
-		CBBF4EE715830D7300E364D9 /* TimerWindow.xib */ = {
-			isa = PBXVariantGroup;
-			children = (
-				CBDB11512084225A0010397E /* Base */,
-				CBDB116B2084234B0010397E /* de */,
-				CBDB116C2084234D0010397E /* es */,
-				CBDB116D2084234F0010397E /* sv */,
-				CBDB116E208423510010397E /* ja */,
-				CBDB116F208423520010397E /* zh-Hans */,
-				CBDB1170208423540010397E /* it */,
-				CBDB1171208423550010397E /* tr */,
-				CBDB1172208423570010397E /* pt-BR */,
-				CBDB1173208423580010397E /* ko */,
-				CBDB11742084235A0010397E /* nl */,
-				CBDB11922084801B0010397E /* da */,
-				CB2E753420BD193200FAF051 /* fr */,
-			);
-			name = TimerWindow.xib;
-			sourceTree = "<group>";
-		};
 		CBDB118E2084239D0010397E /* FirstTime.xib */ = {
 			isa = PBXVariantGroup;
 			children = (
@@ -4158,6 +4077,10 @@
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = SelfControl_Prefix.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "$(HOME)/Applications";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
@@ -4165,6 +4088,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "org.eyebeam.${PRODUCT_NAME:identifier}";
 				PRODUCT_NAME = SelfControl;
 				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OBJC_BRIDGING_HEADER = "SelfControl-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -4338,6 +4262,7 @@
 				MTL_ENABLE_DEBUG_INFO = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = org.selfcontrolapp.SelfControlTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
@@ -4371,6 +4296,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = org.selfcontrolapp.SelfControlTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};

@@ -7,88 +7,16 @@
 
 #import "SCUIUtilities.h"
 #import <SystemConfiguration/SystemConfiguration.h>
+// SCDialog lives in the app's Swift code; this file is also compiled into the
+// Swift-less SelfControl Killer target, which falls back to the system error sheet.
+#if __has_include("SelfControl-Swift.h")
+#import "SelfControl-Swift.h"
+#define SC_HAS_DIALOG 1
+#else
+#define SC_HAS_DIALOG 0
+#endif
 
 @implementation SCUIUtilities
-
-+ (NSString*)blockTeaserStringWithMaxLength:(NSInteger)maxStringLen {
-    NSArray<NSString*>* blocklist;
-    BOOL isAllowlist;
-    
-    // if we've got a block running (and it's from the modern system),
-    // the real source of truth is secured settings.
-    // if no block is running (or it's an old-school one), the best we've got is what's in defaults
-    if ([SCBlockUtilities modernBlockIsRunning]) {
-        SCSettings* settings = [SCSettings sharedSettings];
-        blocklist = [settings valueForKey: @"ActiveBlocklist"];
-        isAllowlist = [settings boolForKey: @"ActiveBlockAsWhitelist"];
-    } else {
-        NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-        blocklist = [defaults arrayForKey: @"Blocklist"];
-        isAllowlist = [defaults boolForKey: @"BlockAsWhitelist"];
-    }
-    
-    // special strings if the list is empty
-    if (blocklist.count == 0) {
-        if (isAllowlist) {
-            return @"Blocking the entire Internet";
-        } else {
-            return @"Blocking nothing (blocklist is empty)";
-        }
-    }
-    
-    NSString* startStr;
-    if (isAllowlist) {
-        startStr = @"Blocking the entire Internet EXCEPT ";
-    } else {
-        startStr = @"Blocking ";
-    }
-    
-    NSMutableString* siteStr = [NSMutableString stringWithCapacity: (NSUInteger)maxStringLen];
-    NSInteger ESTIMATED_OTHERS_STR_LEN = 15; // this is a guesstimate of how long the end-string will be - we don't really know yet
-    NSInteger MAX_SITE_CHARS = (NSInteger)maxStringLen - (NSInteger)startStr.length - ESTIMATED_OTHERS_STR_LEN;
-    NSInteger MAX_HOSTS_IN_STRING = 3;
-    NSInteger hostsInString = 0;
-    NSInteger curIndex = 0;
-
-    for (NSString* hostString in blocklist) {
-        // don't go over our max host allotment
-        if (hostsInString + 1 > MAX_HOSTS_IN_STRING) break;
-
-        // don't go over our max string length
-        if ((NSInteger)hostString.length + (NSInteger)siteStr.length > MAX_SITE_CHARS) break;
-
-        if (hostsInString > 0) {
-            if (blocklist.count > 2) {
-                [siteStr appendString: @", "];
-            } else {
-                [siteStr appendString: @" "];
-            }
-        }
-        
-        if (curIndex == ((NSInteger)blocklist.count - 1) && (NSInteger)blocklist.count > 1) {
-            [siteStr appendFormat: @"and %@", hostString];
-        } else {
-            [siteStr appendString: hostString];
-        }
-
-        hostsInString++;
-
-        curIndex++;
-    }
-    
-    NSInteger numOthers = (NSInteger)blocklist.count - hostsInString;
-    if (numOthers > 0) {
-        if (hostsInString == 0) {
-            [siteStr appendFormat: @"%ld %@", (long)numOthers, numOthers > 1 ? @"sites" : @"site"];
-        } else if (hostsInString <= 2) {
-            [siteStr appendFormat: @" and %ld %@", (long)numOthers, numOthers > 1 ? @"others" : @"other"];
-        } else {
-            [siteStr appendFormat: @", and %ld %@", (long)numOthers, numOthers > 1 ? @"others" : @"other"];
-        }
-    }
-
-    return [startStr stringByAppendingString: siteStr];
-}
 
 + (BOOL)networkConnectionIsAvailable {
     SCNetworkReachabilityFlags flags;
@@ -126,26 +54,29 @@
         return NO;
     }
 
-    NSAlert* alert = [[NSAlert alloc] init];
-    [alert setMessageText: NSLocalizedString(@"Restart Firefox", "FireFox browser restart prompt")];
-    [alert setInformativeText:NSLocalizedString(@"SelfControl's block may not work properly in Firefox until you restart the browser. Do you want to quit Firefox now?", @"Message explaining Firefox restart requirement")];
-    [alert addButtonWithTitle: NSLocalizedString(@"Quit Firefox", @"Button to quit Firefox")];
-    [alert addButtonWithTitle: NSLocalizedString(@"Continue Without Restart", "Button to decline restarting Firefox")];
-    alert.showsSuppressionButton = YES;
-
-    NSModalResponse modalResponse = [alert runModal];
-    if (alert.suppressionButton.state == NSControlStateValueOn) {
+#if SC_HAS_DIALOG
+    // Not Now answers Esc and Return; quitting Firefox needs an explicit click.
+    SCDialogResult* result = [SCDialog runWithTitle: NSLocalizedString(@"Restart Firefox?", @"FireFox browser restart prompt")
+                                            message: NSLocalizedString(@"Firefox may not respect the block until it restarts.", @"Message explaining Firefox restart requirement")
+                                            buttons: @[NSLocalizedString(@"Not Now", @"Button to decline restarting Firefox"),
+                                                       NSLocalizedString(@"Quit Firefox", @"Button to quit Firefox")]
+                                       primaryIndex: 1
+                                        cancelIndex: 0
+                                       defaultIndex: 0
+                                   suppressionTitle: NSLocalizedString(@"Don't ask again", @"Firefox restart prompt suppression checkbox")];
+    if (result.suppressionChecked) {
         // no more warnings, they say
         [defaults setBool: YES forKey: RESTART_FF_SUPPRESSION_KEY];
     }
-    if (modalResponse == NSAlertFirstButtonReturn) {
+    if (result.buttonIndex == 1) {
         for (NSRunningApplication* ff in runningFF) {
             [ff terminate];
         }
         
         return YES;
     }
-    
+#endif
+
     return NO;
 }
 
@@ -157,22 +88,35 @@
     return [SCBlockUtilities anyBlockIsRunning] || [SCBlockUtilities blockRulesFoundOnSystem];
 }
 
-+ (void)presentError:(NSError*)err {
-    if (err == nil) return;
-
++ (nullable NSError*)displayableError:(nullable NSError*)err {
+    if (err == nil) return nil;
     // When errors are generated in the daemon, they generally don't have access to the localized .strings
     // files which are in our bundle, so the errors won't have a proper localized description.
     if ([err.domain isEqualToString: kSelfControlErrorDomain] && [err.userInfo[@"SCDescriptionNotFound"] boolValue]) {
         err = [SCErr errorWithCode: err.code];
     }
-    
     // we don't present auth cancelled errors, since they generally don't indicate a "real" problem
-    if ([SCMiscUtilities errorIsAuthCanceled: err]) return;
-    
+    if ([SCMiscUtilities errorIsAuthCanceled: err]) return nil;
+    return err;
+}
+
++ (void)presentError:(NSError*)err {
+    NSError* shown = [SCUIUtilities displayableError: err];
+    if (shown == nil) return;
+
     // always present errors on the main thread since it's a UI task
-    [NSApp performSelectorOnMainThread: @selector(presentError:)
-                            withObject: err
-                         waitUntilDone: YES];
+    void (^present)(void) = ^{
+#if SC_HAS_DIALOG
+        [SCDialog showError: shown];
+#else
+        [NSApp presentError: shown];
+#endif
+    };
+    if ([NSThread isMainThread]) {
+        present();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), present);
+    }
 }
 
 @end
