@@ -12,7 +12,18 @@
 
 @implementation SCHelperToolUtilities
 
-+ (SCRuleLayer*)resolvedLayerNamed:(NSString*)name hostDomains:(NSMutableOrderedSet<NSString*>*)hostDomains {
+// A resolution option from a deep record or payload. Absent / non-number
+// means the fail-closed choice: for a blocklist, evaluating common subdomains
+// and linked domains blocks more (YES); for an allowlist they allow more (NO).
+// allowLocal (allowlist only) defaults to NO.
+static BOOL SCDeepOption(NSDictionary* deep, NSString* key, BOOL failClosedDefault) {
+    id value = deep[key];
+    return [value isKindOfClass: [NSNumber class]] ? [value boolValue] : failClosedDefault;
+}
+
++ (SCRuleLayer*)resolvedLayerNamed:(NSString*)name
+                       hostDomains:(NSMutableOrderedSet<NSString*>*)hostDomains
+                   installedAnchor:(NSString*)installedAnchor {
     SCSettings* settings = [SCSettings sharedSettings];
     NSArray* entries; BOOL allowlist, allowLocal, commonSubdomains, linkedDomains;
     NSDictionary* payload = nil;
@@ -21,16 +32,19 @@
         if (deep == nil) {
             // Record tampered away but the layer is installed: keep enforcing the
             // installed list (from the anchor payload) until the heal path rebuilds it.
-            NSString* anchor = [NSString stringWithContentsOfFile: @"/etc/pf.anchors/org.eyebeam" encoding: NSUTF8StringEncoding error: nil];
-            deep = [SCRuleCompiler deepPayloadFromAnchorText: anchor];
+            deep = [SCRuleCompiler deepPayloadFromAnchorText: installedAnchor];
             if (deep == nil) return nil;   // can't rebuild: caller must not touch the rules
         }
         entries = deep[@"blocklist"];
         allowlist = [deep[@"isAllowlist"] boolValue];
-        allowLocal = [deep[@"allowLocal"] boolValue];
-        commonSubdomains = [deep[@"evaluateCommonSubdomains"] boolValue];
-        linkedDomains = [deep[@"includeLinkedDomains"] boolValue];
-        NSMutableDictionary* p = [@{@"blocklist": entries ?: @[], @"isAllowlist": @(allowlist)} mutableCopy];
+        allowLocal = SCDeepOption(deep, @"allowLocal", NO);
+        commonSubdomains = SCDeepOption(deep, @"evaluateCommonSubdomains", !allowlist);
+        linkedDomains = SCDeepOption(deep, @"includeLinkedDomains", !allowlist);
+        NSMutableDictionary* p = [@{@"blocklist": [entries isKindOfClass: [NSArray class]] ? entries : @[],
+                                    @"isAllowlist": @(allowlist),
+                                    @"allowLocal": @(allowLocal),
+                                    @"evaluateCommonSubdomains": @(commonSubdomains),
+                                    @"includeLinkedDomains": @(linkedDomains)} mutableCopy];
         if ([deep[@"emergencyUnlockEnabled"] isKindOfClass: [NSNumber class]]) p[@"emergencyUnlockEnabled"] = deep[@"emergencyUnlockEnabled"];
         payload = p;
     } else {
@@ -46,38 +60,56 @@
                                      includeCommonSubdomains: commonSubdomains includeLinkedDomains: linkedDomains];
     NSArray* specs = nil; NSArray* domains = nil;
     [bm resolveEntries: entries specs: &specs hostDomains: &domains];
-    if (!allowlist) [hostDomains addObjectsFromArray: domains];
+    if (!allowlist) {
+        [hostDomains addObjectsFromArray: domains];
+        // Tighten-only: a running blocklist layer keeps every address it already
+        // blocks. Re-resolution happens under our own hosts sinkhole (blocked
+        // domains -> 0.0.0.0 / ::) or possibly offline, so a fresh lookup can come
+        // back short; that must never shrink a running block. The compiler dedupes.
+        // Never for an allowlist layer: a union there would allow MORE.
+        specs = [specs arrayByAddingObjectsFromArray:
+                 [SCRuleCompiler blocklistSpecsForLayer: name inAnchorText: installedAnchor]];
+    }
 
     SCRuleLayer* layer = [SCRuleLayer layerWithName: name isAllowlist: allowlist allowLocal: allowLocal specs: specs];
     layer.payload = payload;
     return layer;
 }
 
-+ (void)applyDesiredLayers:(NSArray<NSString*>*)layerNames {
++ (BOOL)applyDesiredLayers:(NSArray<NSString*>*)layerNames {
     NSLog(@"INFO: Applying block layers: [%@]", [layerNames componentsJoinedByString: @","]);
     if (layerNames.count == 0) {
-        [[BlockManager new] clearBlock];
+        BOOL cleared = [[BlockManager new] clearBlock];
         [SCHelperToolUtilities clearOSDNSCache];
-        return;
+        return cleared;
     }
+    // Read once: the deep fallback payload and the tighten-only union both come from it.
+    NSString* installedAnchor = [NSString stringWithContentsOfFile: @"/etc/pf.anchors/org.eyebeam" encoding: NSUTF8StringEncoding error: nil];
     NSMutableOrderedSet<NSString*>* hostDomains = [NSMutableOrderedSet orderedSet];
     NSMutableArray<SCRuleLayer*>* layers = [NSMutableArray array];
     BOOL anyBlocklist = NO;
     for (NSString* name in layerNames) {
-        SCRuleLayer* layer = [self resolvedLayerNamed: name hostDomains: hostDomains];
+        SCRuleLayer* layer = [self resolvedLayerNamed: name hostDomains: hostDomains installedAnchor: installedAnchor];
         if (layer == nil) {
+            // Known limitation: the deep record AND the anchor's payload are both
+            // gone (requires root tampering). The installed rules are left exactly
+            // as they are (fail-closed), but no layer change can be applied - e.g.
+            // a new regular block can't be layered on - until a heal rebuilds the
+            // deep record. Callers see NO.
             NSLog(@"WARNING: Can't resolve block layer %@; leaving installed rules untouched.", name);
-            return;
+            return NO;
         }
         anyBlocklist = anyBlocklist || !layer.isAllowlist;
         [layers addObject: layer];
     }
     NSString* anchorText = [SCRuleCompiler anchorTextForLayers: layers];
     BlockManager* writer = [[BlockManager alloc] init];
-    if (![writer installAnchorText: anchorText hostDomains: anyBlocklist ? hostDomains.array : nil]) {
+    BOOL installed = [writer installAnchorText: anchorText hostDomains: anyBlocklist ? hostDomains.array : nil];
+    if (!installed) {
         NSLog(@"ERROR: Failed to install block layers.");
     }
     [SCHelperToolUtilities clearOSDNSCache];
+    return installed;
 }
 
 // The deep layer is enforced while its record exists OR its rules are installed
@@ -93,13 +125,13 @@
                                             deepShouldEnforce: [self deepShouldEnforce]];
 }
 
-+ (void)installBlockRulesFromSettings {
-    [self applyDesiredLayers: [self desiredLayersWithOverrideActive: NO]];
++ (BOOL)installBlockRulesFromSettings {
+    return [self applyDesiredLayers: [self desiredLayersWithOverrideActive: NO]];
 }
 
-+ (void)clearBlockRulesOnly {
++ (BOOL)clearBlockRulesOnly {
     NSLog(@"INFO: Lifting base block rules (override active).");
-    [self applyDesiredLayers: [self desiredLayersWithOverrideActive: YES]];
+    return [self applyDesiredLayers: [self desiredLayersWithOverrideActive: YES]];
 }
 
 + (void)unloadDaemonJob {
@@ -216,14 +248,18 @@
 
 + (void)removeBlock {
     [SCBlockUtilities removeBlockFromSettings];
-    [self applyDesiredLayers: [self desiredLayersWithOverrideActive: NO]];   // deep layer only, or teardown
+    if (![self applyDesiredLayers: [self desiredLayersWithOverrideActive: NO]]) {   // deep layer only, or teardown
+        NSLog(@"ERROR: Failed to apply block layers while removing the regular block.");
+    }
     [self finishRemovingBlock];
 }
 
 + (void)removeAllBlocks {
     [SCBlockUtilities removeDeepBlockFromSettings];
     [SCBlockUtilities removeBlockFromSettings];
-    [self applyDesiredLayers: @[]];   // explicit: the deep layer goes too
+    if (![self applyDesiredLayers: @[]]) {   // explicit: the deep layer goes too
+        NSLog(@"ERROR: Failed to clear all block rules.");
+    }
     [self finishRemovingBlock];
 }
 

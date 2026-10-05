@@ -17,14 +17,17 @@ NS_ASSUME_NONNULL_BEGIN
 // The single enforcement path: installs exactly these layers (SCLayerBase,
 // SCLayerDeep) from settings, replacing whatever was there. Empty -> teardown.
 // If a layer can't be resolved (deep layer with neither record nor anchor
-// payload) nothing is changed (fail-closed).
-+ (void)applyDesiredLayers:(NSArray<NSString*>*)layerNames;
+// payload) nothing is changed (fail-closed). Running blocklist layers are
+// tighten-only: addresses already in the installed anchor are kept.
+// Returns YES when the rules were installed (or cleared); NO when a layer
+// couldn't be resolved or the install failed (the previous rules then stay).
++ (BOOL)applyDesiredLayers:(NSArray<NSString*>*)layerNames;
 
 // Installs the regular block's layer (plus the deep layer if a deep block exists).
-+ (void)installBlockRulesFromSettings;
++ (BOOL)installBlockRulesFromSettings;
 
 // Lifts the regular block's layer for an override; a deep layer stays.
-+ (void)clearBlockRulesOnly;
++ (BOOL)clearBlockRulesOnly;
 
 // exits the daemon process cleanly once settings are synced; launchd's
 // KeepAlive={SuccessfulExit=false} keeps it dead until relaunched on-demand

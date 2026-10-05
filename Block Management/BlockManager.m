@@ -129,6 +129,11 @@ BOOL appendMode = NO;
 }
 
 - (void)emitIP:(NSString*)ip port:(NSInteger)port maskLen:(NSInteger)maskLen {
+    // While a blocklist block runs, /etc/hosts maps blocked domains to 0.0.0.0 / ::
+    // and CFHost honors /etc/hosts, so re-resolving returns our own sinkhole
+    // addresses. They are never real destinations (and loopback always passes
+    // anyway), so drop them in every mode.
+    if (ip != nil && [@[@"0.0.0.0", @"::", @"127.0.0.1", @"::1"] containsObject: ip]) return;
     if (collectedSpecs != nil) {
         @synchronized (collectedSpecs) {
             [collectedSpecs addObject:[SCRuleCompiler specWithIP:ip maskLen:maskLen port:port]];
@@ -143,31 +148,58 @@ BOOL appendMode = NO;
     collectedDomains = [NSMutableOrderedSet orderedSet];
     [self addBlockEntriesFromStrings: entries];
     [opQueue waitUntilAllOperationsAreFinished];
-    *outSpecs = [collectedSpecs copy];
-    *outDomains = collectedDomains.array;
+    // Deterministic output (resolution runs concurrently): star specs first,
+    // then by ip string, mask, port; domains alphabetically.
+    *outSpecs = [collectedSpecs sortedArrayUsingComparator:^NSComparisonResult(NSDictionary* a, NSDictionary* b) {
+        NSString* ipA = [a[@"ip"] isKindOfClass: [NSString class]] ? a[@"ip"] : nil;
+        NSString* ipB = [b[@"ip"] isKindOfClass: [NSString class]] ? b[@"ip"] : nil;
+        if (ipA == nil && ipB != nil) return NSOrderedAscending;
+        if (ipA != nil && ipB == nil) return NSOrderedDescending;
+        if (ipA != nil) {
+            NSComparisonResult r = [ipA compare: ipB];
+            if (r != NSOrderedSame) return r;
+        }
+        NSComparisonResult r = [@([a[@"maskLen"] integerValue]) compare: @([b[@"maskLen"] integerValue])];
+        if (r != NSOrderedSame) return r;
+        return [@([a[@"port"] integerValue]) compare: @([b[@"port"] integerValue])];
+    }];
+    *outDomains = [collectedDomains.array sortedArrayUsingSelector: @selector(compare:)];
     collectedSpecs = nil;
     collectedDomains = nil;
 }
 
+// pf first: if it fails, PacketFilter has already put the previous rules back
+// and /etc/hosts was never touched, so the system is exactly as before and the
+// next checkup retries. Hosts is then rewritten with a single write per file
+// (old SC block removed and new one added in memory), so there is never a
+// moment with no hosts block.
 - (BOOL)installAnchorText:(NSString*)anchorText hostDomains:(NSArray<NSString*>*)hostDomains {
+    if ([pf installAnchorText: anchorText] != 0) {
+        NSLog(@"ERROR: pf install failed; hosts file left unchanged.");
+        return NO;
+    }
+
+    BOOL hostsOK = YES;
     for (HostFileBlocker* blocker in hostBlockerSet.blockers) {
-        if ([blocker containsSelfControlBlock]) {
-            [blocker removeSelfControlBlock];
-            [blocker writeNewFileContents];
+        BOOL hadBlock = [blocker containsSelfControlBlock];
+        // Back up only a clean file. When a block is already there, the backup
+        // made (from a clean file) by the install that wrote it is kept.
+        if (hostDomains != nil && !hadBlock) [blocker createBackupHostsFile];
+        if (hadBlock) [blocker removeSelfControlBlock];
+        if (hostDomains != nil) {
+            [blocker addSelfControlBlockHeader];
+            for (NSString* domain in hostDomains) {
+                [blocker addRuleBlockingDomain: domain];
+            }
+            [blocker addSelfControlBlockFooter];
+        }
+        if (hadBlock || hostDomains != nil) {
+            hostsOK = [blocker writeNewFileContents] && hostsOK;
         }
     }
-    if (hostDomains != nil) {
-        [hostBlockerSet createBackupHostsFile];
-        [hostBlockerSet addSelfControlBlockHeader];
-        for (NSString* domain in hostDomains) {
-            [hostBlockerSet addRuleBlockingDomain: domain];
-        }
-        [hostBlockerSet addSelfControlBlockFooter];
-        [hostBlockerSet writeNewFileContents];
-    } else {
-        [hostBlockerSet deleteBackupHostsFile];
-    }
-    return [pf installAnchorText: anchorText] == 0;
+    if (hostDomains == nil) [hostBlockerSet deleteBackupHostsFile];
+    if (!hostsOK) NSLog(@"ERROR: Failed to write the SelfControl hosts block.");
+    return hostsOK;
 }
 
 - (void)enqueueBlockEntry:(SCBlockEntry*)entry {
@@ -200,11 +232,10 @@ BOOL appendMode = NO;
     }
 
 	BOOL isIP = [entry.hostname isValidIPAddress];
-	BOOL isIPv4 = [entry.hostname isValidIPv4Address];
 
 	if([entry.hostname isEqualToString: @"*"]) {
 		[self emitIP: nil port: entry.port maskLen: 0];
-	} else if(isIPv4) { // current we do NOT do ipfw blocking for IPv6
+	} else if(isIP) { // IPv4 or IPv6 literal; the rule compiler validates the address
 		[self emitIP: entry.hostname port: entry.port maskLen: entry.maskLen];
 	} else if(!isIP) { // domain name
         // Google requires special handling

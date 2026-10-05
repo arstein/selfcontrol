@@ -37,6 +37,8 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
 + (NSDate*)overrideEndDateFromSettings:(SCSettings*)settings
                            outStateOut:(NSDictionary**)outState;
 + (NSTimeZone*)activationTimeZoneFromSettings:(SCSettings*)settings;
++ (BOOL)overrideActiveNowInSettings:(SCSettings*)settings;
++ (void)installBaseLayerIfMissing;
 // Applies a verified-time trusted-timing decision (and, if verified-expired,
 // removes the block). Caller holds daemonMethodLock and has already checked
 // modernBlockIsRunning + verifier generation. Does NOT sync or notify, except
@@ -195,7 +197,13 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     NSLog(@"Adding firewall rules...");
     // BlockIsRunning first: the desired layers derive from it.
     [settings setValue: @YES forKey: @"BlockIsRunning"];
-    [SCHelperToolUtilities installBlockRulesFromSettings];
+    if (![SCHelperToolUtilities installBlockRulesFromSettings]) {
+        // BlockIsRunning stays YES: a failed install leaves the previous rules in
+        // place (PacketFilter rolls back, and takes out pf.conf lines it added), so
+        // the checkup sees the regular block's rules missing and retries the install.
+        NSLog(@"ERROR: Installing the block's rules failed; the checkup will retry.");
+        [SCSentry addBreadcrumb: @"Daemon failed to install block rules at start" category: @"daemon"];
+    }
     
     NSError* syncErr = [settings syncSettingsAndWait: 5]; // synchronize ASAP since BlockIsRunning is a really important one
     if (syncErr != nil) {
@@ -276,21 +284,11 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     [settings setValue:storedBlocklist forKey:@"ActiveBlocklist"];
 
     // Re-resolve and rewrite every layer (no partial appends). If an override is
-    // active the base layer must stay lifted: compute that exactly as checkupBlock does.
-    NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
-    NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState
-                                                    reading:[SCTrustedClock currentReading]];
-    NSDate* overrideEndDate = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:NULL];
-    BOOL clockAnchored = [clockState isKindOfClass:[NSDictionary class]] && clockState[@"wallAnchor"] != nil;
-    BOOL overrideActive = [SCOverrideDecision liftRemainingSecsWithTrustedNow:trustedNow
-                                                               overrideEndDate:overrideEndDate
-                                                                 clockAnchored:clockAnchored
-                                                                   maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS] > 0;
-    if (overrideActive) {
-        [SCHelperToolUtilities clearBlockRulesOnly];
-    } else {
-        [SCHelperToolUtilities installBlockRulesFromSettings];
-    }
+    // active the base layer must stay lifted: computed exactly as checkupBlock does.
+    BOOL overrideActive = [SCDaemonBlockMethods overrideActiveNowInSettings:settings];
+    BOOL applied = overrideActive ? [SCHelperToolUtilities clearBlockRulesOnly]
+                                  : [SCHelperToolUtilities installBlockRulesFromSettings];
+    if (!applied) NSLog(@"ERROR: Failed to apply block rules after updating the blocklist.");
 
     // make sure everyone knows about our new list
     NSError* syncErr = [settings syncSettingsAndWait: 5];
@@ -403,6 +401,35 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     return tz ?: [NSTimeZone timeZoneForSecondsFromGMT:0];
 }
 
+// "Rules installed" above is coarse (pf.conf anchor line OR hosts block), so a
+// deep layer alone counts. When the regular block runs (and no override lifts
+// it) but its layer is not in the installed anchor - a failed install that was
+// rolled back onto the deep layer, or an override that just ended - install it.
+// Tightening only; no network needed.
++ (void)installBaseLayerIfMissing {
+    if (![SCBlockUtilities modernBlockIsRunning] || [SCBlockUtilities baseRulesFoundOnSystem]) return;
+    NSLog(@"INFO: Regular block running but its rules are missing; installing.");
+    if (![SCHelperToolUtilities installBlockRulesFromSettings]) {
+        NSLog(@"ERROR: Installing the regular block's rules failed; will retry.");
+    }
+    [SCHelperToolUtilities sendConfigurationChangedNotification];
+}
+
+// Fail-closed override state: requires a genuinely ANCHORED trusted clock
+// (trustedNowForState: silently returns the raw wall clock when wallAnchor is
+// absent), and the lift is bounded so a corrupt overrideEndDate can't lift forever.
++ (BOOL)overrideActiveNowInSettings:(SCSettings*)settings {
+    NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
+    NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState
+                                                    reading:[SCTrustedClock currentReading]];
+    NSDate* overrideEndDate = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:NULL];
+    BOOL clockAnchored = [clockState isKindOfClass:[NSDictionary class]] && clockState[@"wallAnchor"] != nil;
+    return [SCOverrideDecision liftRemainingSecsWithTrustedNow:trustedNow
+                                               overrideEndDate:overrideEndDate
+                                                 clockAnchored:clockAnchored
+                                                   maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS] > 0;
+}
+
 + (void)checkupBlock {
     if (![SCDaemonBlockMethods lockOrTimeout: nil timeout: CHECKUP_LOCK_TIMEOUT]) {
         return;
@@ -447,12 +474,8 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     // bound the lift so a corrupt/oversized overrideEndDate cannot lift indefinitely.
     NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState
                                                     reading:[SCTrustedClock currentReading]];
-    NSDate* overrideEndDate = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:NULL];
     BOOL clockAnchored = [clockState isKindOfClass:[NSDictionary class]] && clockState[@"wallAnchor"] != nil;
-    BOOL overrideActive = [SCOverrideDecision liftRemainingSecsWithTrustedNow:trustedNow
-                                                               overrideEndDate:overrideEndDate
-                                                                 clockAnchored:clockAnchored
-                                                                   maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS] > 0;
+    BOOL overrideActive = [SCDaemonBlockMethods overrideActiveNowInSettings:settings];
 
     // Midnight reset must be driven by VERIFIED time (master spec §4). trustedNow advances
     // monotonically offline, so it may only DETECT that a reset is due; the reset itself is
@@ -543,6 +566,7 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         }
         case SCEnforcementActionSeekVerifiedStart: {
             // Start not yet verified / re-verification flagged: ask for verified time.
+            if (!overrideActive) [SCDaemonBlockMethods installBaseLayerIfMissing];
             [[SCBlockEndVerifier sharedVerifier]
                 requestVerificationWithCompletion:^(NSDate* verifiedNow, NSDictionary* reading, NSUInteger generation) {
                     [SCDaemonBlockMethods handleVerifiedTime:verifiedNow reading:reading generation:generation];
@@ -562,6 +586,7 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
                 }
                 break; // no integrity check while base is intentionally lifted
             }
+            [SCDaemonBlockMethods installBaseLayerIfMissing];
             if ([[NSDate date] timeIntervalSinceDate:lastBlockIntegrityCheck] > integrityCheckIntervalSecs) {
                 lastBlockIntegrityCheck = [NSDate date];
                 shouldRunIntegrityCheck = YES;
