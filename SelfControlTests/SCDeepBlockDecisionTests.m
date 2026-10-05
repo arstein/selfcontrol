@@ -120,4 +120,65 @@ static NSMutableDictionary* CompleteRecord(void) {
     XCTAssertEqualObjects(updated[@"blocklist"], @[@"a.com"]);   // untouched fields survive
 }
 
+- (void)testHealNeeded {
+    NSDictionary* good = @{@"durationSecs": @600, @"clockState": @{@"x": @1}, @"startIsVerified": @NO};
+    XCTAssertFalse([SCDeepBlockDecision healNeededForRecord:nil remainingKnown:NO layerInstalled:NO]);
+    XCTAssertTrue([SCDeepBlockDecision healNeededForRecord:nil remainingKnown:NO layerInstalled:YES]);
+    XCTAssertFalse([SCDeepBlockDecision healNeededForRecord:good remainingKnown:YES layerInstalled:YES]);
+    XCTAssertTrue([SCDeepBlockDecision healNeededForRecord:good remainingKnown:NO layerInstalled:YES]);
+    NSDictionary* tooLong = @{@"durationSecs": @99999, @"clockState": @{@"x": @1}};
+    XCTAssertTrue([SCDeepBlockDecision healNeededForRecord:tooLong remainingKnown:YES layerInstalled:NO]);
+}
+
+- (void)testHealedRecordFromPayloadOnly {
+    NSDate* now = [NSDate dateWithTimeIntervalSince1970:5000];
+    XCTAssertNil([SCDeepBlockDecision healedRecordFromRecord:nil payload:nil verifiedNow:now clockState:@{@"c": @1}]);
+    NSDictionary* healed = [SCDeepBlockDecision healedRecordFromRecord:nil
+                                                               payload:@{@"blocklist": @[@"a.com"], @"isAllowlist": @YES,
+                                                                         @"allowLocal": @YES, @"evaluateCommonSubdomains": @NO,
+                                                                         @"includeLinkedDomains": @NO}
+                                                           verifiedNow:now clockState:@{@"c": @1}];
+    XCTAssertEqualObjects(healed[@"blocklist"], @[@"a.com"]);
+    XCTAssertEqualObjects(healed[@"isAllowlist"], @YES);
+    XCTAssertEqualObjects(healed[@"allowLocal"], @YES);
+    XCTAssertEqualObjects(healed[@"evaluateCommonSubdomains"], @NO);
+    XCTAssertEqualObjects(healed[@"includeLinkedDomains"], @NO);
+    XCTAssertEqualObjects(healed[@"emergencyUnlockEnabled"], @NO);   // unknown => off
+    XCTAssertEqualObjects(healed[@"durationSecs"], @(SC_DEEP_HEAL_SECS));
+    XCTAssertEqualObjects(healed[@"startWall"], now);
+    XCTAssertEqualObjects(healed[@"startIsVerified"], @YES);
+    XCTAssertEqualObjects(healed[@"needsVerification"], @NO);
+    XCTAssertEqualObjects(healed[@"clockState"], @{@"c": @1});
+    XCTAssertTrue([SCDeepBlockDecision recordTimingIsComplete:healed]);
+
+    NSDictionary* allowed = [SCDeepBlockDecision healedRecordFromRecord:nil
+                                                                payload:@{@"blocklist": @[], @"isAllowlist": @NO, @"emergencyUnlockEnabled": @YES}
+                                                            verifiedNow:now clockState:@{@"c": @1}];
+    XCTAssertEqualObjects(allowed[@"emergencyUnlockEnabled"], @YES);
+}
+
+- (void)testHealedRecordKeepsRecordAndFillsGaps {
+    NSDate* now = [NSDate dateWithTimeIntervalSince1970:5000];
+    NSDictionary* record = @{@"blocklist": @[@"r.com"], @"isAllowlist": @NO, @"durationSecs": @99999,
+                             @"emergencyUnlockEnabled": @YES};
+    NSDictionary* payload = @{@"blocklist": @[@"p.com"], @"isAllowlist": @YES, @"allowLocal": @YES,
+                              @"emergencyUnlockEnabled": @NO};
+    NSDictionary* healed = [SCDeepBlockDecision healedRecordFromRecord:record payload:payload verifiedNow:now clockState:@{@"c": @1}];
+    XCTAssertEqualObjects(healed[@"blocklist"], @[@"r.com"]);
+    XCTAssertEqualObjects(healed[@"isAllowlist"], @NO);
+    XCTAssertEqualObjects(healed[@"allowLocal"], @YES);              // gap filled from payload
+    XCTAssertEqualObjects(healed[@"emergencyUnlockEnabled"], @NO);   // payload turns it off
+    XCTAssertEqualObjects(healed[@"durationSecs"], @(SC_DEEP_HEAL_SECS));
+
+    // A broken record with no payload still heals (timing), unlock unknown => off.
+    NSDictionary* noPayload = [SCDeepBlockDecision healedRecordFromRecord:@{@"blocklist": @[@"r.com"]} payload:nil
+                                                              verifiedNow:now clockState:@{@"c": @1}];
+    XCTAssertEqualObjects(noPayload[@"blocklist"], @[@"r.com"]);
+    XCTAssertEqualObjects(noPayload[@"emergencyUnlockEnabled"], @NO);
+    // Record says on, payload silent: stays on.
+    NSDictionary* on = [SCDeepBlockDecision healedRecordFromRecord:@{@"emergencyUnlockEnabled": @YES} payload:@{}
+                                                       verifiedNow:now clockState:@{@"c": @1}];
+    XCTAssertEqualObjects(on[@"emergencyUnlockEnabled"], @YES);
+}
+
 @end

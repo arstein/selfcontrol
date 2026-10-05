@@ -11,6 +11,7 @@
 #import"SCDaemonBlockMethods.h"
 #import "SCFileWatcher.h"
 #import "SCTrustedClock.h"
+#import "SCBlockUtilities.h"
 #import <Security/Security.h>
 #import <signal.h>
 
@@ -94,6 +95,20 @@ static dispatch_source_t SCMakeSignalSource(int sig, dispatch_queue_t q, dispatc
             if (syncErr != nil) NSLog(@"WARNING: failed to persist re-anchored trusted clock: %@", syncErr);
         }
     }
+    // The deep block keeps its own clock state; re-anchor it the same way.
+    NSDictionary* deep = [SCBlockUtilities deepBlockRecord];
+    NSDictionary* deepClock = deep[@"clockState"];
+    NSDictionary* bootReading = [SCTrustedClock currentReading];
+    if ([deepClock isKindOfClass:[NSDictionary class]] && deepClock.count > 0 &&
+        ![deepClock[@"bootSessionID"] isEqual:bootReading[@"boot"]]) {
+        NSMutableDictionary* updated = [deep mutableCopy];
+        updated[@"clockState"] = [SCTrustedClock reanchoredStateAfterBootChange:deepClock reading:bootReading];
+        updated[@"needsVerification"] = @YES;
+        SCSettings* settings = [SCSettings sharedSettings];
+        [settings setValue:updated forKey:@"DeepBlock"];
+        NSError* syncErr = [settings syncSettingsAndWait:5];
+        if (syncErr != nil) NSLog(@"WARNING: failed to persist re-anchored deep-block clock: %@", syncErr);
+    }
     [SCDaemonBlockMethods.daemonMethodLock unlock];
 
     [self.listener resume];
@@ -105,7 +120,7 @@ static dispatch_source_t SCMakeSignalSource(int sig, dispatch_queue_t q, dispatc
     // we do NOT run checkup if there's no block, because it can result
     // in the daemon actually unloading itself before the app has a chance
     // to start the block
-    if ([SCBlockUtilities anyBlockIsRunning] || [SCBlockUtilities blockRulesFoundOnSystem]) {
+    if ([SCBlockUtilities anyBlockIsRunning] || [SCBlockUtilities deepBlockIsRunning] || [SCBlockUtilities blockRulesFoundOnSystem]) {
         [self startCheckupTimer];
     }
     
@@ -113,7 +128,7 @@ static dispatch_source_t SCMakeSignalSource(int sig, dispatch_queue_t q, dispatc
     [self resetInactivityTimer];
     
     self.hostsFileWatcher = [SCFileWatcher watcherWithFile: @"/etc/hosts" block:^(NSError * _Nonnull error) {
-        if ([SCBlockUtilities anyBlockIsRunning]) {
+        if ([SCBlockUtilities anyBlockIsRunning] || [SCBlockUtilities deepBlockIsRunning]) {
             NSLog(@"INFO: hosts file changed, checking block integrity");
             [SCDaemonBlockMethods checkBlockIntegrity];
         }
@@ -157,8 +172,16 @@ static dispatch_source_t SCMakeSignalSource(int sig, dispatch_queue_t q, dispatc
     if (clockState.count > 0) {
         [settings setValue:[SCTrustedClock checkpointState:clockState reading:[SCTrustedClock currentReading]]
                     forKey:@"TrustedClockState"];
-        [settings syncSettingsAndWait:2];
     }
+    NSDictionary* deep = [SCBlockUtilities deepBlockRecord];
+    NSDictionary* deepClock = deep[@"clockState"];
+    BOOL deepClockPresent = [deepClock isKindOfClass:[NSDictionary class]] && deepClock.count > 0;
+    if (deepClockPresent) {
+        NSMutableDictionary* updated = [deep mutableCopy];
+        updated[@"clockState"] = [SCTrustedClock checkpointState:deepClock reading:[SCTrustedClock currentReading]];
+        [settings setValue:updated forKey:@"DeepBlock"];
+    }
+    if (clockState.count > 0 || deepClockPresent) [settings syncSettingsAndWait:2];
 
     if (locked) [lock unlock];
 }
@@ -207,7 +230,7 @@ static dispatch_source_t SCMakeSignalSource(int sig, dispatch_queue_t q, dispatc
         if ([[NSDate date] timeIntervalSinceDate: self.lastActivityDate] > INACTIVITY_LIMIT_SECS) {
             // if we're inactive but also there's a block running, that's a bad thing
             // start the checkups going again - unclear why they would've stopped
-            if ([SCBlockUtilities anyBlockIsRunning] || [SCBlockUtilities blockRulesFoundOnSystem]) {
+            if ([SCBlockUtilities anyBlockIsRunning] || [SCBlockUtilities deepBlockIsRunning] || [SCBlockUtilities blockRulesFoundOnSystem]) {
                 [self startCheckupTimer];
                 [SCDaemonBlockMethods checkupBlock];
                 return;

@@ -38,6 +38,19 @@ typedef NS_ENUM(NSInteger, SCDeepAction) {
 + (NSDictionary*)timingSnapshotForRecord:(nullable id)record;
 /// Applies trustedTimingDecisionForSettings: writes (regular-block keys) to a record.
 + (NSDictionary*)record:(nullable id)record byApplyingTimingWrites:(NSDictionary*)writes;
+/// YES when a heal is still needed: the record is gone while its layer is installed,
+/// or the record's end can't be determined.
++ (BOOL)healNeededForRecord:(nullable NSDictionary*)record
+             remainingKnown:(BOOL)remainingKnown
+             layerInstalled:(BOOL)layerInstalled;
+/// The record a heal writes: verified start of `verifiedNow`, the maximum length, and
+/// list/options from the record, filling gaps from the anchor payload. Emergency unlock
+/// stays on only if neither source turns it off and one of them says so. nil when
+/// there is neither a record nor a payload (nothing to rebuild from).
++ (nullable NSDictionary*)healedRecordFromRecord:(nullable NSDictionary*)record
+                                         payload:(nullable NSDictionary*)payload
+                                     verifiedNow:(NSDate*)verifiedNow
+                                      clockState:(NSDictionary*)clockState;
 @end
 
 NS_ASSUME_NONNULL_END

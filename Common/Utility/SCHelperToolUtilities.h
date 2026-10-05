@@ -44,6 +44,9 @@ NS_ASSUME_NONNULL_BEGIN
 // Clear only the OS-level DNS cache
 + (void)clearOSDNSCache;
 
+// Plays the user's block-end sound, if they asked for one.
++ (void)playBlockEndSound;
+
 // Removes the regular block (settings + its rules, sound, caches); a running deep block stays enforced.
 + (void)removeBlock;
 
