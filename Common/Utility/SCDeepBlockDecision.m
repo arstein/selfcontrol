@@ -12,10 +12,10 @@ NSString* const SCLayerDeep = @"deep";
 
 + (NSArray<NSString*>*)desiredLayersWithBaseRunning:(BOOL)baseRunning
                                      overrideActive:(BOOL)overrideActive
-                                        deepPresent:(BOOL)deepPresent {
+                                       deepShouldEnforce:(BOOL)deepShouldEnforce {
     NSMutableArray* layers = [NSMutableArray array];
-    if (baseRunning && (!overrideActive || deepPresent)) [layers addObject:SCLayerBase];
-    if (deepPresent) [layers addObject:SCLayerDeep];
+    if (baseRunning && (!overrideActive || deepShouldEnforce)) [layers addObject:SCLayerBase];
+    if (deepShouldEnforce) [layers addObject:SCLayerDeep];
     return layers;
 }
 
@@ -27,7 +27,7 @@ NSString* const SCLayerDeep = @"deep";
                      needsVerification:(BOOL)needsVerification
                         layerInstalled:(BOOL)layerInstalled {
     if (!recordPresent) return layerInstalled ? SCDeepActionHeal : SCDeepActionNone;
-    if (!timingComplete || !remainingKnown) return SCDeepActionHeal;
+    if (!timingComplete || !remainingKnown) return layerInstalled ? SCDeepActionHeal : SCDeepActionInstall;
     if (expired) return SCDeepActionSeekVerifiedExpiry;
     if (!layerInstalled) return SCDeepActionInstall;
     if (!startIsVerified || needsVerification) return SCDeepActionSeekVerifiedStart;
@@ -38,8 +38,17 @@ NSString* const SCLayerDeep = @"deep";
     if (![record isKindOfClass:[NSDictionary class]]) return NO;
     NSNumber* duration = record[@"durationSecs"];
     NSDictionary* clockState = record[@"clockState"];
-    return [duration isKindOfClass:[NSNumber class]] && duration.doubleValue > 0 &&
-           [clockState isKindOfClass:[NSDictionary class]] && clockState.count > 0;
+    if (![duration isKindOfClass:[NSNumber class]]) return NO;
+    double secs = duration.doubleValue;
+    if (!isfinite(secs) || secs <= 0 || secs > SC_DEEP_MAX_SECS) return NO;
+    if (![clockState isKindOfClass:[NSDictionary class]] || clockState.count == 0) return NO;
+    id verified = record[@"startIsVerified"];
+    if ([verified respondsToSelector:@selector(boolValue)] && [verified boolValue]) {
+        id start = record[@"startWall"];
+        if (![start isKindOfClass:[NSDate class]] ||
+            [(NSDate*)start timeIntervalSinceDate:[NSDate distantPast]] <= 0) return NO;
+    }
+    return YES;
 }
 
 static NSDictionary<NSString*, NSString*>* SCDeepTimingKeyMap(void) {
@@ -51,7 +60,8 @@ static NSDictionary<NSString*, NSString*>* SCDeepTimingKeyMap(void) {
              @"TrustedClockNeedsVerification": @"needsVerification"};
 }
 
-+ (NSDictionary*)timingSnapshotForRecord:(NSDictionary*)record {
++ (NSDictionary*)timingSnapshotForRecord:(id)record {
+    if (![record isKindOfClass:[NSDictionary class]]) return @{};
     NSMutableDictionary* snap = [NSMutableDictionary dictionary];
     [SCDeepTimingKeyMap() enumerateKeysAndObjectsUsingBlock:^(NSString* settingsKey, NSString* recordKey, BOOL* stop) {
         if (record[recordKey] != nil) snap[settingsKey] = record[recordKey];
@@ -59,8 +69,8 @@ static NSDictionary<NSString*, NSString*>* SCDeepTimingKeyMap(void) {
     return snap;
 }
 
-+ (NSDictionary*)record:(NSDictionary*)record byApplyingTimingWrites:(NSDictionary*)writes {
-    NSMutableDictionary* updated = [record mutableCopy];
++ (NSDictionary*)record:(id)record byApplyingTimingWrites:(NSDictionary*)writes {
+    NSMutableDictionary* updated = [record isKindOfClass:[NSDictionary class]] ? [record mutableCopy] : [NSMutableDictionary dictionary];
     NSDictionary* map = SCDeepTimingKeyMap();
     for (NSString* key in writes) {
         NSString* recordKey = map[key];

@@ -1,6 +1,7 @@
 #import <XCTest/XCTest.h>
 #import "SCBlockUtilities.h"
 #import "SCTrustedClock.h"
+#import "SCDeepBlockDecision.h"
 
 @interface SCDeepBlockUtilitiesTests : XCTestCase
 @end
@@ -48,6 +49,39 @@ static NSDictionary* R(NSTimeInterval wall, NSTimeInterval mach) {
     // Hosts-only remnant: the regular block's, unless a deep block owns it.
     XCTAssertEqualObjects([SCBlockUtilities installedLayerNamesForAnchorPresent:NO hostsPresent:YES anchorText:nil deepRecordPresent:NO], (@[@"base"]));
     XCTAssertEqualObjects([SCBlockUtilities installedLayerNamesForAnchorPresent:NO hostsPresent:YES anchorText:nil deepRecordPresent:YES], (@[]));
+}
+
+static NSDate* D(NSTimeInterval t) { return [NSDate dateWithTimeIntervalSince1970:t]; }
+
+static NSDictionary* UnverifiedDeepRecord(void) {
+    return @{@"durationSecs": @600, @"clockState": [SCTrustedClock freshStateWithReading:R(1000, 50)],
+             @"startWall": D(1000), @"startIsVerified": @NO, @"needsVerification": @YES};
+}
+
+- (void)testDeepRecordVerificationThroughRegularTimingDecision {
+    NSDictionary* record = UnverifiedDeepRecord();
+    NSDictionary* decision = [SCBlockUtilities trustedTimingDecisionForSettings:[SCDeepBlockDecision timingSnapshotForRecord:record]
+                                                                    verifiedNow:D(1100) reading:R(1100, 150)];
+    XCTAssertNotNil(decision);
+    NSDictionary* writes = decision[SCTrustedTimingSettingsWritesKey];
+    NSDictionary* updated = [SCDeepBlockDecision record:record byApplyingTimingWrites:writes];
+    XCTAssertEqualObjects(updated[@"startIsVerified"], @YES);
+    XCTAssertEqualObjects(updated[@"needsVerification"], @NO);
+    XCTAssertNotEqualObjects(updated[@"clockState"], record[@"clockState"]);
+    XCTAssertNotNil(updated[@"startWall"]);
+    XCTAssertFalse([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+
+    // Every write key must be mapped (or the known-ignored BlockEndDate); a new key must fail here.
+    NSSet* allowed = [NSSet setWithArray:(@[@"BlockStartWall", @"BlockStartIsVerified", @"BlockDurationSecs",
+                                            @"TrustedClockState", @"TrustedClockNeedsVerification", @"BlockEndDate"])];
+    for (NSString* key in writes) XCTAssertTrue([allowed containsObject:key], @"unmapped write key %@", key);
+}
+
+- (void)testDeepRecordExpiryThroughRegularTimingDecision {
+    NSDictionary* decision = [SCBlockUtilities trustedTimingDecisionForSettings:[SCDeepBlockDecision timingSnapshotForRecord:UnverifiedDeepRecord()]
+                                                                    verifiedNow:D(1700) reading:R(1700, 750)];
+    XCTAssertNotNil(decision);
+    XCTAssertTrue([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
 }
 
 @end

@@ -16,10 +16,13 @@ typedef NS_ENUM(NSInteger, SCDeepAction) {
 @interface SCDeepBlockDecision : NSObject
 + (BOOL)durationSecsIsValid:(NSTimeInterval)secs;
 /// Ordered layer names that should be installed. The regular block is lifted only
-/// by an override, and an override never lifts it while a deep block exists.
+/// by an override, and an override never lifts it while a deep block is enforced.
+/// deepShouldEnforce: YES while the deep block's record exists OR its rules are
+/// installed (a tampered-away record must not relax enforcement). Callers removing
+/// the deep block on a verified path pass NO explicitly.
 + (NSArray<NSString*>*)desiredLayersWithBaseRunning:(BOOL)baseRunning
                                      overrideActive:(BOOL)overrideActive
-                                        deepPresent:(BOOL)deepPresent;
+                                       deepShouldEnforce:(BOOL)deepShouldEnforce;
 + (SCDeepAction)actionForRecordPresent:(BOOL)recordPresent
                         timingComplete:(BOOL)timingComplete
                         remainingKnown:(BOOL)remainingKnown
@@ -27,13 +30,14 @@ typedef NS_ENUM(NSInteger, SCDeepAction) {
                        startIsVerified:(BOOL)startIsVerified
                      needsVerification:(BOOL)needsVerification
                         layerInstalled:(BOOL)layerInstalled;
-/// YES when the record has a positive duration and a non-empty clock state.
+/// YES when the record has a finite duration in (0, SC_DEEP_MAX_SECS], a non-empty clock
+/// state, and (if startIsVerified) a usable startWall.
 + (BOOL)recordTimingIsComplete:(nullable NSDictionary*)record;
 /// The record's timing in the regular block's settings-key shape, so the
 /// existing trusted-timing functions apply unchanged.
-+ (NSDictionary*)timingSnapshotForRecord:(NSDictionary*)record;
++ (NSDictionary*)timingSnapshotForRecord:(nullable id)record;
 /// Applies trustedTimingDecisionForSettings: writes (regular-block keys) to a record.
-+ (NSDictionary*)record:(NSDictionary*)record byApplyingTimingWrites:(NSDictionary*)writes;
++ (NSDictionary*)record:(nullable id)record byApplyingTimingWrites:(NSDictionary*)writes;
 @end
 
 NS_ASSUME_NONNULL_END
