@@ -136,10 +136,14 @@ static NSString* const kBlockPrefix = @"block return out quick proto { tcp udp }
 
 + (NSString*)firstLineWithPrefix:(NSString*)prefix inText:(NSString*)text {
     if (![text isKindOfClass:[NSString class]]) return nil;
-    for (NSString* line in [text componentsSeparatedByString:@"\n"]) {
-        if ([line hasPrefix:prefix]) return [line substringFromIndex:prefix.length];
-    }
-    return nil;
+    __block NSString* found = nil;
+    [text enumerateLinesUsingBlock:^(NSString* line, BOOL* stop) {
+        if ([line hasPrefix:prefix]) {
+            found = [line substringFromIndex:prefix.length];
+            *stop = YES;
+        }
+    }];
+    return found;
 }
 
 + (NSArray<NSString*>*)layerNamesFromAnchorText:(NSString*)text {
@@ -163,7 +167,9 @@ static NSString* const kBlockPrefix = @"block return out quick proto { tcp udp }
     NSArray* blocklist = payload[@"blocklist"];
     if (![blocklist isKindOfClass:[NSArray class]] || ![payload[@"isAllowlist"] isKindOfClass:[NSNumber class]]) return nil;
     for (id entry in blocklist) if (![entry isKindOfClass:[NSString class]]) return nil;
-    return @{@"blocklist": blocklist, @"isAllowlist": payload[@"isAllowlist"]};
+    NSMutableDictionary* result = [@{@"blocklist": blocklist, @"isAllowlist": payload[@"isAllowlist"]} mutableCopy];
+    if ([payload[@"emergencyUnlockEnabled"] isKindOfClass:[NSNumber class]]) result[@"emergencyUnlockEnabled"] = payload[@"emergencyUnlockEnabled"];
+    return result;
 }
 
 @end

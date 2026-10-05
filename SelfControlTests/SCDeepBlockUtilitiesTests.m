@@ -34,11 +34,11 @@ static NSDictionary* R(NSTimeInterval wall, NSTimeInterval mach) {
 }
 
 - (void)testEmergencyUnlockGatingPrefersRegularBlock {
-    XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil]);
-    XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:YES baseValue:@NO deepRecord:(@{@"emergencyUnlockEnabled": @YES})]);
-    XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:YES baseValue:@YES deepRecord:(@{@"emergencyUnlockEnabled": @NO})]);
-    XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:(@{@"emergencyUnlockEnabled": @NO})]);
-    XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:(@{})]);
+    XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil deepLayerInstalled:NO deepPayload:nil]);
+    XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:YES baseValue:@NO deepRecord:(@{@"emergencyUnlockEnabled": @YES}) deepLayerInstalled:NO deepPayload:nil]);
+    XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:YES baseValue:@YES deepRecord:(@{@"emergencyUnlockEnabled": @NO}) deepLayerInstalled:NO deepPayload:nil]);
+    XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:(@{@"emergencyUnlockEnabled": @NO}) deepLayerInstalled:NO deepPayload:nil]);
+    XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:(@{}) deepLayerInstalled:NO deepPayload:nil]);
 }
 
 - (void)testInstalledLayersFromAnchorState {
@@ -82,6 +82,38 @@ static NSDictionary* UnverifiedDeepRecord(void) {
                                                                     verifiedNow:D(1700) reading:R(1700, 750)];
     XCTAssertNotNil(decision);
     XCTAssertTrue([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]);
+}
+
+- (void)testEmergencyUnlockRecordlessDeepLayer {
+    NSDictionary* yes = @{@"emergencyUnlockEnabled": @YES};
+    XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil deepLayerInstalled:YES deepPayload:nil]);
+    XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil deepLayerInstalled:YES deepPayload:yes]);
+    XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil deepLayerInstalled:YES deepPayload:(@{@"blocklist": @[]})]);
+    XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil deepLayerInstalled:YES deepPayload:(@{@"emergencyUnlockEnabled": @NO})]);
+    XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil deepLayerInstalled:NO deepPayload:nil]);
+}
+
+- (void)testInstalledLayersPureEdgeCases {
+    XCTAssertEqualObjects([SCBlockUtilities installedLayerNamesForAnchorPresent:YES hostsPresent:NO anchorText:nil deepRecordPresent:NO], (@[@"base"]));
+    XCTAssertEqualObjects([SCBlockUtilities installedLayerNamesForAnchorPresent:YES hostsPresent:NO anchorText:@"# sc-layers: base,deep\n" deepRecordPresent:NO], (@[@"base", @"deep"]));
+    XCTAssertEqualObjects([SCBlockUtilities installedLayerNamesForAnchorPresent:YES hostsPresent:NO anchorText:@"# sc-layers: \n" deepRecordPresent:NO], (@[]));
+    XCTAssertEqualObjects([SCBlockUtilities installedLayerNamesForAnchorPresent:YES hostsPresent:NO anchorText:@"# Options\n" deepRecordPresent:YES], (@[@"base"]));
+}
+
+- (void)testRemainingVerifiedWithMissingStartFallsBackToElapsed {
+    NSDictionary* state = [SCTrustedClock freshStateWithReading:R(1000, 50)];
+    NSDictionary* verified = @{@"BlockDurationSecs": @600, @"TrustedClockState": state, @"BlockStartIsVerified": @YES};
+    NSDictionary* unverified = @{@"BlockDurationSecs": @600, @"TrustedClockState": state, @"BlockStartIsVerified": @NO};
+    NSNumber* a = [SCBlockUtilities trustedRemainingSecsForTimingSnapshot:verified reading:R(1000, 150)];
+    NSNumber* b = [SCBlockUtilities trustedRemainingSecsForTimingSnapshot:unverified reading:R(1000, 150)];
+    XCTAssertEqualWithAccuracy(a.doubleValue, 500, 0.001);
+    XCTAssertEqualObjects(a, b);
+}
+
+- (void)testRemainingNilForZeroDurationAndEmptyClockState {
+    NSDictionary* state = [SCTrustedClock freshStateWithReading:R(1000, 50)];
+    XCTAssertNil([SCBlockUtilities trustedRemainingSecsForTimingSnapshot:(@{@"BlockDurationSecs": @0, @"TrustedClockState": state}) reading:R(1000, 150)]);
+    XCTAssertNil([SCBlockUtilities trustedRemainingSecsForTimingSnapshot:(@{@"BlockDurationSecs": @600, @"TrustedClockState": @{}}) reading:R(1000, 150)]);
 }
 
 @end

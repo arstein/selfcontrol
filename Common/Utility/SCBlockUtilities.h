@@ -41,11 +41,19 @@ FOUNDATION_EXPORT NSString* const SCKillerExpiryNotVerifiedMarker;
 
 /// The running deep block's record (SCSettings "DeepBlock"), or nil.
 + (nullable NSDictionary*)deepBlockRecord;
+/// YES when a deep-block record exists. Enforcement also continues while the deep
+/// layer's rules are installed without a record (see installedLayerNames).
 + (BOOL)deepBlockIsRunning;
 + (nullable NSNumber*)trustedRemainingDeepBlockSecs;
+/// Does not sync; callers sync.
 + (void)removeDeepBlockFromSettings;
 
-/// Which layers' rules are on the system now (from the anchor's "# sc-layers:" marker).
+/// Which layers' rules are on the system now. Reads files (pf.conf, the anchor,
+/// and hosts when the anchor is absent), so it is not free. An anchor without a
+/// "# sc-layers:" marker counts as the regular block. A hosts-only remnant counts
+/// as the regular block unless a deep record exists (documented trade-off: exploiting
+/// it requires settings tampering, and it avoids a spurious regular-block self-heal
+/// from a deep blocklist's own hosts entries).
 + (NSArray<NSString*>*)installedLayerNames;
 + (NSArray<NSString*>*)installedLayerNamesForAnchorPresent:(BOOL)anchorPresent
                                               hostsPresent:(BOOL)hostsPresent
@@ -57,7 +65,12 @@ FOUNDATION_EXPORT NSString* const SCKillerExpiryNotVerifiedMarker;
 /// Emergency unlock follows the regular block's captured setting when one is
 /// running, otherwise the deep block's.
 + (BOOL)emergencyUnlockAllowedForCurrentBlocks;
-+ (BOOL)emergencyUnlockAllowedWithBaseRunning:(BOOL)baseRunning baseValue:(nullable id)baseValue deepRecord:(nullable NSDictionary*)deepRecord;
+/// Pure decision. With no regular block and no deep record, an installed deep
+/// layer (rules without a record) disallows unlock unless `deepPayload` (from the
+/// anchor) carries emergencyUnlockEnabled = YES; with nothing installed it is allowed.
++ (BOOL)emergencyUnlockAllowedWithBaseRunning:(BOOL)baseRunning baseValue:(nullable id)baseValue deepRecord:(nullable NSDictionary*)deepRecord
+                           deepLayerInstalled:(BOOL)deepLayerInstalled deepPayload:(nullable NSDictionary*)deepPayload;
+
 + (NSArray<NSString*>*)blocklistByRemovingTimeSources:(NSArray<NSString*>*)blocklist;
 
 /// Returns the stored block start as a usable date, or nil when the value is

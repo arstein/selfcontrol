@@ -28,7 +28,8 @@ NS_ASSUME_NONNULL_BEGIN
 + (NSString*)anchorTextForLayers:(NSArray<SCRuleLayer*>*)layers;
 /// Layer names from the "# sc-layers:" marker; nil when there is no marker.
 + (nullable NSArray<NSString*>*)layerNamesFromAnchorText:(nullable NSString*)text;
-/// The deep payload ({blocklist: [String], isAllowlist: Bool}); nil if absent or unreadable.
+/// The deep payload ({blocklist: [String], isAllowlist: Bool}, plus emergencyUnlockEnabled
+/// when the payload carries it as a number/boolean); nil if absent or unreadable.
 + (nullable NSDictionary*)deepPayloadFromAnchorText:(nullable NSString*)text;
 @end
 

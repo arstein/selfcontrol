@@ -163,6 +163,21 @@ static void AssertParses(SCRuleCompilerTests* self, NSString* text) {
     AssertParses(self, t);
 }
 
+- (void)testDeepPayloadCarriesEmergencyUnlockFlag {
+    SCRuleLayer* deep = [SCRuleLayer layerWithName:SCLayerDeep isAllowlist:NO allowLocal:NO specs:@[S(@"1.2.3.4", 0, 0)]];
+    deep.payload = @{@"blocklist": @[@"a.com"], @"isAllowlist": @NO, @"emergencyUnlockEnabled": @NO};
+    NSDictionary* p = [SCRuleCompiler deepPayloadFromAnchorText:[SCRuleCompiler anchorTextForLayers:@[deep]]];
+    XCTAssertEqualObjects(p[@"emergencyUnlockEnabled"], @NO);
+    deep.payload = @{@"blocklist": @[@"a.com"], @"isAllowlist": @NO, @"emergencyUnlockEnabled": @"yes"};
+    p = [SCRuleCompiler deepPayloadFromAnchorText:[SCRuleCompiler anchorTextForLayers:@[deep]]];
+    XCTAssertNotNil(p);
+    XCTAssertNil(p[@"emergencyUnlockEnabled"]);
+    deep.payload = @{@"blocklist": @[@"a.com"], @"isAllowlist": @NO};
+    p = [SCRuleCompiler deepPayloadFromAnchorText:[SCRuleCompiler anchorTextForLayers:@[deep]]];
+    XCTAssertNotNil(p);
+    XCTAssertNil(p[@"emergencyUnlockEnabled"]);
+}
+
 - (void)testDeepPayloadRoundTrip {
     SCRuleLayer* deep = [SCRuleLayer layerWithName:SCLayerDeep isAllowlist:YES allowLocal:NO specs:@[S(@"1.2.3.4", 0, 0)]];
     deep.payload = @{@"blocklist": @[@"docs.google.com", @"github.com"], @"isAllowlist": @YES};

@@ -124,7 +124,8 @@ NSString* const SCKillerExpiryNotVerifiedMarker = @"SC_KILLER_REFUSED_EXPIRY_NOT
 
 + (NSArray<NSString*>*)installedLayerNames {
     BOOL anchorPresent = [PacketFilter blockFoundInPF];
-    BOOL hostsPresent = [HostFileBlocker blockFoundInHostsFile];
+    // The hosts value is unused when the anchor is present, so skip reading /etc/hosts then.
+    BOOL hostsPresent = anchorPresent ? NO : [HostFileBlocker blockFoundInHostsFile];
     NSString* text = anchorPresent ? [NSString stringWithContentsOfFile:@"/etc/pf.anchors/org.eyebeam" encoding:NSUTF8StringEncoding error:nil] : nil;
     return [self installedLayerNamesForAnchorPresent:anchorPresent hostsPresent:hostsPresent
                                           anchorText:text deepRecordPresent:[self deepBlockIsRunning]];
@@ -147,14 +148,33 @@ NSString* const SCKillerExpiryNotVerifiedMarker = @"SC_KILLER_REFUSED_EXPIRY_NOT
 }
 
 + (BOOL)emergencyUnlockAllowedForCurrentBlocks {
-    return [self emergencyUnlockAllowedWithBaseRunning:[self modernBlockIsRunning]
+    // Only consult the anchor when it can matter: no regular block, no deep record.
+    BOOL baseRunning = [self modernBlockIsRunning];
+    NSDictionary* record = [self deepBlockRecord];
+    BOOL deepInstalled = NO;
+    NSDictionary* payload = nil;
+    if (!baseRunning && record == nil && [[self installedLayerNames] containsObject:SCLayerDeep]) {
+        deepInstalled = YES;
+        NSString* text = [NSString stringWithContentsOfFile:@"/etc/pf.anchors/org.eyebeam" encoding:NSUTF8StringEncoding error:nil];
+        payload = [SCRuleCompiler deepPayloadFromAnchorText:text];
+    }
+    return [self emergencyUnlockAllowedWithBaseRunning:baseRunning
                                              baseValue:[[SCSettings sharedSettings] valueForKey:@"EmergencyUnlockEnabled"]
-                                            deepRecord:[self deepBlockRecord]];
+                                            deepRecord:[self deepBlockRecord]
+                                    deepLayerInstalled:deepInstalled
+                                           deepPayload:payload];
 }
 
-+ (BOOL)emergencyUnlockAllowedWithBaseRunning:(BOOL)baseRunning baseValue:(id)baseValue deepRecord:(NSDictionary*)deepRecord {
++ (BOOL)emergencyUnlockAllowedWithBaseRunning:(BOOL)baseRunning baseValue:(id)baseValue deepRecord:(NSDictionary*)deepRecord
+                                    deepLayerInstalled:(BOOL)deepLayerInstalled deepPayload:(NSDictionary*)deepPayload {
     if (baseRunning) return [self emergencyUnlockAllowedForSettingsValue:baseValue];
+    // Missing or non-NSNumber in a present record means allowed (the regular block's upstream default).
     if (deepRecord != nil) return [self emergencyUnlockAllowedForSettingsValue:deepRecord[@"emergencyUnlockEnabled"]];
+    // Deep rules still installed but the record is gone: fail closed unless the payload says otherwise.
+    if (deepLayerInstalled) {
+        id flag = deepPayload[@"emergencyUnlockEnabled"];
+        return [flag isKindOfClass:[NSNumber class]] ? [flag boolValue] : NO;
+    }
     return YES;
 }
 
