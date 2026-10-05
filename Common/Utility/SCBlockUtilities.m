@@ -11,6 +11,8 @@
 #import "SCBlockEntry.h"
 #import "SCSNTPClient.h"
 #import "SCTrustedClock.h"
+#import "SCRuleCompiler.h"
+#import "SCDeepBlockDecision.h"
 
 NSString* const SCTrustedTimingSettingsWritesKey = @"SettingsWrites";
 NSString* const SCTrustedTimingShouldRemoveBlockKey = @"ShouldRemoveBlock";
@@ -76,17 +78,20 @@ NSString* const SCKillerExpiryNotVerifiedMarker = @"SC_KILLER_REFUSED_EXPIRY_NOT
 }
 
 + (NSNumber*)trustedRemainingBlockDurationSecs {
-    SCSettings* settings = [SCSettings sharedSettings];
-    NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
-    NSNumber* duration = [settings valueForKey:@"BlockDurationSecs"];
+    return [self trustedRemainingSecsForTimingSnapshot:[self trustedTimingSettingsSnapshot]
+                                               reading:[SCTrustedClock currentReading]];
+}
+
++ (NSNumber*)trustedRemainingSecsForTimingSnapshot:(NSDictionary*)snapshot reading:(NSDictionary*)reading {
+    NSDictionary* clockState = snapshot[@"TrustedClockState"];
+    NSNumber* duration = snapshot[@"BlockDurationSecs"];
     if (![clockState isKindOfClass:[NSDictionary class]] || clockState.count == 0 ||
         ![duration isKindOfClass:[NSNumber class]] || duration.doubleValue <= 0) {
         return nil;
     }
 
-    NSDictionary* reading = [SCTrustedClock currentReading];
-    NSDate* start = [self effectiveBlockStartWallFromSettingsValue:[settings valueForKey:@"BlockStartWall"]];
-    if ([settings boolForKey:@"BlockStartIsVerified"] && start != nil) {
+    NSDate* start = [self effectiveBlockStartWallFromSettingsValue:snapshot[@"BlockStartWall"]];
+    if ([snapshot[@"BlockStartIsVerified"] boolValue] && start != nil) {
         NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState reading:reading];
         NSDate* end = [start dateByAddingTimeInterval:duration.doubleValue];
         return @([end timeIntervalSinceDate:trustedNow]);
@@ -95,6 +100,62 @@ NSString* const SCKillerExpiryNotVerifiedMarker = @"SC_KILLER_REFUSED_EXPIRY_NOT
     // since the clock state's anchor never exceeds true time since block start,
     // so this over-estimates what remains. Never fall back to the wall clock.
     return @(duration.doubleValue - [SCTrustedClock elapsedSecsForState:clockState reading:reading]);
+}
+
++ (NSDictionary*)deepBlockRecord {
+    id record = [[SCSettings sharedSettings] valueForKey:@"DeepBlock"];
+    return [record isKindOfClass:[NSDictionary class]] ? record : nil;
+}
+
++ (BOOL)deepBlockIsRunning {
+    return [self deepBlockRecord] != nil;
+}
+
++ (NSNumber*)trustedRemainingDeepBlockSecs {
+    NSDictionary* record = [self deepBlockRecord];
+    if (record == nil) return nil;
+    return [self trustedRemainingSecsForTimingSnapshot:[SCDeepBlockDecision timingSnapshotForRecord:record]
+                                               reading:[SCTrustedClock currentReading]];
+}
+
++ (void)removeDeepBlockFromSettings {
+    [[SCSettings sharedSettings] setValue:nil forKey:@"DeepBlock"];
+}
+
++ (NSArray<NSString*>*)installedLayerNames {
+    BOOL anchorPresent = [PacketFilter blockFoundInPF];
+    BOOL hostsPresent = [HostFileBlocker blockFoundInHostsFile];
+    NSString* text = anchorPresent ? [NSString stringWithContentsOfFile:@"/etc/pf.anchors/org.eyebeam" encoding:NSUTF8StringEncoding error:nil] : nil;
+    return [self installedLayerNamesForAnchorPresent:anchorPresent hostsPresent:hostsPresent
+                                          anchorText:text deepRecordPresent:[self deepBlockIsRunning]];
+}
+
++ (NSArray<NSString*>*)installedLayerNamesForAnchorPresent:(BOOL)anchorPresent
+                                              hostsPresent:(BOOL)hostsPresent
+                                                anchorText:(NSString*)anchorText
+                                         deepRecordPresent:(BOOL)deepRecordPresent {
+    if (anchorPresent) {
+        // Rules written before layers existed belong to the regular block.
+        return [SCRuleCompiler layerNamesFromAnchorText:anchorText] ?: @[SCLayerBase];
+    }
+    if (hostsPresent) return deepRecordPresent ? @[] : @[SCLayerBase];
+    return @[];
+}
+
++ (BOOL)baseRulesFoundOnSystem {
+    return [[self installedLayerNames] containsObject:SCLayerBase];
+}
+
++ (BOOL)emergencyUnlockAllowedForCurrentBlocks {
+    return [self emergencyUnlockAllowedWithBaseRunning:[self modernBlockIsRunning]
+                                             baseValue:[[SCSettings sharedSettings] valueForKey:@"EmergencyUnlockEnabled"]
+                                            deepRecord:[self deepBlockRecord]];
+}
+
++ (BOOL)emergencyUnlockAllowedWithBaseRunning:(BOOL)baseRunning baseValue:(id)baseValue deepRecord:(NSDictionary*)deepRecord {
+    if (baseRunning) return [self emergencyUnlockAllowedForSettingsValue:baseValue];
+    if (deepRecord != nil) return [self emergencyUnlockAllowedForSettingsValue:deepRecord[@"emergencyUnlockEnabled"]];
+    return YES;
 }
 
 + (NSDate*)effectiveBlockStartWallFromSettingsValue:(id)value {

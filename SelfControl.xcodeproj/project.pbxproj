@@ -42,6 +42,7 @@
 		74D12E81A81C616878E26EBF /* SCDeepBlockDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = C1A9B19987CDA0FF001D78E7 /* SCDeepBlockDecision.m */; };
 		76996DFFBBFE42891BC6C711 /* SCDeepBlockDecisionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 456D6495D72237672F8B902C /* SCDeepBlockDecisionTests.m */; };
 		7B22F65F8C9AF39C7B2AA7F0 /* SCBlockEndVerifier.m in Sources */ = {isa = PBXBuildFile; fileRef = D5E8B4627CAD0BF0737808C7 /* SCBlockEndVerifier.m */; };
+		7FD212FF1635C607DC0B8470 /* SCDeepBlockUtilitiesTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 84E1269A0F7592BF80439B63 /* SCDeepBlockUtilitiesTests.m */; };
 		804B13BC7121D0ED56402698 /* SCSNTPClientTests.m in Sources */ = {isa = PBXBuildFile; fileRef = EF40A558EA4A4D4E9BD3D7E6 /* SCSNTPClientTests.m */; };
 		852E43B3F649D630AA026647 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		86EF8AB37951183C3963D3A2 /* SCAllowlistRegressionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 536F52DBF0D6D44BBCA6B720 /* SCAllowlistRegressionTests.m */; };
@@ -628,6 +629,7 @@
 		79957742827112D9CEEDAC30 /* SCTediumChallenge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTediumChallenge.m; sourceTree = "<group>"; };
 		7C9867E1F58D960865388A88 /* UIFormattingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UIFormattingTests.swift; sourceTree = "<group>"; };
 		7D7C81EC1475727A3CDDDEC2 /* SCMinutesValueTransformer.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCMinutesValueTransformer.h; sourceTree = "<group>"; };
+		84E1269A0F7592BF80439B63 /* SCDeepBlockUtilitiesTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCDeepBlockUtilitiesTests.m; sourceTree = "<group>"; };
 		895BEE3423889EBCCFFD10F9 /* SCMinutesValueTransformerTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCMinutesValueTransformerTests.m; sourceTree = "<group>"; };
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* SelfControl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SelfControl.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1728,6 +1730,7 @@
 				536F52DBF0D6D44BBCA6B720 /* SCAllowlistRegressionTests.m */,
 				456D6495D72237672F8B902C /* SCDeepBlockDecisionTests.m */,
 				1B22BEDC3BCF60A63859EBA5 /* SCRuleCompilerTests.m */,
+				84E1269A0F7592BF80439B63 /* SCDeepBlockUtilitiesTests.m */,
 			);
 			path = SelfControlTests;
 			sourceTree = "<group>";
@@ -3861,6 +3864,7 @@
 				C1F9E8521B6469F0A1D11C6F /* SCDeepBlockDecision.m in Sources */,
 				3FEF27295AD733D6F2D925F4 /* SCRuleCompiler.m in Sources */,
 				C102630601BADA289A300BB0 /* SCRuleCompilerTests.m in Sources */,
+				7FD212FF1635C607DC0B8470 /* SCDeepBlockUtilitiesTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -34,6 +34,30 @@ FOUNDATION_EXPORT NSString* const SCKillerExpiryNotVerifiedMarker;
 
 + (BOOL)currentBlockIsExpired;
 + (nullable NSNumber*)trustedRemainingBlockDurationSecs;
+
+/// Remaining seconds for any block's timing snapshot (regular-block key shape);
+/// nil when it can't be determined. Never falls back to the wall clock.
++ (nullable NSNumber*)trustedRemainingSecsForTimingSnapshot:(NSDictionary*)snapshot reading:(NSDictionary*)reading;
+
+/// The running deep block's record (SCSettings "DeepBlock"), or nil.
++ (nullable NSDictionary*)deepBlockRecord;
++ (BOOL)deepBlockIsRunning;
++ (nullable NSNumber*)trustedRemainingDeepBlockSecs;
++ (void)removeDeepBlockFromSettings;
+
+/// Which layers' rules are on the system now (from the anchor's "# sc-layers:" marker).
++ (NSArray<NSString*>*)installedLayerNames;
++ (NSArray<NSString*>*)installedLayerNamesForAnchorPresent:(BOOL)anchorPresent
+                                              hostsPresent:(BOOL)hostsPresent
+                                                anchorText:(nullable NSString*)anchorText
+                                         deepRecordPresent:(BOOL)deepRecordPresent;
+/// The regular block's rules specifically (not just any SelfControl rules).
++ (BOOL)baseRulesFoundOnSystem;
+
+/// Emergency unlock follows the regular block's captured setting when one is
+/// running, otherwise the deep block's.
++ (BOOL)emergencyUnlockAllowedForCurrentBlocks;
++ (BOOL)emergencyUnlockAllowedWithBaseRunning:(BOOL)baseRunning baseValue:(nullable id)baseValue deepRecord:(nullable NSDictionary*)deepRecord;
 + (NSArray<NSString*>*)blocklistByRemovingTimeSources:(NSArray<NSString*>*)blocklist;
 
 /// Returns the stored block start as a usable date, or nil when the value is
