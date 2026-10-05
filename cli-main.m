@@ -137,6 +137,7 @@ int main(int argc, char* argv[]) {
                 @"BlockSoundShouldPlay": defaultsDict[@"BlockSoundShouldPlay"],
                 @"BlockSound": defaultsDict[@"BlockSound"],
                 @"EnableErrorReporting": defaultsDict[@"EnableErrorReporting"],
+                @"EmergencyUnlockEnabled": defaultsDict[@"EmergencyUnlockEnabled"],
                 @"OverridePerDay": defaultsDict[@"OverridePerDay"],
                 @"OverrideMinutes": defaultsDict[@"OverrideMinutes"]
             };

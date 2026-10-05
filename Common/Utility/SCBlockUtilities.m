@@ -32,6 +32,11 @@ NSString* const SCKillerExpiryNotVerifiedMarker = @"SC_KILLER_REFUSED_EXPIRY_NOT
     return [settings boolForKey: @"BlockIsRunning"];
 }
 
++ (BOOL)emergencyUnlockAllowedForSettingsValue:(id)value {
+    if (![value isKindOfClass: [NSNumber class]]) return YES;
+    return [value boolValue];
+}
+
 + (BOOL)legacyBlockIsRunning {
     // first see if there's a legacy settings file from v3.x
     // which could be in any user's home folder
@@ -192,6 +197,7 @@ NSString* const SCKillerExpiryNotVerifiedMarker = @"SC_KILLER_REFUSED_EXPIRY_NOT
     // Stale override state must not outlive its block.
     [settings setValue: nil forKey: @"OverrideState"];
     [settings setValue: nil forKey: @"OverridePolicy"];
+    [settings setValue: nil forKey: @"EmergencyUnlockEnabled"];
     [settings setValue: nil forKey: @"ActivationTimeZone"];
     [self clearTrustedTimingSettings];
 }

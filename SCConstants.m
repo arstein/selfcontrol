@@ -49,6 +49,7 @@ OSStatus const AUTH_CANCELLED_STATUS = -60006;
             @"TimerWindowFloats": @NO,
             @"BadgeApplicationIcon": @YES,
             @"BlockDuration": @1,
+            @"EmergencyUnlockEnabled": @YES,
             @"OverridePerDay": @(SC_OVERRIDE_DEFAULT_PER_DAY),
             @"OverrideMinutes": @(SC_OVERRIDE_DEFAULT_MINUTES),
             @"MaxBlockLength": @1440,

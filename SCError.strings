@@ -37,6 +37,7 @@
 "321" = "There's no block running.";
 "322" = "The block has already ended.";
 "323" = "SelfControl restarted, so your progress was reset. Open Emergency Unlock to start again.";
+"324" = "Emergency unlock is turned off for this block.";
 "330" = "There's nothing to override right now.";
 "331" = "An override is already running.";
 "332" = "Overrides aren't available during a deep block.";

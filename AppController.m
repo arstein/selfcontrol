@@ -424,6 +424,7 @@
                                                                 @"BlockSoundShouldPlay": [self->defaults_ valueForKey: @"BlockSoundShouldPlay"],
                                                                 @"BlockSound": [self->defaults_ valueForKey: @"BlockSound"],
                                                                 @"EnableErrorReporting": [self->defaults_ valueForKey: @"EnableErrorReporting"],
+                                                                @"EmergencyUnlockEnabled": [self->defaults_ valueForKey: @"EmergencyUnlockEnabled"],
                                                                 @"OverridePerDay": [self->defaults_ valueForKey: @"OverridePerDay"],
                                                                 @"OverrideMinutes": [self->defaults_ valueForKey: @"OverrideMinutes"]
                                                             }
@@ -583,7 +584,9 @@
     if (menuItem.action == @selector(openTediumOverride:)) {
         // Match the daemon's own gate (SCDaemonBlockMethods rejects the
         // challenge with error 321 unless a modern block is running).
-        return [SCBlockUtilities modernBlockIsRunning];
+        // The block may also have been started with emergency unlock turned off.
+        return [SCBlockUtilities modernBlockIsRunning] &&
+               [SCBlockUtilities emergencyUnlockAllowedForSettingsValue: [[SCSettings sharedSettings] valueForKey: @"EmergencyUnlockEnabled"]];
     }
     // No edits while a block is starting: installBlock reads Blocklist,
     // BlockAsWhitelist and the override settings only after the auth prompt.

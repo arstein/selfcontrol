@@ -11,6 +11,7 @@
 #import "SCErr.h"
 #import "SCSettings.h"
 #import "SCTrustedClock.h"
+#import "SCBlockUtilities.h"
 
 @interface SCUtilityTests : XCTestCase
 
@@ -354,6 +355,13 @@ static NSDictionary* SCTTSnapshot(NSDictionary* clockState, NSTimeInterval start
     XCTAssertNil([SCBlockUtilities effectiveBlockStartWallFromSettingsValue:@12345]);
     NSDate* real = SCTTDate(1767225600);
     XCTAssertEqualObjects([SCBlockUtilities effectiveBlockStartWallFromSettingsValue:real], real);
+}
+
+- (void)testEmergencyUnlockAllowedForSettingsValue {
+    XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedForSettingsValue: nil]);
+    XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedForSettingsValue: @YES]);
+    XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedForSettingsValue: @NO]);
+    XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedForSettingsValue: @"NO"]);
 }
 
 @end
