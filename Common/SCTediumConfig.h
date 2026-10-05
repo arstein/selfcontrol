@@ -3,8 +3,7 @@
 #ifndef SCTediumConfig_h
 #define SCTediumConfig_h
 
-// ⚠️ TESTING VALUE. Raise to ~300 before relying on this as a deterrent.
-#define SC_TEDIUM_REQUIRED_ENTRIES 10
+#define SC_TEDIUM_REQUIRED_ENTRIES 300
 
 // Wrong digit: progress = MAX(0, progress - penalty)
 #define SC_TEDIUM_WRONG_ENTRY_PENALTY 20

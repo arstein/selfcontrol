@@ -43,6 +43,8 @@ final class SnapshotRenderer: NSObject {
             ("04-restrictions-allowlist", AppModel.preview { $0.path = [.restrictions]; $0.isAllowlist = true }),
             ("05-overrides", AppModel.preview { $0.path = [.overrides] }),
             ("06-settings", AppModel.preview { $0.path = [.settings] }),
+            ("06b-settings-block-running", blocking(13312) { $0.path = [.settings] }),
+            ("07b-blocking-unlock-off", blocking(13312) { $0.emergencyUnlockAvailable = false }),
             ("07-blocking-sameday", blocking(3 * 3600 + 41 * 60 + 52)),
             ("08-blocking-multiday", blocking(86400 + 3 * 3600 + 41 * 60 + 52)),
             ("09-override-confirm", blocking(86400 + 13312) { $0.sheet = .overrideConfirm }),

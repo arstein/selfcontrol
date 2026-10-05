@@ -170,6 +170,8 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     NSInteger overrideMinutes = [blockSettings[@"OverrideMinutes"] integerValue];
     [settings setValue:@{ @"perDay": @(overridePerDay), @"minutes": @(overrideMinutes) }
                 forKey:@"OverridePolicy"];
+    // Captured at start like the override policy; absent/odd values mean "allowed".
+    [settings setValue: blockSettings[@"EmergencyUnlockEnabled"] forKey: @"EmergencyUnlockEnabled"];
     NSString* activationTZName = [NSTimeZone systemTimeZone].name;
     [settings setValue:activationTZName forKey:@"ActivationTimeZone"];
     NSTimeZone* activationZone = [NSTimeZone timeZoneWithName:activationTZName] ?: [NSTimeZone timeZoneForSecondsFromGMT:0];
@@ -814,6 +816,12 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         reply(0, 0, 0, [SCErr errorWithCode: 321]); // no block to override
         return;
     }
+    if (![SCBlockUtilities emergencyUnlockAllowedForSettingsValue: [[SCSettings sharedSettings] valueForKey: @"EmergencyUnlockEnabled"]]) {
+        tediumChallenge = nil;
+        [self.daemonMethodLock unlock];
+        reply(0, 0, 0, [SCErr errorWithCode: 324]); // turned off for this block
+        return;
+    }
     if (tediumChallenge == nil) {
         tediumChallenge = [[SCTediumChallenge alloc] initWithRequiredEntries: SC_TEDIUM_REQUIRED_ENTRIES];
         NSLog(@"INFO: Tedium override challenge started (%d entries required)", SC_TEDIUM_REQUIRED_ENTRIES);
@@ -834,6 +842,12 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         tediumChallenge = nil;
         [self.daemonMethodLock unlock];
         reply(0, 0, 0, NO, [SCErr errorWithCode: 322]); // no active challenge/block
+        return;
+    }
+    if (![SCBlockUtilities emergencyUnlockAllowedForSettingsValue: [[SCSettings sharedSettings] valueForKey: @"EmergencyUnlockEnabled"]]) {
+        tediumChallenge = nil;
+        [self.daemonMethodLock unlock];
+        reply(0, 0, 0, NO, [SCErr errorWithCode: 324]); // turned off for this block
         return;
     }
     if (tediumChallenge == nil) {

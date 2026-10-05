@@ -62,6 +62,8 @@ final class AppModel: ObservableObject {
     @Published var timeState: TimeState = .countdown(seconds: 0)
     @Published var blockDurationSecs: Double? = nil
     @Published var isStuck = false
+    /// False when the running block was started with emergency unlock turned off.
+    @Published var emergencyUnlockAvailable = true
     @Published var override = OverrideStatus()
 
     // Lists
@@ -172,6 +174,7 @@ final class AppModel: ObservableObject {
         assign(\.isAddingBlock, appController?.addingBlock ?? false)
         assign(\.activeEntries, settings.value(forKey: "ActiveBlocklist") as? [String] ?? [])
         assign(\.isActiveAllowlist, settings.bool(forKey: "ActiveBlockAsWhitelist"))
+        assign(\.emergencyUnlockAvailable, !modern || SCBlockUtilities.emergencyUnlockAllowed(forSettingsValue: settings.value(forKey: "EmergencyUnlockEnabled")))
         assign(\.blockDurationSecs, (settings.value(forKey: "BlockDurationSecs") as? NSNumber)?.doubleValue)
         reloadDefaults()
         updateTime()

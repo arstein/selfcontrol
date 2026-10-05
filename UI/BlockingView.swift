@@ -21,7 +21,7 @@ struct BlockingView: View {
                     .foregroundColor(Theme.danger)
             }
             Spacer(minLength: 0)
-            if model.isModernBlock {
+            if model.isModernBlock && model.emergencyUnlockAvailable {
                 Button(NSLocalizedString("Emergency unlock…", comment: "")) { model.push(.emergencyUnlock) }
                     .buttonStyle(LinkButtonStyle())
                     .padding(.bottom, 12)

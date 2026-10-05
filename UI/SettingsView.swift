@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage("TimerWindowFloats") private var keepOnTop = false
     @AppStorage("BlockSoundShouldPlay") private var soundOn = false
     @AppStorage("BlockSound") private var soundIndex = 5
+    @AppStorage("EmergencyUnlockEnabled") private var emergencyUnlock = true
     @State private var showCustomMax = false
     @State private var customMaxText = ""
 
@@ -39,6 +40,8 @@ struct SettingsView: View {
                     toggle(NSLocalizedString("Check internet before starting", comment: ""), $verifyInternet)
                     RowDivider()
                     toggle(NSLocalizedString("Highlight invalid entries", comment: ""), $highlightInvalid)
+                    RowDivider()
+                    toggle(NSLocalizedString("Emergency unlock", comment: ""), $emergencyUnlock, subtitle: emergencyUnlockSubtitle)
                 }
                 groupLabel(NSLocalizedString("Window & sound", comment: "settings group"))
                 Card {
@@ -58,6 +61,12 @@ struct SettingsView: View {
             .padding(.top, 4)
             .padding(.bottom, 16)
         }
+    }
+
+    private var emergencyUnlockSubtitle: String {
+        // the toggle only affects the next block; the running one keeps what it started with
+        if model.isBlockRunning { return NSLocalizedString("Changes apply to your next block", comment: "") }
+        return String(format: NSLocalizedString("End a block early by typing %ld random digits", comment: ""), Int(SC_TEDIUM_REQUIRED_ENTRIES))
     }
 
     private func groupLabel(_ t: String) -> some View {

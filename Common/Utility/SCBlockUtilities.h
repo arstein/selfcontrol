@@ -26,6 +26,10 @@ FOUNDATION_EXPORT NSString* const SCKillerExpiryNotVerifiedMarker;
 // uses the below methods as well as filesystem checks to see if the block is REALLY running or not
 + (BOOL)anyBlockIsRunning;
 + (BOOL)modernBlockIsRunning;
+// Whether the current block allows emergency unlock, given the raw SCSettings
+// "EmergencyUnlockEnabled" value. Missing or non-NSNumber means YES, so blocks
+// started before the setting existed behave as before.
++ (BOOL)emergencyUnlockAllowedForSettingsValue:(nullable id)value;
 + (BOOL)legacyBlockIsRunning;
 
 + (BOOL)currentBlockIsExpired;
