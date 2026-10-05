@@ -47,11 +47,18 @@ NS_ASSUME_NONNULL_BEGIN
 // Plays the user's block-end sound, if they asked for one.
 + (void)playBlockEndSound;
 
-// Removes the regular block (settings + its rules, sound, caches); a running deep block stays enforced.
-+ (void)removeBlock;
+// YES while the deep layer must be enforced: its record exists OR its rules are
+// installed (a tampered-away record never relaxes enforcement).
++ (BOOL)deepShouldEnforce;
 
-// Emergency unlock: removes the regular block and the deep block.
-+ (void)removeAllBlocks;
+// Removes the regular block (its rules, then settings, sound, caches); a running
+// deep block stays enforced. Rules first: settings are cleared only when the rules
+// came off. Returns NO (settings untouched, block still "running") on failure.
++ (BOOL)removeBlock;
+
+// Emergency unlock: removes the regular block and the deep block, rules first as
+// above. Returns NO (settings untouched) when the rules couldn't be cleared.
++ (BOOL)removeAllBlocks;
 
 + (void)sendConfigurationChangedNotification;
 

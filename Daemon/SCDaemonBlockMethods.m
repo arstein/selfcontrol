@@ -548,9 +548,13 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
             // (anti-permablock for old blocks). Otherwise leave checkups running.
             if ([SCBlockUtilities currentBlockIsExpired]) {
                 NSLog(@"INFO: Legacy block expired; preserving upstream removal behavior.");
-                [SCHelperToolUtilities removeBlock];
-                [SCDaemonBlockMethods invalidateTediumChallenge];
-                [[SCDaemon sharedDaemon] stopCheckupTimer];
+                if ([SCHelperToolUtilities removeBlock]) {
+                    [SCDaemonBlockMethods invalidateTediumChallenge];
+                    // A deep block may still be enforced: only stop when nothing is left.
+                    [SCDaemonBlockMethods stopCheckupTimerIfIdle];
+                } else {
+                    NSLog(@"ERROR: Removing the expired legacy block failed; will retry.");
+                }
             }
             break;
         }
@@ -857,12 +861,17 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
 
     if ([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
         NSLog(@"INFO: Block expiry verified against network time; removing block.");
-        [SCHelperToolUtilities removeBlock];
-        [SCDaemonBlockMethods invalidateTediumChallenge];
-        [[SCBlockEndVerifier sharedVerifier] reset];
-        [SCDaemonBlockMethods stopCheckupTimerIfIdle];
-        [SCSentry addBreadcrumb:@"Daemon verified and cleared expired block" category:@"daemon"];
-        if (outRemoved != NULL) *outRemoved = YES;
+        if ([SCHelperToolUtilities removeBlock]) {
+            [SCDaemonBlockMethods invalidateTediumChallenge];
+            [[SCBlockEndVerifier sharedVerifier] reset];
+            [SCDaemonBlockMethods stopCheckupTimerIfIdle];
+            [SCSentry addBreadcrumb:@"Daemon verified and cleared expired block" category:@"daemon"];
+            if (outRemoved != NULL) *outRemoved = YES;
+        } else {
+            // The block stays "running and expired" (the timing writes above are
+            // persisted by the caller), so the next verified time retries removal.
+            NSLog(@"ERROR: Removing the verified-expired block failed; will retry on the next verification.");
+        }
     }
     return YES;
 }
@@ -1106,12 +1115,20 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
 
     if (outcome == SCTediumSubmitComplete) {
         NSLog(@"INFO: Tedium override completed (%ld entries); removing block.", (long)progress);
-        [SCSentry addBreadcrumb: @"Block removed via tedium override" category: @"daemon"];
-        [SCHelperToolUtilities removeBlock];
-        [[SCBlockEndVerifier sharedVerifier] reset];
-        [SCDaemonBlockMethods stopCheckupTimerIfIdle];
-        tediumChallenge = nil;
-        removed = YES;
+        if ([SCHelperToolUtilities removeBlock]) {
+            [SCSentry addBreadcrumb: @"Block removed via tedium override" category: @"daemon"];
+            [[SCBlockEndVerifier sharedVerifier] reset];
+            [SCDaemonBlockMethods stopCheckupTimerIfIdle];
+            tediumChallenge = nil;
+            removed = YES;
+        } else {
+            // Block (and its settings) stay. The completed challenge is kept, so the
+            // next correct digit completes it again and retries the removal.
+            NSLog(@"ERROR: Tedium override completed but removing the block failed.");
+            reply(outcome, progress, nextDigit, NO, [SCErr errorWithCode: 300]);   // try again in a moment
+            [self.daemonMethodLock unlock];
+            return;
+        }
     }
 
     reply(outcome, progress, nextDigit, removed, nil);
@@ -1302,6 +1319,17 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         [self.daemonMethodLock unlock];
         [gate unlock];
         reply(0, nil, [SCErr errorWithCode: 330]);
+        return;
+    }
+    NSNumber* remainingAfterVerify = [SCBlockUtilities trustedRemainingBlockDurationSecs];
+    if (remainingAfterVerify != nil && remainingAfterVerify.doubleValue <= 0) {
+        // Verified-expired but the removal failed: never spend an override on it.
+        // Persist the verified-time writes; the next verification retries removal.
+        NSError* syncError = [settings syncSettingsAndWait:5];
+        if (syncError != nil) NSLog(@"WARNING: failed to persist verified time: %@", syncError);
+        [self.daemonMethodLock unlock];
+        [gate unlock];
+        reply(0, nil, [SCErr errorWithCode: 300]);
         return;
     }
 

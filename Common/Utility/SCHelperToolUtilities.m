@@ -47,7 +47,7 @@ static BOOL SCDeepOption(NSDictionary* deep, NSString* key, BOOL failClosedDefau
         allowLocal = SCDeepOption(deep, @"allowLocal", NO);
         commonSubdomains = SCDeepOption(deep, @"evaluateCommonSubdomains", !allowlist);
         linkedDomains = SCDeepOption(deep, @"includeLinkedDomains", !allowlist);
-        NSMutableDictionary* p = [@{@"blocklist": [entries isKindOfClass: [NSArray class]] ? entries : @[],
+        NSMutableDictionary* p = [@{@"blocklist": entries,
                                     @"isAllowlist": @(allowlist),
                                     @"allowLocal": @(allowLocal),
                                     @"evaluateCommonSubdomains": @(commonSubdomains),
@@ -253,21 +253,33 @@ static BOOL SCDeepOption(NSDictionary* deep, NSString* key, BOOL failClosedDefau
     }
 }
 
-+ (void)removeBlock {
-    [SCBlockUtilities removeBlockFromSettings];
-    if (![self applyDesiredLayers: [self desiredLayersWithOverrideActive: NO]]) {   // deep layer only, or teardown
-        NSLog(@"ERROR: Failed to apply block layers while removing the regular block.");
+// Both removals apply the target rules FIRST and only clear settings once the
+// rules really came off. A failed teardown leaves the block "running and
+// expired" in settings, so the next verified time retries the removal; clearing
+// settings first would let the integrity/heal paths rebuild the still-installed
+// rules into a fresh block.
++ (BOOL)removeBlock {
+    NSArray* layers = [SCDeepBlockDecision desiredLayersWithBaseRunning: NO
+                                                         overrideActive: NO
+                                                      deepShouldEnforce: [self deepShouldEnforce]];   // deep layer only, or teardown
+    if (![self applyDesiredLayers: layers]) {
+        NSLog(@"ERROR: Failed to remove the regular block's rules; keeping its settings so removal is retried.");
+        return NO;
     }
+    [SCBlockUtilities removeBlockFromSettings];
     [self finishRemovingBlock];
+    return YES;
 }
 
-+ (void)removeAllBlocks {
++ (BOOL)removeAllBlocks {
+    if (![self applyDesiredLayers: @[]]) {   // explicit: the deep layer goes too
+        NSLog(@"ERROR: Failed to clear all block rules; keeping block settings so removal is retried.");
+        return NO;
+    }
     [SCBlockUtilities removeDeepBlockFromSettings];
     [SCBlockUtilities removeBlockFromSettings];
-    if (![self applyDesiredLayers: @[]]) {   // explicit: the deep layer goes too
-        NSLog(@"ERROR: Failed to clear all block rules.");
-    }
     [self finishRemovingBlock];
+    return YES;
 }
 
 + (void)finishRemovingBlock {
