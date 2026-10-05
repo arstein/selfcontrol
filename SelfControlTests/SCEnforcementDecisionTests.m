@@ -176,4 +176,17 @@
     XCTAssertEqual([SCEnforcementDecision healDurationSecsForExistingDuration:@(14 * 86400)], 14 * 86400.0);
 }
 
+// --- install backoff: 5 s, doubling, capped at 300 s ---
+- (void)testInstallBackoffStartsAtFiveSeconds {
+    XCTAssertEqual([SCEnforcementDecision installBackoffSecsAfterFailureWithCurrent:0], 5.0);
+    XCTAssertEqual([SCEnforcementDecision installBackoffSecsAfterFailureWithCurrent:-3], 5.0);
+    XCTAssertEqual([SCEnforcementDecision installBackoffSecsAfterFailureWithCurrent:NAN], 5.0);
+}
+- (void)testInstallBackoffDoublesUpToCap {
+    XCTAssertEqual([SCEnforcementDecision installBackoffSecsAfterFailureWithCurrent:5], 10.0);
+    XCTAssertEqual([SCEnforcementDecision installBackoffSecsAfterFailureWithCurrent:160], 300.0);
+    XCTAssertEqual([SCEnforcementDecision installBackoffSecsAfterFailureWithCurrent:300], 300.0);
+    XCTAssertEqual([SCEnforcementDecision installBackoffSecsAfterFailureWithCurrent:INFINITY], 300.0);
+}
+
 @end

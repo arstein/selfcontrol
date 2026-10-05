@@ -33,5 +33,11 @@ typedef NS_ENUM(NSInteger, SCEnforcementAction) {
 /// block, never shorten it (fail-closed). `existingDuration` is the stored
 /// BlockDurationSecs (nil/<=0 when unknown).
 + (NSTimeInterval)healDurationSecsForExistingDuration:(nullable NSNumber*)existingDuration;
+
+/// Backoff (seconds) before the next tightening re-install after one failed:
+/// 5 s after the first failure, then doubling, capped at 300 s. `current` is the
+/// backoff in effect (0 = none yet); non-finite or negative counts as none, except
+/// +infinity, which is capped.
++ (NSTimeInterval)installBackoffSecsAfterFailureWithCurrent:(NSTimeInterval)current;
 @end
 NS_ASSUME_NONNULL_END

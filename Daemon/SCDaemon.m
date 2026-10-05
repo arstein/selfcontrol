@@ -12,6 +12,7 @@
 #import "SCFileWatcher.h"
 #import "SCTrustedClock.h"
 #import "SCBlockUtilities.h"
+#import "SCHelperToolUtilities.h"
 #import <Security/Security.h>
 #import <signal.h>
 
@@ -128,7 +129,8 @@ static dispatch_source_t SCMakeSignalSource(int sig, dispatch_queue_t q, dispatc
     [self resetInactivityTimer];
     
     self.hostsFileWatcher = [SCFileWatcher watcherWithFile: @"/etc/hosts" block:^(NSError * _Nonnull error) {
-        if ([SCBlockUtilities anyBlockIsRunning] || [SCBlockUtilities deepBlockIsRunning]) {
+        // deepShouldEnforce also covers an installed deep layer whose record is gone.
+        if ([SCBlockUtilities anyBlockIsRunning] || [SCHelperToolUtilities deepShouldEnforce]) {
             NSLog(@"INFO: hosts file changed, checking block integrity");
             [SCDaemonBlockMethods checkBlockIntegrity];
         }
