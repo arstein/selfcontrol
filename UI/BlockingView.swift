@@ -5,6 +5,7 @@ struct BlockingView: View {
 
     var body: some View {
         VStack(spacing: Theme.gap) {
+            if model.deepRunning { DeepBlockBanner() }
             if model.overrideRunning { overrideTimeCard } else { timeCard }
             if model.override.perDay > 0 && model.isModernBlock { overridesCard }
             if model.overrideRunning { underlyingBlockRow }
@@ -13,6 +14,12 @@ struct BlockingView: View {
                        subtitle: restrictionsSubtitle,
                        action: { model.push(.restrictions) }) {
                     Text("\(model.shownEntries.count)").foregroundColor(Theme.sub)
+                }
+                RowDivider()
+                NavRow(title: NSLocalizedString("Deep Block", comment: "row"),
+                       subtitle: model.deepRowSubtitle,
+                       action: { model.push(.deepBlock) }) {
+                    Text("\(model.entries(.deep).count)").foregroundColor(Theme.sub)
                 }
             }
             if model.isStuck {
@@ -163,11 +170,12 @@ struct BlockingView: View {
 
     private var canUseOverride: Bool {
         let o = model.override
-        return !o.checking && !o.active && !model.overrideRunning && o.remainingToday > 0 && o.perDay > 0
+        return !model.overridesBlockedByDeep && !o.checking && !o.active && !model.overrideRunning && o.remainingToday > 0 && o.perDay > 0
     }
 
     private var overridesSubtitle: String {
         let o = model.override
+        if model.overridesBlockedByDeep { return NSLocalizedString("Unavailable during a deep block", comment: "") }
         if model.overrideRunning { return NSLocalizedString("Available after this one ends", comment: "") }
         if o.checking { return NSLocalizedString("Checking status…", comment: "") }
         if o.remainingToday == 0 { return NSLocalizedString("None left today · resets at midnight", comment: "") }

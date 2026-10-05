@@ -10,10 +10,16 @@ struct EmergencyUnlockView: View {
         Int(ceil(Double(SC_TEDIUM_REQUIRED_ENTRIES) * Double(SC_TEDIUM_MIN_ENTRY_INTERVAL_SECS) / 60.0))
     }
 
+    private var deepIntro: String {
+        let time = minutesEstimate <= 1 ? NSLocalizedString("about a minute", comment: "")
+            : String(format: NSLocalizedString("about %ld minutes", comment: ""), minutesEstimate)
+        return String(format: NSLocalizedString("Ends every running block, including the deep block, even offline. Type each digit as it appears. It takes %@ on purpose.", comment: ""), time)
+    }
+
     var body: some View {
         let t = model.tedium
         VStack(alignment: .leading, spacing: Theme.gap) {
-            Text(minutesEstimate <= 1
+            Text(model.deepRunning ? deepIntro : minutesEstimate <= 1
                  ? NSLocalizedString("Ends the whole block, even offline. Type each digit as it appears. It takes about a minute on purpose.", comment: "")
                  : String(format: NSLocalizedString("Ends the whole block, even offline. Type each digit as it appears. It takes about %ld minutes on purpose.", comment: ""), minutesEstimate))
                 .foregroundColor(Theme.sub).lineSpacing(3).padding(.horizontal, 2)

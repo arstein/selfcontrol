@@ -96,6 +96,19 @@ final class SnapshotRenderer: NSObject {
                 m.maxBlockLengthMinutes = 43200
                 m.sheet = .extend(presetMinutes: 1440)
             }),
+            ("29-ready-deep-row", AppModel.preview { m in m.deepEntries = ["docs.google.com", "github.com", "mail.google.com"]; m.isDeepAllowlist = true }),
+            ("30-deep-block-card", AppModel.preview { m in m.path = [.deepBlock]; m.deepEntries = ["docs.google.com", "github.com"]; m.isDeepAllowlist = true; m.deepDurationMinutes = 45 }),
+            ("31-deep-list", AppModel.preview { m in m.path = [.deepList]; m.deepEntries = ["docs.google.com", "github.com"]; m.isDeepAllowlist = true }),
+            ("32-deep-only-running", AppModel.preview { m in
+                m.deepRunning = true; m.deepTimeState = .countdown(seconds: 1932)
+                m.deepActiveEntries = ["docs.google.com", "github.com"]; m.isDeepActiveAllowlist = true }),
+            ("33-both-running", blocking(13312) { m in
+                m.deepRunning = true; m.deepTimeState = .countdown(seconds: 1932)
+                m.deepActiveEntries = ["docs.google.com"]; m.isDeepActiveAllowlist = true }),
+            ("34-deep-list-locked", AppModel.preview { m in
+                m.path = [.deepList]; m.deepRunning = true; m.deepTimeState = .countdown(seconds: 1932)
+                m.deepActiveEntries = ["docs.google.com", "github.com"]; m.isDeepActiveAllowlist = true }),
+            ("35-deep-verifying", AppModel.preview { m in m.deepRunning = true; m.deepTimeState = .verifyingEnd }),
         ]
     }
 

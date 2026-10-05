@@ -3,6 +3,7 @@ import AppKit
 
 struct RestrictionsView: View {
     @EnvironmentObject var model: AppModel
+    var list: ListKind = .main
     @State private var input = ""
     @State private var error: String? = nil
     @State private var busy = false
@@ -11,18 +12,18 @@ struct RestrictionsView: View {
     @State private var importNote: String? = nil
     @State private var importNoteToken = 0
 
-    private var blocking: Bool { model.isBlockRunning }
+    private var blocking: Bool { model.listLocked(list) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.gap) {
             Card {
                 RadioRow(title: NSLocalizedString("Block these sites", comment: ""),
                          subtitle: NSLocalizedString("Everything else stays open", comment: ""),
-                         selected: !model.shownAllowlist, enabled: !blocking) { model.setAllowlist(false) }
+                         selected: !model.allowlist(list), enabled: !blocking) { model.setAllowlist(false, for: list) }
                 RowDivider()
                 RadioRow(title: NSLocalizedString("Allow only these sites", comment: ""),
                          subtitle: NSLocalizedString("Everything else is blocked", comment: ""),
-                         selected: model.shownAllowlist, enabled: !blocking) { model.setAllowlist(true) }
+                         selected: model.allowlist(list), enabled: !blocking) { model.setAllowlist(true, for: list) }
             }
 
             // Spec §6.2: shown disabled (not hidden) when the running block can't take additions.
@@ -45,12 +46,12 @@ struct RestrictionsView: View {
             Card {
                 ScrollView {
                     VStack(spacing: 0) {
-                        ForEach(Array(model.shownEntries.enumerated()), id: \.element) { index, entry in
+                        ForEach(Array(model.entries(list).enumerated()), id: \.element) { index, entry in
                             entryRow(entry)
-                            if index < model.shownEntries.count - 1 { RowDivider() }
+                            if index < model.entries(list).count - 1 { RowDivider() }
                         }
-                        if model.shownEntries.isEmpty {
-                            Text(model.shownAllowlist
+                        if model.entries(list).isEmpty {
+                            Text(model.allowlist(list)
                                  ? NSLocalizedString("Nothing allowed — every site will be blocked.", comment: "")
                                  : NSLocalizedString("No sites yet. Add one above.", comment: ""))
                                 .foregroundColor(Theme.sub).padding(14).frame(maxWidth: .infinity, alignment: .leading)
@@ -83,11 +84,11 @@ struct RestrictionsView: View {
                     }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 }
-                Button(NSLocalizedString("Export…", comment: "")) { (NSApp.delegate as? AppController)?.save(nil) }
+                Button(NSLocalizedString("Export…", comment: "")) { model.exportList(list) }
                     .buttonStyle(.plain).foregroundColor(Theme.sub).font(.system(size: 12))
                 Spacer()
-                Text(model.shownEntries.count == 1 ? NSLocalizedString("1 site", comment: "")
-                     : String(format: NSLocalizedString("%ld sites", comment: ""), model.shownEntries.count))
+                Text(model.entries(list).count == 1 ? NSLocalizedString("1 site", comment: "")
+                     : String(format: NSLocalizedString("%ld sites", comment: ""), model.entries(list).count))
                     .font(.system(size: 12)).foregroundColor(Theme.sub)
             }
             .padding(.horizontal, 2)
@@ -97,9 +98,13 @@ struct RestrictionsView: View {
         .padding(.top, 4)
     }
 
-    private var addAllowed: Bool { !blocking || model.canAddDuringBlock }
+    private var addAllowed: Bool { list == .main ? (!blocking || model.canAddDuringBlock) : !blocking }
 
     private var caption: String {
+        if list == .deep {
+            return blocking ? NSLocalizedString("Changes apply to your next deep block.", comment: "")
+                            : NSLocalizedString("The deep list is separate from your Restrictions.", comment: "")
+        }
         if !blocking { return NSLocalizedString("Entries cover their common subdomains (www. etc.) when that setting is on.", comment: "") }
         if model.isLegacyBlock { return NSLocalizedString("This block was started by an older version of SelfControl, so sites can’t be added to it.", comment: "") }
         if !model.isModernBlock { return NSLocalizedString("This block can’t be changed from here.", comment: "") }
@@ -117,7 +122,7 @@ struct RestrictionsView: View {
             if entry.contains("/") { Text(NSLocalizedString("IP range", comment: "")).font(.system(size: 11)).foregroundColor(Theme.sub) }
             if !blocking {
                 // Always reserve the button's 22pt slot so rows don't change height on hover.
-                Button { model.removeEditableEntry(entry) } label: {
+                Button { model.removeEntry(entry, from: list) } label: {
                     Image(systemName: "minus").font(.system(size: 9, weight: .bold))
                         .frame(width: 22, height: 22).background(Color(hex: 0x4A4A52)).clipShape(Circle())
                 }
@@ -134,7 +139,7 @@ struct RestrictionsView: View {
         .contentShape(Rectangle())   // hover/click anywhere on the row, including the empty middle
         .onHover { inside in hovered = inside ? entry : (hovered == entry ? nil : hovered) }
         .contextMenu {
-            if !blocking { Button(NSLocalizedString("Remove", comment: "")) { model.removeEditableEntry(entry) } }
+            if !blocking { Button(NSLocalizedString("Remove", comment: "")) { model.removeEntry(entry, from: list) } }
         }
     }
 
@@ -149,11 +154,11 @@ struct RestrictionsView: View {
         Button(NSLocalizedString("Incoming Mail Servers (Thunderbird)", comment: "")) { importList(HostImporter.incomingMailHostnamesFromThunderbird()) }
         Button(NSLocalizedString("Outgoing Mail Servers (Thunderbird)", comment: "")) { importList(HostImporter.outgoingMailHostnamesFromThunderbird()) }
         Divider()
-        Button(NSLocalizedString("From File…", comment: "")) { (NSApp.delegate as? AppController)?.open(nil) }
+        Button(NSLocalizedString("From File…", comment: "")) { model.importListFromFile(list) }
     }
 
     private func importList(_ hosts: [Any]?) {
-        let skipped = model.importHosts((hosts ?? []).compactMap { $0 as? String })
+        let skipped = model.importHosts((hosts ?? []).compactMap { $0 as? String }, to: list)
         importNoteToken += 1
         let token = importNoteToken
         importNote = HostValidity.skippedNote(count: skipped)
@@ -170,7 +175,7 @@ struct RestrictionsView: View {
         guard !text.isEmpty else { return }
         error = nil
         if !blocking {
-            if model.addEditableEntries(text) { input = "" }
+            if model.addEntries(text, to: list) { input = "" }
             else { error = NSLocalizedString("That doesn’t look like a site address.", comment: "") }
             return
         }

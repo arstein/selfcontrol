@@ -155,6 +155,15 @@ final class AppModel: ObservableObject {
     var canStartDeep: Bool { !deepRunning && !isAddingDeepBlock && (!deepEntries.isEmpty || isDeepAllowlist) }
     /// Overrides are unavailable for the whole deep block.
     var overridesBlockedByDeep: Bool { deepRunning }
+    /// Deep Block row subtitle on Ready and Blocking.
+    var deepRowSubtitle: String {
+        if deepRunning {
+            guard let secs = deepRemainingSeconds else { return NSLocalizedString("Running · verifying end time…", comment: "") }
+            let p = CountdownText.parts(seconds: secs)
+            return String(format: NSLocalizedString("Running · %@ left", comment: ""), [p.days, p.clock].compactMap { $0 }.joined(separator: " "))
+        }
+        return RestrictionsSummary.subtitle(entries: deepEntries, isAllowlist: isDeepAllowlist)
+    }
 
     func entries(_ list: ListKind) -> [String] { list == .main ? shownEntries : (deepRunning ? deepActiveEntries : deepEntries) }
     func allowlist(_ list: ListKind) -> Bool { list == .main ? shownAllowlist : (deepRunning ? isDeepActiveAllowlist : isDeepAllowlist) }
@@ -221,11 +230,11 @@ final class AppModel: ObservableObject {
         if wasDeep != deepRunning && wasRunning == isBlockRunning && !path.isEmpty && path.last != .emergencyUnlock {
             assign(\.path, [])
         }
-        if wasRunning != isBlockRunning {
-            if !isBlockRunning && tedium.blockRemoved {
+        if wasRunning != isBlockRunning || (wasDeep && !deepRunning && path.last == .emergencyUnlock && tedium.blockRemoved) {
+            if !isBlockRunning && !deepRunning && tedium.blockRemoved {
                 // let the "Block removed." state show briefly before resetting
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                    guard let self, !self.isBlockRunning else { return }
+                    guard let self, !self.isBlockRunning, !self.deepRunning else { return }
                     self.resetNavigation()
                 }
             } else {
@@ -237,7 +246,7 @@ final class AppModel: ObservableObject {
     private func resetNavigation() {
         assign(\.path, [])
         assign(\.sheet, nil)
-        if !isBlockRunning { assign(\.tedium, TediumState()) }
+        if !isBlockRunning && !deepRunning { assign(\.tedium, TediumState()) }
     }
 
     func reloadDefaults() {

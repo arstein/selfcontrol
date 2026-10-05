@@ -38,6 +38,7 @@
 		70E0BC5BC8C667E1F27070CB /* Pods_SelfControl_SelfControlTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C0C3522F0A52062B1A4A44A2 /* Pods_SelfControl_SelfControlTests.framework */; };
 		70EEA0FB5E10C843E1D8527D /* Pods_SelfControl.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B11FB9056B53F6FFE4C0F01C /* Pods_SelfControl.framework */; };
 		71520F6318ABCCA392060E63 /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
+		73DD63F5054D8641A7A07E1C /* DeepBlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E3AD1F11774089D1862B97 /* DeepBlockView.swift */; };
 		73DF6AEA0FE67BC9EFB97044 /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
 		74D12E81A81C616878E26EBF /* SCDeepBlockDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = C1A9B19987CDA0FF001D78E7 /* SCDeepBlockDecision.m */; };
 		76996DFFBBFE42891BC6C711 /* SCDeepBlockDecisionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 456D6495D72237672F8B902C /* SCDeepBlockDecisionTests.m */; };
@@ -637,6 +638,7 @@
 		949F9F8815B32EC6007B8B42 /* zh-Hans */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		949F9F8D15B333A1007B8B42 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		9988E4646DE67C808EAAEB2C /* SCDialog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SCDialog.swift; sourceTree = "<group>"; };
+		A7E3AD1F11774089D1862B97 /* DeepBlockView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeepBlockView.swift; sourceTree = "<group>"; };
 		AB08B8166109BB41FB60297D /* SCMinutesValueTransformer.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCMinutesValueTransformer.m; sourceTree = "<group>"; };
 		AFFB44E1661C4F0D19201EAE /* SelfControl-Bridging-Header.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "SelfControl-Bridging-Header.h"; sourceTree = "<group>"; };
 		B11FB9056B53F6FFE4C0F01C /* Pods_SelfControl.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SelfControl.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1708,6 +1710,7 @@
 				0E40DB90D392659CD8444EFC /* EmergencyUnlockView.swift */,
 				275DAEC954CBFC5808FEC632 /* SnapshotRenderer.swift */,
 				9988E4646DE67C808EAAEB2C /* SCDialog.swift */,
+				A7E3AD1F11774089D1862B97 /* DeepBlockView.swift */,
 			);
 			name = UI;
 			path = UI;
@@ -3819,6 +3822,7 @@
 				8E08C2790832EE667C1E5AC2 /* SCDialog.swift in Sources */,
 				74D12E81A81C616878E26EBF /* SCDeepBlockDecision.m in Sources */,
 				2FD1E2F18DE487DBD0B0E4E3 /* SCRuleCompiler.m in Sources */,
+				73DD63F5054D8641A7A07E1C /* DeepBlockView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
