@@ -51,6 +51,14 @@ NSString* const SCLayerDeep = @"deep";
     return YES;
 }
 
++ (BOOL)recordListIsUsable:(NSDictionary*)record {
+    if (![record isKindOfClass:[NSDictionary class]]) return NO;
+    NSArray* list = record[@"blocklist"];
+    if (![list isKindOfClass:[NSArray class]] || ![record[@"isAllowlist"] isKindOfClass:[NSNumber class]]) return NO;
+    for (id entry in list) if (![entry isKindOfClass:[NSString class]]) return NO;
+    return YES;
+}
+
 static NSDictionary<NSString*, NSString*>* SCDeepTimingKeyMap(void) {
     // regular-block settings key -> deep record key
     return @{@"BlockStartWall": @"startWall",

@@ -29,9 +29,16 @@ static BOOL SCDeepOption(NSDictionary* deep, NSString* key, BOOL failClosedDefau
     NSDictionary* payload = nil;
     if ([name isEqualToString: SCLayerDeep]) {
         NSDictionary* deep = [SCBlockUtilities deepBlockRecord];
+        if (deep != nil && ![SCDeepBlockDecision recordListIsUsable: deep]) {
+            // A record whose list or mode has the wrong type can't say what to
+            // enforce (and a guessed mode could relax it): treat it as unusable.
+            NSLog(@"WARNING: Deep block record has an unusable blocklist/isAllowlist; using the installed payload.");
+            deep = nil;
+        }
         if (deep == nil) {
-            // Record tampered away but the layer is installed: keep enforcing the
-            // installed list (from the anchor payload) until the heal path rebuilds it.
+            // Record tampered away (or unusable) but the layer is installed: keep
+            // enforcing the installed list (from the anchor payload) until the heal
+            // path rebuilds it. The payload parser validates the same types.
             deep = [SCRuleCompiler deepPayloadFromAnchorText: installedAnchor];
             if (deep == nil) return nil;   // can't rebuild: caller must not touch the rules
         }

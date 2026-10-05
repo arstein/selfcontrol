@@ -33,6 +33,10 @@ typedef NS_ENUM(NSInteger, SCDeepAction) {
 /// YES when the record has a finite duration in (0, SC_DEEP_MAX_SECS], a non-empty clock
 /// state, and (if startIsVerified) a usable startWall.
 + (BOOL)recordTimingIsComplete:(nullable NSDictionary*)record;
+/// YES when the record's list can be enforced as stored: "blocklist" is an array of
+/// strings and "isAllowlist" is an NSNumber. A record failing this is unusable for
+/// building rules (callers fall back to the anchor payload, else hold).
++ (BOOL)recordListIsUsable:(nullable NSDictionary*)record;
 /// The record's timing in the regular block's settings-key shape, so the
 /// existing trusted-timing functions apply unchanged.
 + (NSDictionary*)timingSnapshotForRecord:(nullable id)record;

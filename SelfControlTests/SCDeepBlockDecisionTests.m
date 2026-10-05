@@ -181,4 +181,17 @@ static NSMutableDictionary* CompleteRecord(void) {
     XCTAssertEqualObjects(on[@"emergencyUnlockEnabled"], @YES);
 }
 
+- (void)testRecordListIsUsable {
+    XCTAssertTrue([SCDeepBlockDecision recordListIsUsable:(@{@"blocklist": @[@"a.com"], @"isAllowlist": @NO})]);
+    XCTAssertTrue([SCDeepBlockDecision recordListIsUsable:(@{@"blocklist": @[], @"isAllowlist": @YES})]);
+    XCTAssertFalse([SCDeepBlockDecision recordListIsUsable:nil]);
+    XCTAssertFalse([SCDeepBlockDecision recordListIsUsable:(id)@"x"]);
+    XCTAssertFalse([SCDeepBlockDecision recordListIsUsable:(@{@"isAllowlist": @NO})]);
+    XCTAssertFalse([SCDeepBlockDecision recordListIsUsable:(@{@"blocklist": @"a.com", @"isAllowlist": @NO})]);
+    XCTAssertFalse([SCDeepBlockDecision recordListIsUsable:(@{@"blocklist": @[@"a.com", @3], @"isAllowlist": @NO})]);
+    XCTAssertFalse([SCDeepBlockDecision recordListIsUsable:(@{@"blocklist": @[@"a.com"]})]);
+    XCTAssertFalse([SCDeepBlockDecision recordListIsUsable:(@{@"blocklist": @[@"a.com"], @"isAllowlist": @"NO"})]);
+    XCTAssertFalse([SCDeepBlockDecision recordListIsUsable:(@{@"blocklist": @[@"a.com"], @"isAllowlist": @[]})]);
+}
+
 @end
