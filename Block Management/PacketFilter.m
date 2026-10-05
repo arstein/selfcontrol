@@ -11,6 +11,7 @@
 NSString* const kPfctlExecutablePath = @"/sbin/pfctl";
 NSString* const kPFConfPath = @"/etc/pf.conf";
 NSString* const kPFAnchorCommand = @"anchor \"org.eyebeam\"";
+NSString* const kPFAnchorPath = @"/etc/pf.anchors/org.eyebeam";
 
 @implementation PacketFilter
 
@@ -216,39 +217,90 @@ NSFileHandle* appendFileHandle;
 
 	return [task terminationStatus];
 }
-// Writes the whole anchor and (re)loads pf. Releases our previous enable
-// reference first so repeated installs never leak pf enable references.
-- (int)installAnchorText:(NSString*)anchorText {
-	[self addSelfControlConfig];
-	[anchorText writeToFile: @"/etc/pf.anchors/org.eyebeam" atomically: true encoding: NSUTF8StringEncoding error: nil];
-
-	NSString* oldToken = [self readPFToken: nil];
-	if ([oldToken length]) {
-		NSString* trimmed = [oldToken stringByTrimmingCharactersInSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]];
-		NSTask* release = [NSTask launchedTaskWithLaunchPath: kPfctlExecutablePath arguments: @[@"-X", trimmed]];
-		[release waitUntilExit];
-	}
-
+// Runs pfctl with the given arguments, capturing combined stdout/stderr.
+- (int)runPfctl:(NSArray<NSString*>*)args output:(NSString**)outOutput {
 	NSTask* task = [[NSTask alloc] init];
 	[task setLaunchPath: kPfctlExecutablePath];
-	[task setArguments: @[@"-E", @"-f", @"/etc/pf.conf", @"-F", @"states"]];
+	[task setArguments: args];
 	NSPipe* inPipe = [[NSPipe alloc] init];
 	NSFileHandle* readHandle = [inPipe fileHandleForReading];
 	[task setStandardOutput: inPipe];
 	[task setStandardError: inPipe];
 	[task launch];
-	NSString* pfctlOutput = [[NSString alloc] initWithData: [readHandle readDataToEndOfFile] encoding: NSUTF8StringEncoding];
+	NSString* output = [[NSString alloc] initWithData: [readHandle readDataToEndOfFile] encoding: NSUTF8StringEncoding];
 	[readHandle closeFile];
 	[task waitUntilExit];
+	if (outOutput != NULL) *outOutput = output ?: @"";
+	return [task terminationStatus];
+}
 
+// Writes the whole anchor and (re)loads pf. Fail-closed: pf is never disabled
+// here, and any failure puts back exactly what was enforced before.
+//  1. Parse-check the text (pfctl -n) before touching /etc at all.
+//  2. Load it with a fresh enable reference (-E).
+//  3. Only after a successful load is the previous enable reference released,
+//     so there is never a moment with zero references (pf would turn off).
+//  4. On failure the previous anchor (and pf.conf, if we added our lines in
+//     this attempt) is restored and reloaded without -E; the old reference stays.
+- (int)installAnchorText:(NSString*)anchorText {
+	NSString* tmpPath = [NSTemporaryDirectory() stringByAppendingPathComponent:
+	                     [NSString stringWithFormat: @"sc-anchor-%@.conf", NSUUID.UUID.UUIDString]];
+	if (![anchorText writeToFile: tmpPath atomically: YES encoding: NSUTF8StringEncoding error: nil]) {
+		NSLog(@"ERROR: Couldn't write SelfControl rules to a temp file for validation; leaving pf untouched.");
+		return 1;
+	}
+	NSString* checkOutput = nil;
+	int checkStatus = [self runPfctl: @[@"-n", @"-a", @"org.eyebeam", @"-f", tmpPath] output: &checkOutput];
+	[[NSFileManager defaultManager] removeItemAtPath: tmpPath error: nil];
+	if (checkStatus != 0) {
+		NSLog(@"ERROR: pfctl rejected SelfControl rules; leaving pf untouched: %@", checkOutput);
+		return checkStatus;
+	}
+
+	NSString* previousAnchor = [NSString stringWithContentsOfFile: kPFAnchorPath encoding: NSUTF8StringEncoding error: nil];
+	NSString* oldToken = [[self readPFToken: nil] stringByTrimmingCharactersInSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+	BOOL confHadAnchor = [self containsSelfControlBlock];
+
+	[self addSelfControlConfig];
+	BOOL wroteAnchor = [anchorText writeToFile: kPFAnchorPath atomically: YES encoding: NSUTF8StringEncoding error: nil];
+	NSString* pfctlOutput = @"";
+	int status = wroteAnchor ? [self runPfctl: @[@"-E", @"-f", kPFConfPath, @"-F", @"states"] output: &pfctlOutput] : 1;
+	NSString* newToken = nil;
 	for (NSString* line in [pfctlOutput componentsSeparatedByString: @"\n"]) {
 		if ([line hasPrefix: @"Token : "]) {
-			[self writePFToken: [line substringFromIndex: [@"Token : " length]] error: nil];
+			newToken = [[line substringFromIndex: [@"Token : " length]] stringByTrimmingCharactersInSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]];
 			break;
 		}
 	}
-	if ([task terminationStatus] != 0) NSLog(@"ERROR: pfctl failed to load SelfControl rules: %@", pfctlOutput);
-	return [task terminationStatus];
+
+	if (status == 0) {
+		if ([newToken length]) {
+			[self writePFToken: newToken error: nil];
+			if ([oldToken length] && ![oldToken isEqualToString: newToken]) {
+				[self runPfctl: @[@"-X", oldToken] output: nil];
+			}
+		} else {
+			// The rules are loaded; keep them (rolling back would relax enforcement)
+			// and keep whatever reference we already hold.
+			NSLog(@"WARNING: pfctl loaded SelfControl rules but printed no enable token: %@", pfctlOutput);
+		}
+		return 0;
+	}
+
+	NSLog(@"ERROR: pfctl failed to load SelfControl rules (status %d); restoring previous rules: %@", status, pfctlOutput);
+	if (!wroteAnchor) NSLog(@"ERROR: Couldn't write %@", kPFAnchorPath);
+	// A reference taken by this failed attempt would otherwise leak; the old one stays.
+	if ([newToken length] && ![newToken isEqualToString: oldToken]) {
+		[self runPfctl: @[@"-X", newToken] output: nil];
+	}
+	[(previousAnchor ?: @"") writeToFile: kPFAnchorPath atomically: YES encoding: NSUTF8StringEncoding error: nil];
+	// Our pf.conf lines were added by this attempt: take them out again, so the
+	// checkup sees no rules installed and retries the install.
+	if (!confHadAnchor) [self removeSelfControlConfig];
+	NSString* reloadOutput = nil;
+	int reloadStatus = [self runPfctl: @[@"-f", kPFConfPath] output: &reloadOutput];
+	if (reloadStatus != 0) NSLog(@"ERROR: pfctl failed to reload the previous rules (status %d): %@", reloadStatus, reloadOutput);
+	return status;
 }
 
 - (int)refreshPFRules {
@@ -270,12 +322,10 @@ NSFileHandle* appendFileHandle;
 	return [NSString stringWithContentsOfFile: @"/etc/SelfControlPFToken" encoding: NSUTF8StringEncoding error: error];
 }
 
-- (int)stopBlock:(BOOL)force {
-	NSError* err;
-	NSString* token = [self readPFToken: &err];
-
-	[@"" writeToFile: @"/etc/pf.anchors/org.eyebeam" atomically: true encoding: NSUTF8StringEncoding error: nil];
-	NSString* mainConf = [NSString stringWithContentsOfFile: @"/etc/pf.conf" encoding: NSUTF8StringEncoding error: nil];
+// Strips every org.eyebeam line from /etc/pf.conf (file only; no reload).
+- (void)removeSelfControlConfig {
+	NSString* mainConf = [NSString stringWithContentsOfFile: kPFConfPath encoding: NSUTF8StringEncoding error: nil];
+	if (mainConf == nil) return;   // never replace an unreadable pf.conf with an empty one
 	NSArray* lines = [mainConf componentsSeparatedByString: @"\n"];
 	NSMutableString* newConf = [NSMutableString stringWithCapacity: [mainConf length]];
 	for (NSString* line in lines) {
@@ -285,18 +335,27 @@ NSFileHandle* appendFileHandle;
 	}
 	newConf = [[newConf stringByTrimmingCharactersInSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]] mutableCopy];
 	[newConf appendString: @"\n"];
-	[newConf writeToFile: @"/etc/pf.conf" atomically: true encoding: NSUTF8StringEncoding error: nil];
+	[newConf writeToFile: kPFConfPath atomically: true encoding: NSUTF8StringEncoding error: nil];
+}
 
-	NSString* commandString;
+- (int)stopBlock:(BOOL)force {
+	NSError* err;
+	NSString* token = [[self readPFToken: &err] stringByTrimmingCharactersInSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+
+	[@"" writeToFile: kPFAnchorPath atomically: true encoding: NSUTF8StringEncoding error: nil];
+	[self removeSelfControlConfig];
+
+	NSArray* args;
 	if ([token length] && !force) {
-		commandString = [NSString stringWithFormat: @"-X %@ -f /etc/pf.conf", token];
+		args = @[@"-X", token, @"-f", kPFConfPath];
 	} else {
-		commandString = @"-d -f /etc/pf.conf";
+		args = @[@"-d", @"-f", kPFConfPath];
 	}
-	NSArray* args = [commandString componentsSeparatedByString: @" "];
 
 	NSTask* task = [NSTask launchedTaskWithLaunchPath: kPfctlExecutablePath arguments: args];
 	[task waitUntilExit];
+	// The reference is released (or pf force-disabled): never release this token again.
+	[[NSFileManager defaultManager] removeItemAtPath: @"/etc/SelfControlPFToken" error: nil];
 	return [task terminationStatus];
 }
 
