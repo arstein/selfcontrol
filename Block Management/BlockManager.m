@@ -128,12 +128,26 @@ BOOL appendMode = NO;
 	[pf startBlock];
 }
 
++ (BOOL)isSinkholeAddress:(NSString*)ip maskLen:(NSInteger)maskLen {
+    if (![ip isKindOfClass: [NSString class]] || ![@[@"0.0.0.0", @"::", @"127.0.0.1", @"::1"] containsObject: ip]) return NO;
+    NSInteger fullLen = [ip containsString: @":"] ? 128 : 32;
+    return maskLen == 0 || maskLen == fullLen;
+}
+
 - (void)emitIP:(NSString*)ip port:(NSInteger)port maskLen:(NSInteger)maskLen {
     // While a blocklist block runs, /etc/hosts maps blocked domains to 0.0.0.0 / ::
     // and CFHost honors /etc/hosts, so re-resolving returns our own sinkhole
     // addresses. They are never real destinations (and loopback always passes
-    // anyway), so drop them in every mode.
-    if (ip != nil && [@[@"0.0.0.0", @"::", @"127.0.0.1", @"::1"] containsObject: ip]) return;
+    // anyway), so drop them in every mode - but only as single hosts (no mask, or
+    // the full /32 or /128). A range a user typed, like 0.0.0.0/1, is kept.
+    //
+    // Known gap (documented, not fixed): a domain listed in two blocklist layers
+    // is resolved for the second layer while the first layer's hosts sinkhole is
+    // already active, so the second resolution only sees these sinkhole addresses
+    // and that layer's pf rules lack the domain's real IPs. /etc/hosts still
+    // blocks the domain, and the tighten-only union keeps any IPs a layer already
+    // had in the installed anchor.
+    if ([BlockManager isSinkholeAddress: ip maskLen: maskLen]) return;
     if (collectedSpecs != nil) {
         @synchronized (collectedSpecs) {
             [collectedSpecs addObject:[SCRuleCompiler specWithIP:ip maskLen:maskLen port:port]];

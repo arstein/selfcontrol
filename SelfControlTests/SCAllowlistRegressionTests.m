@@ -23,6 +23,22 @@
     XCTAssertEqual(status, 0, @"pfctl rejected the allowlist anchor: %@", output);
 }
 
+// Sinkhole addresses (what /etc/hosts maps blocked domains to) are dropped only
+// as single hosts; a range the user typed that starts at one is kept.
+- (void)testSinkholeDropKeepsRanges {
+    XCTAssertTrue([BlockManager isSinkholeAddress: @"0.0.0.0" maskLen: 0]);
+    XCTAssertTrue([BlockManager isSinkholeAddress: @"0.0.0.0" maskLen: 32]);
+    XCTAssertTrue([BlockManager isSinkholeAddress: @"::" maskLen: 0]);
+    XCTAssertTrue([BlockManager isSinkholeAddress: @"::" maskLen: 128]);
+    XCTAssertTrue([BlockManager isSinkholeAddress: @"127.0.0.1" maskLen: 0]);
+    XCTAssertTrue([BlockManager isSinkholeAddress: @"::1" maskLen: 128]);
+    XCTAssertFalse([BlockManager isSinkholeAddress: @"0.0.0.0" maskLen: 1]);
+    XCTAssertFalse([BlockManager isSinkholeAddress: @"::" maskLen: 1]);
+    XCTAssertFalse([BlockManager isSinkholeAddress: @"0.0.0.0" maskLen: 128]);
+    XCTAssertFalse([BlockManager isSinkholeAddress: @"93.184.216.34" maskLen: 0]);
+    XCTAssertFalse([BlockManager isSinkholeAddress: nil maskLen: 0]);
+}
+
 - (void)testPlainAllowlistIsAcceptedByPF {
     PacketFilter* pf = [[PacketFilter alloc] initAsAllowlist: YES];
     [pf addRuleWithIP: @"93.184.216.34" port: 0 maskLen: 0];

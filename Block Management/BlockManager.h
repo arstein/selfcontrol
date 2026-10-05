@@ -41,6 +41,10 @@
 	NSMutableOrderedSet<NSString*>* collectedDomains;
 }
 
+// YES for our own hosts-sinkhole / loopback addresses (0.0.0.0, ::, 127.0.0.1,
+// ::1) as single hosts (no mask, /32 or /128); a range like 0.0.0.0/1 is not one.
++ (BOOL)isSinkholeAddress:(NSString*)ip maskLen:(NSInteger)maskLen;
+
 - (BlockManager*)initAsAllowlist:(BOOL)allowlist;
 - (BlockManager*)initAsAllowlist:(BOOL)allowlist allowLocal:(BOOL)local;
 - (BlockManager*)initAsAllowlist:(BOOL)allowlist allowLocal:(BOOL)local includeCommonSubdomains:(BOOL)blockCommon;
