@@ -20,6 +20,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)getVersion:(void(^)(NSString* version, NSError* error))reply;
 - (void)startBlockWithControllingUID:(uid_t)controllingUID blocklist:(NSArray<NSString*>*)blocklist isAllowlist:(BOOL)isAllowlist endDate:(NSDate*)endDate blockSettings:(NSDictionary*)blockSettings reply:(void(^)(NSError* error))reply;
+- (void)startDeepBlockWithBlocklist:(NSArray<NSString*>*)blocklist isAllowlist:(BOOL)isAllowlist durationSecs:(double)durationSecs blockSettings:(NSDictionary*)blockSettings reply:(void(^)(NSError* _Nullable error))reply;
 - (void)updateBlocklist:(NSArray<NSString*>*)newBlocklist reply:(void(^)(NSError* error))reply;
 - (void)updateBlockEndDate:(NSDate*)newEndDate reply:(void(^)(NSError* error))reply;
 - (void)startTediumChallenge:(void(^)(NSInteger digit, NSInteger progress, NSInteger requiredEntries, NSError* _Nullable error))reply;

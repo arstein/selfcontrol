@@ -293,6 +293,26 @@
     }];
 }
 
+- (void)startDeepBlockWithBlocklist:(NSArray<NSString*>*)blocklist isAllowlist:(BOOL)isAllowlist durationSecs:(double)durationSecs blockSettings:(NSDictionary*)blockSettings reply:(void(^)(NSError* _Nullable error))reply {
+    [self connectAndExecuteCommandBlock:^(NSError * connectError) {
+        if (connectError != nil) {
+            [SCSentry captureError: connectError];
+            reply(connectError);
+        } else {
+            [[self.daemonConnection remoteObjectProxyWithErrorHandler:^(NSError * proxyError) {
+                [SCSentry captureError: proxyError];
+                reply(proxyError);
+            }] startDeepBlockWithBlocklist: blocklist isAllowlist: isAllowlist durationSecs: durationSecs blockSettings: blockSettings authorization: self.authorization reply:^(NSError* error) {
+                if (error != nil && ![SCMiscUtilities errorIsAuthCanceled: error]) {
+                    NSLog(@"Start deep block failed with error = %@\n", error);
+                    [SCSentry captureError: error];
+                }
+                reply(error);
+            }];
+        }
+    }];
+}
+
 - (void)startBlockWithControllingUID:(uid_t)controllingUID blocklist:(NSArray<NSString*>*)blocklist isAllowlist:(BOOL)isAllowlist endDate:(NSDate*)endDate blockSettings:(NSDictionary*)blockSettings reply:(void(^)(NSError* error))reply {
     [self connectAndExecuteCommandBlock:^(NSError * connectError) {
         if (connectError != nil) {

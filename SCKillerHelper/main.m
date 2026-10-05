@@ -19,6 +19,7 @@
 #import "SCSentry.h"
 #import "SCSNTPClient.h"
 #import "SCBlockUtilities.h"
+#import "SCDeepBlockDecision.h"
 
 #define LOG_FILE @"~/Documents/SelfControl-Killer.log"
 
@@ -130,8 +131,10 @@ int main(int argc, char* argv[]) {
         // same decision the daemon makes (an unverified start is corrected to
         // verifiedNow - monotonic elapsed, so a block started offline becomes
         // clearable once its full duration has truly elapsed).
-        if ([settings boolForKey:@"BlockIsRunning"] &&
-            [[settings valueForKey:@"TrustedClockState"] count] > 0) {
+        BOOL baseNeedsProof = [settings boolForKey:@"BlockIsRunning"] &&
+            [[settings valueForKey:@"TrustedClockState"] count] > 0;
+        NSDictionary* deepRecord = [SCBlockUtilities deepBlockRecord];
+        if (baseNeedsProof || deepRecord != nil) {
             NSString* refusal = nil;
             NSDictionary* readingAtResponse = nil;
             NSDate* verifiedNow = [SCSNTPClient fetchNetworkTimeWithTimeout:3.0
@@ -139,16 +142,30 @@ int main(int argc, char* argv[]) {
             if (verifiedNow == nil) {
                 refusal = @"network time could not be reached";
             } else {
-                NSDictionary* decision = [SCBlockUtilities
-                    trustedTimingDecisionForSettings:[SCBlockUtilities trustedTimingSettingsSnapshot]
-                                         verifiedNow:verifiedNow
-                                             reading:readingAtResponse];
-                if (decision == nil) {
-                    refusal = @"the active block's trusted-timing state is incomplete";
-                } else if (![decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
-                    refusal = @"network time does not confirm the block has expired";
-                } else {
-                    [log appendFormat:@"Network time %@ confirms the block has expired.\n\n", verifiedNow];
+                if (baseNeedsProof) {
+                    NSDictionary* decision = [SCBlockUtilities
+                        trustedTimingDecisionForSettings:[SCBlockUtilities trustedTimingSettingsSnapshot]
+                                             verifiedNow:verifiedNow
+                                                 reading:readingAtResponse];
+                    if (decision == nil) {
+                        refusal = @"the active block's trusted-timing state is incomplete";
+                    } else if (![decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
+                        refusal = @"network time does not confirm the block has expired";
+                    }
+                }
+                if (refusal == nil && deepRecord != nil) {
+                    NSDictionary* decision = [SCBlockUtilities
+                        trustedTimingDecisionForSettings:[SCDeepBlockDecision timingSnapshotForRecord:deepRecord]
+                                             verifiedNow:verifiedNow
+                                                 reading:readingAtResponse];
+                    if (decision == nil) {
+                        refusal = @"the deep block's trusted-timing state is incomplete";
+                    } else if (![decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
+                        refusal = @"network time does not confirm the deep block has expired";
+                    }
+                }
+                if (refusal == nil) {
+                    [log appendFormat:@"Network time %@ confirms the block(s) have expired.\n\n", verifiedNow];
                 }
             }
 

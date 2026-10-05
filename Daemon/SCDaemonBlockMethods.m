@@ -291,6 +291,82 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     [self.daemonMethodLock unlock];
 }
 
++ (void)startDeepBlockWithBlocklist:(NSArray<NSString*>*)blocklist isAllowlist:(BOOL)isAllowlist durationSecs:(double)durationSecs blockSettings:(NSDictionary*)blockSettings reply:(void(^)(NSError* error))reply {
+    if (![SCDaemonBlockMethods lockOrTimeout: reply]) return;
+    [[SCDaemon sharedDaemon] resetInactivityTimer];
+    [SCSentry addBreadcrumb: @"Daemon method startDeepBlock called" category: @"daemon"];
+
+    NSError* err = nil;
+    NSArray<NSString*>* filtered = [SCBlockUtilities blocklistByRemovingTimeSources: blocklist ?: @[]];
+    NSDictionary* reading = [SCTrustedClock currentReading];
+    if ([SCBlockUtilities deepBlockIsRunning]) err = [SCErr errorWithCode: 325];
+    else if (![SCDeepBlockDecision durationSecsIsValid: durationSecs]) err = [SCErr errorWithCode: 326];
+    else if (filtered.count == 0 && !isAllowlist) err = [SCErr errorWithCode: 302];
+    else if (reading[@"wall"] == nil) err = [SCErr errorWithCode: 327];
+    if (err != nil) {
+        reply(err);
+        [self.daemonMethodLock unlock];
+        return;
+    }
+
+    SCSettings* settings = [SCSettings sharedSettings];
+    NSMutableDictionary* record = [@{
+        @"blocklist": filtered,
+        @"isAllowlist": @(isAllowlist),
+        @"durationSecs": @(durationSecs),
+        @"startWall": reading[@"wall"],
+        @"startIsVerified": @NO,
+        @"needsVerification": @YES,
+        @"clockState": [SCTrustedClock freshStateWithReading: reading],
+        @"allowLocal": @([blockSettings[@"AllowLocalNetworks"] boolValue]),
+        @"evaluateCommonSubdomains": @([blockSettings[@"EvaluateCommonSubdomains"] boolValue]),
+        @"includeLinkedDomains": @([blockSettings[@"IncludeLinkedDomains"] boolValue]),
+    } mutableCopy];
+    if (blockSettings[@"EmergencyUnlockEnabled"] != nil) record[@"emergencyUnlockEnabled"] = blockSettings[@"EmergencyUnlockEnabled"];
+    [settings setValue: record forKey: @"DeepBlock"];
+
+    // Overrides are off for the whole deep block: end one that's running now.
+    id originalOverrideState = [settings valueForKey: @"OverrideState"];
+    BOOL overrideEnded = NO;
+    if ([originalOverrideState isKindOfClass: [NSDictionary class]] && originalOverrideState[@"overrideEndDate"] != nil) {
+        NSMutableDictionary* ended = [originalOverrideState mutableCopy];
+        [ended removeObjectForKey: @"overrideEndDate"];
+        [settings setValue: ended forKey: @"OverrideState"];
+        overrideEnded = YES;
+        NSLog(@"INFO: Deep block starting; ending the active override.");
+    }
+
+    // Derives base (if running) + deep. Starts always run: not throttled.
+    if (![SCHelperToolUtilities installBlockRulesFromSettings]) {
+        // A start that didn't install must not leave a record behind.
+        NSLog(@"ERROR: Installing the deep block's rules failed; not starting it.");
+        [SCBlockUtilities removeDeepBlockFromSettings];
+        if (overrideEnded) [settings setValue: originalOverrideState forKey: @"OverrideState"];
+        NSError* syncErr = [settings syncSettingsAndWait: 5];
+        if (syncErr != nil) NSLog(@"WARNING: Sync failed after rolling back deep block start: %@", syncErr);
+        [SCSentry addBreadcrumb: @"Daemon failed to install deep block rules at start" category: @"daemon"];
+        err = [SCErr errorWithCode: 327];
+        reply(err);
+        [[SCDaemon sharedDaemon] resetInactivityTimer];
+        [self.daemonMethodLock unlock];
+        return;
+    }
+    [SCDaemonBlockMethods resetInstallBackoff];
+    [SCDaemonBlockMethods invalidateTediumChallenge];
+
+    NSError* syncErr = [settings syncSettingsAndWait: 5];
+    if (syncErr != nil) NSLog(@"WARNING: Sync failed after starting deep block: %@", syncErr);
+    [SCHelperToolUtilities sendConfigurationChangedNotification];
+    if ([blockSettings[@"ClearCaches"] boolValue]) [SCHelperToolUtilities clearBrowserCaches];
+
+    NSLog(@"INFO: Deep block started (%.0fs, %@).", durationSecs, isAllowlist ? @"allowlist" : @"blocklist");
+    reply(nil);
+    [[SCDaemon sharedDaemon] resetInactivityTimer];
+    [[SCDaemon sharedDaemon] startCheckupTimer];
+    [self.daemonMethodLock unlock];
+    [SCDaemonBlockMethods requestVerifiedTime];
+}
+
 + (void)updateBlocklist:(NSArray<NSString*>*)newBlocklist authorization:(NSData *)authData reply:(void(^)(NSError* error))reply {
     if (![SCDaemonBlockMethods lockOrTimeout: reply]) {
         return;
@@ -640,11 +716,16 @@ static NSTimeInterval sInstallBackoffSecs = 0;
         }
         case SCEnforcementActionSeekVerifiedExpiry: {
             // Trusted-expired: ask for verified time. handleVerifiedTime remains
-            // the ONLY place expiry removes rules. No integrity check (about to remove).
+            // the ONLY place expiry removes rules. While waiting (e.g. offline) pf may
+            // be disabled or flushed, so the integrity check (add-only) still runs.
             [[SCBlockEndVerifier sharedVerifier]
                 requestVerificationWithCompletion:^(NSDate* verifiedNow, NSDictionary* reading, NSUInteger generation) {
                     [SCDaemonBlockMethods handleVerifiedTime:verifiedNow reading:reading generation:generation];
                 }];
+            if ([[NSDate date] timeIntervalSinceDate:lastBlockIntegrityCheck] > integrityCheckIntervalSecs) {
+                lastBlockIntegrityCheck = [NSDate date];
+                shouldRunIntegrityCheck = YES;
+            }
             break;
         }
         case SCEnforcementActionSeekVerifiedStart: {
@@ -733,7 +814,7 @@ static NSTimeInterval sInstallBackoffSecs = 0;
             break;
     }
     // Integrity also covers a deep-only block (it only ever adds rules).
-    if ((deepAction == SCDeepActionSteady || deepAction == SCDeepActionSeekVerifiedStart || deepAction == SCDeepActionHeal) &&
+    if ((deepAction == SCDeepActionSteady || deepAction == SCDeepActionSeekVerifiedStart || deepAction == SCDeepActionSeekVerifiedExpiry || deepAction == SCDeepActionHeal) &&
         [[NSDate date] timeIntervalSinceDate:lastBlockIntegrityCheck] > integrityCheckIntervalSecs) {
         lastBlockIntegrityCheck = [NSDate date];
         shouldRunIntegrityCheck = YES;
@@ -1139,12 +1220,12 @@ static NSTimeInterval sInstallBackoffSecs = 0;
         reply(0, 0, 0, [SCErr errorWithCode: 320]); // busy; app may retry
         return;
     }
-    if (![SCBlockUtilities modernBlockIsRunning]) {
+    if (![SCBlockUtilities modernBlockIsRunning] && ![SCBlockUtilities deepBlockIsRunning]) {
         [self.daemonMethodLock unlock];
         reply(0, 0, 0, [SCErr errorWithCode: 321]); // no block to override
         return;
     }
-    if (![SCBlockUtilities emergencyUnlockAllowedForSettingsValue: [[SCSettings sharedSettings] valueForKey: @"EmergencyUnlockEnabled"]]) {
+    if (![SCBlockUtilities emergencyUnlockAllowedForCurrentBlocks]) {
         tediumChallenge = nil;
         [self.daemonMethodLock unlock];
         reply(0, 0, 0, [SCErr errorWithCode: 324]); // turned off for this block
@@ -1165,14 +1246,14 @@ static NSTimeInterval sInstallBackoffSecs = 0;
         reply(0, 0, 0, NO, [SCErr errorWithCode: 320]);
         return;
     }
-    if (![SCBlockUtilities modernBlockIsRunning]) {
+    if (![SCBlockUtilities modernBlockIsRunning] && ![SCBlockUtilities deepBlockIsRunning]) {
         // The block is actually gone (removed, expired, or never modern).
         tediumChallenge = nil;
         [self.daemonMethodLock unlock];
         reply(0, 0, 0, NO, [SCErr errorWithCode: 322]); // no active challenge/block
         return;
     }
-    if (![SCBlockUtilities emergencyUnlockAllowedForSettingsValue: [[SCSettings sharedSettings] valueForKey: @"EmergencyUnlockEnabled"]]) {
+    if (![SCBlockUtilities emergencyUnlockAllowedForCurrentBlocks]) {
         tediumChallenge = nil;
         [self.daemonMethodLock unlock];
         reply(0, 0, 0, NO, [SCErr errorWithCode: 324]); // turned off for this block
@@ -1195,7 +1276,7 @@ static NSTimeInterval sInstallBackoffSecs = 0;
 
     if (outcome == SCTediumSubmitComplete) {
         NSLog(@"INFO: Tedium override completed (%ld entries); removing block.", (long)progress);
-        if ([SCHelperToolUtilities removeBlock]) {
+        if ([SCHelperToolUtilities removeAllBlocks]) {
             [SCSentry addBreadcrumb: @"Block removed via tedium override" category: @"daemon"];
             [[SCBlockEndVerifier sharedVerifier] reset];
             [SCDaemonBlockMethods stopCheckupTimerIfIdle];
@@ -1242,12 +1323,11 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     return gate;
 }
 
-// Reads the Phase 5 deep-block guard (DeepBlock key absent today => not active).
+// Phase 5: a deep block's presence alone denies overrides (fail-closed; its
+// expiry is a verified transition that deletes the record). deepShouldEnforce
+// also counts an installed deep layer, so a tampered-away record still denies.
 + (BOOL)deepBlockActiveInSettings:(SCSettings*)settings trustedNow:(NSDate*)trustedNow clockAnchored:(BOOL)clockAnchored {
-    NSDictionary* deep = [settings valueForKey:@"DeepBlock"];
-    if (![deep isKindOfClass:[NSDictionary class]]) return NO;
-    id de = deep[@"endDate"];
-    return [de isKindOfClass:[NSDate class]] && trustedNow != nil && clockAnchored && [trustedNow compare:de] == NSOrderedAscending;
+    return [SCHelperToolUtilities deepShouldEnforce];
 }
 
 + (void)invokeOverrideWithReply:(void(^)(NSInteger remainingAfter, NSDate* _Nullable overrideEndDate, NSError* _Nullable error))reply {
