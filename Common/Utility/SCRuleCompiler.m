@@ -168,8 +168,65 @@ static NSString* const kBlockPrefix = @"block return out quick proto { tcp udp }
     if (![blocklist isKindOfClass:[NSArray class]] || ![payload[@"isAllowlist"] isKindOfClass:[NSNumber class]]) return nil;
     for (id entry in blocklist) if (![entry isKindOfClass:[NSString class]]) return nil;
     NSMutableDictionary* result = [@{@"blocklist": blocklist, @"isAllowlist": payload[@"isAllowlist"]} mutableCopy];
-    if ([payload[@"emergencyUnlockEnabled"] isKindOfClass:[NSNumber class]]) result[@"emergencyUnlockEnabled"] = payload[@"emergencyUnlockEnabled"];
+    for (NSString* key in @[@"emergencyUnlockEnabled", @"allowLocal", @"evaluateCommonSubdomains", @"includeLinkedDomains"]) {
+        if ([payload[key] isKindOfClass:[NSNumber class]]) result[key] = payload[key];
+    }
     return result;
+}
+
+// "a.b.c.d" or "a.b.c.d/n" -> spec (validated); nil if not a well-formed address.
++ (NSDictionary*)specForAddress:(NSString*)address port:(NSInteger)port {
+    NSArray<NSString*>* parts = [address componentsSeparatedByString:@"/"];
+    if (parts.count > 2 || parts[0].length == 0) return nil;
+    NSInteger mask = 0;
+    if (parts.count == 2) {
+        NSScanner* scanner = [NSScanner scannerWithString:parts[1]];
+        if (![scanner scanInteger:&mask] || !scanner.isAtEnd || mask <= 0) return nil;
+    }
+    NSDictionary* spec = [self specWithIP:parts[0] maskLen:mask port:port];
+    return [self addressForSpec:spec] != nil ? spec : nil;
+}
+
++ (NSArray<NSDictionary*>*)blocklistSpecsForLayer:(NSString*)name inAnchorText:(NSString*)text {
+    if (![text isKindOfClass:[NSString class]] || name.length == 0) return @[];
+    NSString* header = [NSString stringWithFormat:@"# layer %@ (blocklist)", name];
+    NSString* tablePrefix = [NSString stringWithFormat:@"table <sc_%@> persist { ", name];
+    NSMutableArray<NSDictionary*>* specs = [NSMutableArray array];
+    __block BOOL inSection = NO;
+    [text enumerateLinesUsingBlock:^(NSString* line, BOOL* stop) {
+        if ([line hasPrefix:@"# layer "]) {
+            if (inSection) { *stop = YES; return; }
+            inSection = [line isEqualToString:header];
+            return;
+        }
+        if (!inSection) return;
+        if ([line hasPrefix:tablePrefix] && [line hasSuffix:@" }"]) {
+            NSString* body = [line substringWithRange:NSMakeRange(tablePrefix.length, line.length - tablePrefix.length - 2)];
+            for (NSString* part in [body componentsSeparatedByString:@","]) {
+                NSString* address = [part stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+                NSDictionary* spec = [self specForAddress:address port:0];
+                if (spec != nil) [specs addObject:spec];
+            }
+            return;
+        }
+        if (![line hasPrefix:kBlockPrefix]) return;
+        // "<addr>" | "<addr> port <p>" | "any" | "any port <p>"; the "<sc_name>" table rule is skipped.
+        NSArray<NSString*>* words = [[line substringFromIndex:kBlockPrefix.length] componentsSeparatedByString:@" "];
+        NSInteger port = 0;
+        if (words.count == 3 && [words[1] isEqualToString:@"port"]) {
+            NSScanner* scanner = [NSScanner scannerWithString:words[2]];
+            if (![scanner scanInteger:&port] || !scanner.isAtEnd || port <= 0 || port > 65535) return;
+        } else if (words.count != 1) {
+            return;
+        }
+        if ([words[0] isEqualToString:@"any"]) {
+            [specs addObject:[self specWithIP:nil maskLen:0 port:port]];
+            return;
+        }
+        NSDictionary* spec = [self specForAddress:words[0] port:port];
+        if (spec != nil) [specs addObject:spec];
+    }];
+    return specs;
 }
 
 @end

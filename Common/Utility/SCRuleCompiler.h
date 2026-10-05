@@ -28,9 +28,16 @@ NS_ASSUME_NONNULL_BEGIN
 + (NSString*)anchorTextForLayers:(NSArray<SCRuleLayer*>*)layers;
 /// Layer names from the "# sc-layers:" marker; nil when there is no marker.
 + (nullable NSArray<NSString*>*)layerNamesFromAnchorText:(nullable NSString*)text;
-/// The deep payload ({blocklist: [String], isAllowlist: Bool}, plus emergencyUnlockEnabled
-/// when the payload carries it as a number/boolean); nil if absent or unreadable.
+/// The deep payload ({blocklist: [String], isAllowlist: Bool}, plus emergencyUnlockEnabled,
+/// allowLocal, evaluateCommonSubdomains and includeLinkedDomains when the payload carries
+/// them as a number/boolean); nil if absent or unreadable.
 + (nullable NSDictionary*)deepPayloadFromAnchorText:(nullable NSString*)text;
+/// The specs a compiled BLOCKLIST layer section enforces: every table address
+/// (port 0) plus every single-address / `any` rule, as specWithIP:maskLen:port:
+/// dicts. The section runs from "# layer <name> (blocklist)" to the next
+/// "# layer " line or EOF. @[] when the section is absent or is an allowlist.
+/// Recompiling the returned specs reproduces the section.
++ (NSArray<NSDictionary*>*)blocklistSpecsForLayer:(NSString*)name inAnchorText:(nullable NSString*)text;
 @end
 
 NS_ASSUME_NONNULL_END

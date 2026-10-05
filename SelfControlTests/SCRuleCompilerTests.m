@@ -188,4 +188,64 @@ static void AssertParses(SCRuleCompilerTests* self, NSString* text) {
     AssertParses(self, t);
 }
 
+- (void)testBlocklistSpecsRoundTrip {
+    NSArray* specs = @[S(@"1.2.3.4", 0, 0), S(@"10.0.0.0", 8, 0), S(@"2001:db8::", 32, 0), S(@"9.9.9.9", 0, 443),
+                       S(@"8.8.8.8", 32, 80), S(nil, 0, 0), S(nil, 0, 25)];
+    SCRuleLayer* base = [SCRuleLayer layerWithName:SCLayerBase isAllowlist:NO allowLocal:NO specs:specs];
+    SCRuleLayer* deep = [SCRuleLayer layerWithName:SCLayerDeep isAllowlist:NO allowLocal:NO specs:@[S(@"5.6.7.8", 0, 0), S(@"6.6.6.6", 0, 22)]];
+    NSString* t = [SCRuleCompiler anchorTextForLayers:@[base, deep]];
+    NSArray* parsed = [SCRuleCompiler blocklistSpecsForLayer:SCLayerBase inAnchorText:t];
+    XCTAssertEqual(parsed.count, specs.count);
+    XCTAssertTrue([parsed containsObject:S(@"10.0.0.0", 8, 0)]);
+    XCTAssertTrue([parsed containsObject:S(@"8.8.8.8", 32, 80)]);
+    XCTAssertTrue([parsed containsObject:S(nil, 0, 0)]);
+    XCTAssertTrue([parsed containsObject:S(nil, 0, 25)]);
+    // the other layer's section is not included
+    XCTAssertFalse([parsed containsObject:S(@"5.6.7.8", 0, 0)]);
+    XCTAssertFalse([parsed containsObject:S(@"6.6.6.6", 0, 22)]);
+    SCRuleLayer* rebuilt = [SCRuleLayer layerWithName:SCLayerBase isAllowlist:NO allowLocal:NO specs:parsed];
+    XCTAssertEqualObjects(([SCRuleCompiler anchorTextForLayers:@[rebuilt, deep]]), t);
+
+    NSArray* deepParsed = [SCRuleCompiler blocklistSpecsForLayer:SCLayerDeep inAnchorText:t];
+    XCTAssertEqualObjects(deepParsed, (@[S(@"5.6.7.8", 0, 0), S(@"6.6.6.6", 0, 22)]));
+}
+
+- (void)testBlocklistSpecsUnionDedupes {
+    NSArray* specs = @[S(@"1.2.3.4", 0, 0), S(@"9.9.9.9", 0, 443), S(nil, 0, 25)];
+    NSString* t = [SCRuleCompiler anchorTextForLayers:@[[SCRuleLayer layerWithName:SCLayerBase isAllowlist:NO allowLocal:NO specs:specs]]];
+    NSArray* parsed = [SCRuleCompiler blocklistSpecsForLayer:SCLayerBase inAnchorText:t];
+    NSArray* unioned = [specs arrayByAddingObjectsFromArray:parsed];
+    XCTAssertEqualObjects([SCRuleCompiler anchorTextForLayers:@[[SCRuleLayer layerWithName:SCLayerBase isAllowlist:NO allowLocal:NO specs:unioned]]], t);
+}
+
+- (void)testBlocklistSpecsAbsentOrAllowlist {
+    NSString* t = [SCRuleCompiler anchorTextForLayers:@[
+        [SCRuleLayer layerWithName:SCLayerBase isAllowlist:NO allowLocal:NO specs:@[S(@"1.2.3.4", 0, 0)]],
+        [SCRuleLayer layerWithName:SCLayerDeep isAllowlist:YES allowLocal:YES specs:@[S(@"5.6.7.8", 0, 0)]]]];
+    XCTAssertEqualObjects([SCRuleCompiler blocklistSpecsForLayer:SCLayerDeep inAnchorText:t], (@[]));
+    XCTAssertEqualObjects([SCRuleCompiler blocklistSpecsForLayer:@"other" inAnchorText:t], (@[]));
+    XCTAssertEqualObjects([SCRuleCompiler blocklistSpecsForLayer:SCLayerBase inAnchorText:nil], (@[]));
+    XCTAssertEqualObjects([SCRuleCompiler blocklistSpecsForLayer:SCLayerBase inAnchorText:@"# Options\nblock return out proto tcp from any to 1.2.3.4\n"], (@[]));
+    // a blocklist layer with nothing in it
+    NSString* empty = [SCRuleCompiler anchorTextForLayers:@[[SCRuleLayer layerWithName:SCLayerBase isAllowlist:NO allowLocal:NO specs:@[]]]];
+    XCTAssertEqualObjects([SCRuleCompiler blocklistSpecsForLayer:SCLayerBase inAnchorText:empty], (@[]));
+}
+
+- (void)testDeepPayloadCarriesResolutionOptions {
+    SCRuleLayer* deep = [SCRuleLayer layerWithName:SCLayerDeep isAllowlist:NO allowLocal:NO specs:@[S(@"1.2.3.4", 0, 0)]];
+    deep.payload = @{@"blocklist": @[@"a.com"], @"isAllowlist": @NO, @"allowLocal": @YES,
+                     @"evaluateCommonSubdomains": @NO, @"includeLinkedDomains": @NO};
+    NSDictionary* p = [SCRuleCompiler deepPayloadFromAnchorText:[SCRuleCompiler anchorTextForLayers:@[deep]]];
+    XCTAssertEqualObjects(p[@"allowLocal"], @YES);
+    XCTAssertEqualObjects(p[@"evaluateCommonSubdomains"], @NO);
+    XCTAssertEqualObjects(p[@"includeLinkedDomains"], @NO);
+    // non-numbers are dropped, absent stay absent
+    deep.payload = @{@"blocklist": @[@"a.com"], @"isAllowlist": @NO, @"allowLocal": @"yes", @"evaluateCommonSubdomains": @[]};
+    p = [SCRuleCompiler deepPayloadFromAnchorText:[SCRuleCompiler anchorTextForLayers:@[deep]]];
+    XCTAssertNotNil(p);
+    XCTAssertNil(p[@"allowLocal"]);
+    XCTAssertNil(p[@"evaluateCommonSubdomains"]);
+    XCTAssertNil(p[@"includeLinkedDomains"]);
+}
+
 @end
