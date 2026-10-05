@@ -456,7 +456,7 @@
     NSInteger minutes = [defaults_ integerForKey: @"DeepBlockDuration"];
     NSString* length = [SCDurationSlider timeSliderDisplayStringFromNumberOfMinutes: minutes];
     // Cancel answers both Esc and Return: Return must never start an irreversible block.
-    SCDialogResult* result = [SCDialog runWithTitle: [NSString stringWithFormat: NSLocalizedString(@"Start a %@ deep block?", @"Deep block confirmation title"), length]
+    SCDialogResult* result = [SCDialog runWithTitle: [NSString stringWithFormat: NSLocalizedString(@"Start a deep block for %@?", @"Deep block confirmation title, e.g. Start a deep block for 45 minutes?"), length]
                                             message: NSLocalizedString(@"It can't be overridden. Only emergency unlock can end it early.", @"Deep block confirmation message")
                                             buttons: @[NSLocalizedString(@"Cancel", @"Cancel button"),
                                                        NSLocalizedString(@"Start Deep Block", @"Button to start a deep block")]
