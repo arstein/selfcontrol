@@ -172,6 +172,10 @@ NSString* const SCKillerExpiryNotVerifiedMarker = @"SC_KILLER_REFUSED_EXPIRY_NOT
     if (deepRecord != nil) return [self emergencyUnlockAllowedForSettingsValue:deepRecord[@"emergencyUnlockEnabled"]];
     // Deep rules still installed but the record is gone: fail closed unless the payload says otherwise.
     if (deepLayerInstalled) {
+        // Record AND payload gone: nothing can rebuild the record, so the layer can
+        // never be timed or verify-expire. Emergency unlock is the only way out (no
+        // permanent block).
+        if (deepPayload == nil) return YES;
         id flag = deepPayload[@"emergencyUnlockEnabled"];
         return [flag isKindOfClass:[NSNumber class]] ? [flag boolValue] : NO;
     }

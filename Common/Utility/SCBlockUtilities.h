@@ -67,7 +67,9 @@ FOUNDATION_EXPORT NSString* const SCKillerExpiryNotVerifiedMarker;
 + (BOOL)emergencyUnlockAllowedForCurrentBlocks;
 /// Pure decision. With no regular block and no deep record, an installed deep
 /// layer (rules without a record) disallows unlock unless `deepPayload` (from the
-/// anchor) carries emergencyUnlockEnabled = YES; with nothing installed it is allowed.
+/// anchor) carries emergencyUnlockEnabled = YES - except when `deepPayload` is nil:
+/// with neither record nor payload the layer can never be rebuilt or expire, so
+/// unlock is allowed (no permanent block). With nothing installed it is allowed.
 + (BOOL)emergencyUnlockAllowedWithBaseRunning:(BOOL)baseRunning baseValue:(nullable id)baseValue deepRecord:(nullable NSDictionary*)deepRecord
                            deepLayerInstalled:(BOOL)deepLayerInstalled deepPayload:(nullable NSDictionary*)deepPayload;
 

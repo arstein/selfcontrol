@@ -86,8 +86,12 @@ static NSDictionary* UnverifiedDeepRecord(void) {
 
 - (void)testEmergencyUnlockRecordlessDeepLayer {
     NSDictionary* yes = @{@"emergencyUnlockEnabled": @YES};
-    XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil deepLayerInstalled:YES deepPayload:nil]);
+    // Record AND payload gone: nothing can rebuild or ever expire the layer, so
+    // emergency unlock is the only way out (no permanent block).
+    XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil deepLayerInstalled:YES deepPayload:nil]);
     XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil deepLayerInstalled:YES deepPayload:yes]);
+    // A regular block still governs while it runs.
+    XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:YES baseValue:@NO deepRecord:nil deepLayerInstalled:YES deepPayload:nil]);
     XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil deepLayerInstalled:YES deepPayload:(@{@"blocklist": @[]})]);
     XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil deepLayerInstalled:YES deepPayload:(@{@"emergencyUnlockEnabled": @NO})]);
     XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedWithBaseRunning:NO baseValue:nil deepRecord:nil deepLayerInstalled:NO deepPayload:nil]);
