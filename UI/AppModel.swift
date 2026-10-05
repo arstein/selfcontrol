@@ -2,8 +2,10 @@ import AppKit
 import Combine
 
 enum Route: Hashable {
-    case restrictions, overrides, settings, emergencyUnlock
+    case restrictions, overrides, settings, emergencyUnlock, deepBlock, deepList
 }
+
+enum ListKind { case main, deep }
 
 enum SheetKind: Equatable {
     case overrideConfirm
@@ -65,6 +67,16 @@ final class AppModel: ObservableObject {
     /// False when the running block was started with emergency unlock turned off.
     @Published var emergencyUnlockAvailable = true
     @Published var override = OverrideStatus()
+
+    // Deep block (Phase 5)
+    @Published var deepRunning = false
+    @Published var isAddingDeepBlock = false
+    @Published var deepTimeState: TimeState = .countdown(seconds: 0)
+    @Published var deepActiveEntries: [String] = []
+    @Published var isDeepActiveAllowlist = false
+    @Published var deepEntries: [String] = []
+    @Published var isDeepAllowlist = false
+    @Published var deepDurationMinutes = 45
 
     // Lists
     @Published var editableEntries: [String] = []
@@ -138,6 +150,15 @@ final class AppModel: ObservableObject {
     }
     var overrideRunning: Bool { override.active && (override.activeRemainingSecs ?? 0) > 0 }
     var canAddDuringBlock: Bool { isModernBlock && !isActiveAllowlist }
+    var deepRemainingSeconds: Int? { if case .countdown(let s) = deepTimeState, s > 0 { return s } else { return nil } }
+    var deepEndDate: Date? { deepRemainingSeconds.map { now.addingTimeInterval(TimeInterval($0)) } }
+    var canStartDeep: Bool { !deepRunning && !isAddingDeepBlock && (!deepEntries.isEmpty || isDeepAllowlist) }
+    /// Overrides are unavailable for the whole deep block.
+    var overridesBlockedByDeep: Bool { deepRunning }
+
+    func entries(_ list: ListKind) -> [String] { list == .main ? shownEntries : (deepRunning ? deepActiveEntries : deepEntries) }
+    func allowlist(_ list: ListKind) -> Bool { list == .main ? shownAllowlist : (deepRunning ? isDeepActiveAllowlist : isDeepAllowlist) }
+    func listLocked(_ list: ListKind) -> Bool { list == .main ? isBlockRunning : deepRunning }
     var durationScale: DurationScale { DurationScale(maxMinutes: maxBlockLengthMinutes) }
 
     // MARK: - Lifecycle
@@ -165,6 +186,7 @@ final class AppModel: ObservableObject {
     func reload() {
         guard live else { return }
         let wasRunning = isBlockRunning
+        let wasDeep = deepRunning
         let settings = SCSettings.shared()
 
         assign(\.isBlockRunning, SCUIUtilities.blockIsRunning())
@@ -174,12 +196,31 @@ final class AppModel: ObservableObject {
         assign(\.isAddingBlock, appController?.addingBlock ?? false)
         assign(\.activeEntries, settings.value(forKey: "ActiveBlocklist") as? [String] ?? [])
         assign(\.isActiveAllowlist, settings.bool(forKey: "ActiveBlockAsWhitelist"))
-        assign(\.emergencyUnlockAvailable, !modern || SCBlockUtilities.emergencyUnlockAllowed(forSettingsValue: settings.value(forKey: "EmergencyUnlockEnabled")))
+        assign(\.emergencyUnlockAvailable, SCBlockUtilities.emergencyUnlockAllowedForCurrentBlocks())
         assign(\.blockDurationSecs, (settings.value(forKey: "BlockDurationSecs") as? NSNumber)?.doubleValue)
+        let deep = SCBlockUtilities.deepBlockRecord()
+        // A record-less installed deep layer is a tamper state; still show it as enforced.
+        assign(\.deepRunning, deep != nil || SCBlockUtilities.installedLayerNames().contains("deep"))
+        assign(\.isAddingDeepBlock, appController?.addingDeepBlock ?? false)
+        assign(\.deepActiveEntries, deep?["blocklist"] as? [String] ?? [])
+        assign(\.isDeepActiveAllowlist, (deep?["isAllowlist"] as? NSNumber)?.boolValue ?? false)
+        if deep != nil {
+            // Same fail-closed shape as the regular block: at/below zero waits for verified time.
+            let remaining = SCBlockUtilities.trustedRemainingDeepBlockSecs()?.doubleValue ?? 0
+            let secs = remaining.isFinite ? Int(ceil(min(max(remaining, -1e9), 1e9))) : -1
+            assign(\.deepTimeState, secs > 0 ? .countdown(seconds: secs) : .verifyingEnd)
+        } else if deepRunning {
+            assign(\.deepTimeState, .verifyingEnd)
+        } else {
+            assign(\.deepTimeState, .countdown(seconds: 0))
+        }
         reloadDefaults()
         updateTime()
         refreshOverride()
 
+        if wasDeep != deepRunning && wasRunning == isBlockRunning && !path.isEmpty && path.last != .emergencyUnlock {
+            assign(\.path, [])
+        }
         if wasRunning != isBlockRunning {
             if !isBlockRunning && tedium.blockRemoved {
                 // let the "Block removed." state show briefly before resetting
@@ -203,6 +244,9 @@ final class AppModel: ObservableObject {
         guard live else { return }
         assign(\.editableEntries, defaults.stringArray(forKey: "Blocklist") ?? [])
         assign(\.isAllowlist, defaults.bool(forKey: "BlockAsWhitelist"))
+        assign(\.deepEntries, defaults.stringArray(forKey: "DeepBlocklist") ?? [])
+        assign(\.isDeepAllowlist, defaults.bool(forKey: "DeepBlockAsWhitelist"))
+        assign(\.deepDurationMinutes, DeepBlockLimits.clamp(defaults.integer(forKey: "DeepBlockDuration")))
         assign(\.maxBlockLengthMinutes, max(1, defaults.integer(forKey: "MaxBlockLength")))
         assign(\.blockDurationMinutes, defaults.integer(forKey: "BlockDuration"))
         assign(\.overridePerDayDefault, defaults.integer(forKey: "OverridePerDay"))
@@ -340,7 +384,7 @@ final class AppModel: ObservableObject {
     func push(_ route: Route) {
         // No edits while a block is starting: installBlock reads the restrictions
         // and override settings from defaults only after the auth prompt.
-        if isAddingBlock && route != .emergencyUnlock { return }
+        if (isAddingBlock || isAddingDeepBlock) && route != .emergencyUnlock { return }
         if path.last != route { path.append(route) }
     }
 
@@ -360,6 +404,27 @@ final class AppModel: ObservableObject {
         guard live, let ac = appController else { return }
         ac.addBlock(nil)   // all guards, alerts, auth + SMAppService flow live there
         reload()
+    }
+
+    func setDeepDuration(_ minutes: Int) {
+        let v = DeepBlockLimits.clamp(minutes)
+        deepDurationMinutes = v
+        if live { defaults.set(v, forKey: "DeepBlockDuration") }
+    }
+
+    func startDeepBlock(completion: @escaping (ActionResult) -> Void = { _ in }) {
+        guard live, let ac = appController else { completion(.cancelled); return }
+        // AppController guarantees completion on the main queue.
+        ac.startDeepBlock { [weak self] error in
+            MainActor.assumeIsolated {
+                self?.reload()
+                let result = AppModel.result(for: error)
+                if case .failed(let msg) = result {
+                    SCUIUtilities.presentError(NSError(domain: kSelfControlErrorDomain, code: 0, userInfo: [NSLocalizedDescriptionKey: msg]))
+                }
+                completion(result)
+            }
+        }
     }
 
     func setOverridePerDay(_ n: Int) {
@@ -433,6 +498,62 @@ final class AppModel: ObservableObject {
         isAllowlist = on
         guard live else { return }
         defaults.set(on, forKey: "BlockAsWhitelist")
+        NotificationCenter.default.post(name: NSNotification.Name("SCConfigurationChangedNotification"), object: self)
+    }
+
+    // MARK: Deep list twins
+
+    @discardableResult
+    func addEntries(_ raw: String, to list: ListKind) -> Bool {
+        guard list == .deep else { return addEditableEntries(raw) }
+        let cleaned = cleanedEntries(raw)
+        guard !cleaned.isEmpty, HostValidity.partition(cleaned).invalid.isEmpty else { return false }
+        var l = deepEntries
+        for e in cleaned where !l.contains(e) { l.append(e) }
+        saveDeep(l)
+        return true
+    }
+
+    func removeEntry(_ entry: String, from list: ListKind) {
+        if list == .main { removeEditableEntry(entry) } else { saveDeep(deepEntries.filter { $0 != entry }) }
+    }
+
+    @discardableResult
+    func importHosts(_ hosts: [String], to list: ListKind) -> Int {
+        guard list == .deep else { return importHosts(hosts) }
+        let split = HostValidity.partition(hosts)
+        var l = deepEntries
+        for h in split.valid where !l.contains(h) { l.append(h) }
+        saveDeep(l)
+        return split.invalid.count
+    }
+
+    func setAllowlist(_ on: Bool, for list: ListKind) {
+        guard list == .deep else { setAllowlist(on); return }
+        guard on != isDeepAllowlist else { return }
+        if on && live { showAllowlistWarningIfNeeded() }
+        isDeepAllowlist = on
+        guard live else { return }
+        defaults.set(on, forKey: "DeepBlockAsWhitelist")
+        NotificationCenter.default.post(name: NSNotification.Name("SCConfigurationChangedNotification"), object: self)
+    }
+
+    func exportList(_ list: ListKind) {
+        guard live else { return }
+        appController?.exportList(forKey: list == .main ? "Blocklist" : "DeepBlocklist",
+                                  allowlistKey: list == .main ? "BlockAsWhitelist" : "DeepBlockAsWhitelist")
+    }
+
+    func importListFromFile(_ list: ListKind) {
+        guard live else { return }
+        appController?.importList(forKey: list == .main ? "Blocklist" : "DeepBlocklist",
+                                  allowlistKey: list == .main ? "BlockAsWhitelist" : "DeepBlockAsWhitelist")
+    }
+
+    private func saveDeep(_ list: [String]) {
+        deepEntries = list
+        guard live else { return }
+        defaults.set(list, forKey: "DeepBlocklist")
         NotificationCenter.default.post(name: NSNotification.Name("SCConfigurationChangedNotification"), object: self)
     }
 

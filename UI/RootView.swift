@@ -57,6 +57,7 @@ struct RootView: View {
         case .overrides: OverridesView()
         case .settings: SettingsView()
         case .emergencyUnlock: EmergencyUnlockView()
+        case .deepBlock, .deepList: EmptyView()   // Task 10
         }
     }
 
@@ -120,6 +121,7 @@ struct HeaderBar: View {
         case .overrides: return NSLocalizedString("Overrides", comment: "card title")
         case .settings: return NSLocalizedString("Settings", comment: "card title")
         case .emergencyUnlock: return NSLocalizedString("Emergency Unlock", comment: "card title")
+        case .deepBlock, .deepList: return ""   // Task 10
         }
     }
 

@@ -267,6 +267,14 @@ enum OverridePolicyLimits {
     }
 }
 
+/// Deep block length bounds in minutes (mirrors SC_DEEP_MIN_SECS / SC_DEEP_MAX_SECS).
+enum DeepBlockLimits {
+    static let minMinutes = 5
+    static let maxMinutes = 240
+    static let scale = DurationScale(maxMinutes: maxMinutes)
+    static func clamp(_ m: Int) -> Int { min(max(m, minMinutes), maxMinutes) }
+}
+
 
 // MARK: - Duration slider tick labels
 
