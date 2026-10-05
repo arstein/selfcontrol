@@ -216,6 +216,41 @@ NSFileHandle* appendFileHandle;
 
 	return [task terminationStatus];
 }
+// Writes the whole anchor and (re)loads pf. Releases our previous enable
+// reference first so repeated installs never leak pf enable references.
+- (int)installAnchorText:(NSString*)anchorText {
+	[self addSelfControlConfig];
+	[anchorText writeToFile: @"/etc/pf.anchors/org.eyebeam" atomically: true encoding: NSUTF8StringEncoding error: nil];
+
+	NSString* oldToken = [self readPFToken: nil];
+	if ([oldToken length]) {
+		NSString* trimmed = [oldToken stringByTrimmingCharactersInSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+		NSTask* release = [NSTask launchedTaskWithLaunchPath: kPfctlExecutablePath arguments: @[@"-X", trimmed]];
+		[release waitUntilExit];
+	}
+
+	NSTask* task = [[NSTask alloc] init];
+	[task setLaunchPath: kPfctlExecutablePath];
+	[task setArguments: @[@"-E", @"-f", @"/etc/pf.conf", @"-F", @"states"]];
+	NSPipe* inPipe = [[NSPipe alloc] init];
+	NSFileHandle* readHandle = [inPipe fileHandleForReading];
+	[task setStandardOutput: inPipe];
+	[task setStandardError: inPipe];
+	[task launch];
+	NSString* pfctlOutput = [[NSString alloc] initWithData: [readHandle readDataToEndOfFile] encoding: NSUTF8StringEncoding];
+	[readHandle closeFile];
+	[task waitUntilExit];
+
+	for (NSString* line in [pfctlOutput componentsSeparatedByString: @"\n"]) {
+		if ([line hasPrefix: @"Token : "]) {
+			[self writePFToken: [line substringFromIndex: [@"Token : " length]] error: nil];
+			break;
+		}
+	}
+	if ([task terminationStatus] != 0) NSLog(@"ERROR: pfctl failed to load SelfControl rules: %@", pfctlOutput);
+	return [task terminationStatus];
+}
+
 - (int)refreshPFRules {
     NSArray* args = [@"-f /etc/pf.conf -F states" componentsSeparatedByString: @" "];
 

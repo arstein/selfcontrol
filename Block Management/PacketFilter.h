@@ -24,6 +24,7 @@
 - (void)writeConfiguration;
 - (NSString*)configurationText;
 - (int)startBlock;
+- (int)installAnchorText:(NSString*)anchorText;
 - (int)stopBlock:(BOOL)force;
 - (void)addSelfControlConfig;
 - (BOOL)containsSelfControlBlock;

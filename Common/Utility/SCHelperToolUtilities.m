@@ -7,32 +7,99 @@
 
 #import "SCHelperToolUtilities.h"
 #import "BlockManager.h"
+#import "SCRuleCompiler.h"
+#import "SCDeepBlockDecision.h"
 
 @implementation SCHelperToolUtilities
 
-+ (void)installBlockRulesFromSettings {
++ (SCRuleLayer*)resolvedLayerNamed:(NSString*)name hostDomains:(NSMutableOrderedSet<NSString*>*)hostDomains {
     SCSettings* settings = [SCSettings sharedSettings];
-    BOOL shouldEvaluateCommonSubdomains = [settings boolForKey: @"EvaluateCommonSubdomains"];
-    BOOL allowLocalNetworks = [settings boolForKey: @"AllowLocalNetworks"];
-    BOOL includeLinkedDomains = [settings boolForKey: @"IncludeLinkedDomains"];
+    NSArray* entries; BOOL allowlist, allowLocal, commonSubdomains, linkedDomains;
+    NSDictionary* payload = nil;
+    if ([name isEqualToString: SCLayerDeep]) {
+        NSDictionary* deep = [SCBlockUtilities deepBlockRecord];
+        if (deep == nil) {
+            // Record tampered away but the layer is installed: keep enforcing the
+            // installed list (from the anchor payload) until the heal path rebuilds it.
+            NSString* anchor = [NSString stringWithContentsOfFile: @"/etc/pf.anchors/org.eyebeam" encoding: NSUTF8StringEncoding error: nil];
+            deep = [SCRuleCompiler deepPayloadFromAnchorText: anchor];
+            if (deep == nil) return nil;   // can't rebuild: caller must not touch the rules
+        }
+        entries = deep[@"blocklist"];
+        allowlist = [deep[@"isAllowlist"] boolValue];
+        allowLocal = [deep[@"allowLocal"] boolValue];
+        commonSubdomains = [deep[@"evaluateCommonSubdomains"] boolValue];
+        linkedDomains = [deep[@"includeLinkedDomains"] boolValue];
+        NSMutableDictionary* p = [@{@"blocklist": entries ?: @[], @"isAllowlist": @(allowlist)} mutableCopy];
+        if ([deep[@"emergencyUnlockEnabled"] isKindOfClass: [NSNumber class]]) p[@"emergencyUnlockEnabled"] = deep[@"emergencyUnlockEnabled"];
+        payload = p;
+    } else {
+        entries = [settings valueForKey: @"ActiveBlocklist"];
+        allowlist = [settings boolForKey: @"ActiveBlockAsWhitelist"];
+        allowLocal = [settings boolForKey: @"AllowLocalNetworks"];
+        commonSubdomains = [settings boolForKey: @"EvaluateCommonSubdomains"];
+        linkedDomains = [settings boolForKey: @"IncludeLinkedDomains"];
+    }
+    if (![entries isKindOfClass: [NSArray class]]) entries = @[];
 
-    // get value for ActiveBlockAsWhitelist
-    BOOL blockAsAllowlist = [settings boolForKey: @"ActiveBlockAsWhitelist"];
+    BlockManager* bm = [[BlockManager alloc] initAsAllowlist: allowlist allowLocal: allowLocal
+                                     includeCommonSubdomains: commonSubdomains includeLinkedDomains: linkedDomains];
+    NSArray* specs = nil; NSArray* domains = nil;
+    [bm resolveEntries: entries specs: &specs hostDomains: &domains];
+    if (!allowlist) [hostDomains addObjectsFromArray: domains];
 
-    BlockManager* blockManager = [[BlockManager alloc] initAsAllowlist: blockAsAllowlist allowLocal: allowLocalNetworks includeCommonSubdomains: shouldEvaluateCommonSubdomains includeLinkedDomains: includeLinkedDomains];
+    SCRuleLayer* layer = [SCRuleLayer layerWithName: name isAllowlist: allowlist allowLocal: allowLocal specs: specs];
+    layer.payload = payload;
+    return layer;
+}
 
-    NSLog(@"About to run BlockManager commands");
-    
-    [blockManager prepareToAddBlock];
-    [blockManager addBlockEntriesFromStrings: [settings valueForKey: @"ActiveBlocklist"]];
-    [blockManager finalizeBlock];
++ (void)applyDesiredLayers:(NSArray<NSString*>*)layerNames {
+    NSLog(@"INFO: Applying block layers: [%@]", [layerNames componentsJoinedByString: @","]);
+    if (layerNames.count == 0) {
+        [[BlockManager new] clearBlock];
+        [SCHelperToolUtilities clearOSDNSCache];
+        return;
+    }
+    NSMutableOrderedSet<NSString*>* hostDomains = [NSMutableOrderedSet orderedSet];
+    NSMutableArray<SCRuleLayer*>* layers = [NSMutableArray array];
+    BOOL anyBlocklist = NO;
+    for (NSString* name in layerNames) {
+        SCRuleLayer* layer = [self resolvedLayerNamed: name hostDomains: hostDomains];
+        if (layer == nil) {
+            NSLog(@"WARNING: Can't resolve block layer %@; leaving installed rules untouched.", name);
+            return;
+        }
+        anyBlocklist = anyBlocklist || !layer.isAllowlist;
+        [layers addObject: layer];
+    }
+    NSString* anchorText = [SCRuleCompiler anchorTextForLayers: layers];
+    BlockManager* writer = [[BlockManager alloc] init];
+    if (![writer installAnchorText: anchorText hostDomains: anyBlocklist ? hostDomains.array : nil]) {
+        NSLog(@"ERROR: Failed to install block layers.");
+    }
+    [SCHelperToolUtilities clearOSDNSCache];
+}
 
+// The deep layer is enforced while its record exists OR its rules are installed
+// (a tampered-away record must never relax enforcement; only a verified expiry or
+// emergency unlock removes it, and those pass explicit layers).
++ (BOOL)deepShouldEnforce {
+    return [SCBlockUtilities deepBlockIsRunning] || [[SCBlockUtilities installedLayerNames] containsObject: SCLayerDeep];
+}
+
++ (NSArray<NSString*>*)desiredLayersWithOverrideActive:(BOOL)overrideActive {
+    return [SCDeepBlockDecision desiredLayersWithBaseRunning: [SCBlockUtilities modernBlockIsRunning]
+                                               overrideActive: overrideActive
+                                            deepShouldEnforce: [self deepShouldEnforce]];
+}
+
++ (void)installBlockRulesFromSettings {
+    [self applyDesiredLayers: [self desiredLayersWithOverrideActive: NO]];
 }
 
 + (void)clearBlockRulesOnly {
     NSLog(@"INFO: Lifting base block rules (override active).");
-    [[BlockManager new] clearBlock];
-    [SCHelperToolUtilities clearOSDNSCache];
+    [self applyDesiredLayers: [self desiredLayersWithOverrideActive: YES]];
 }
 
 + (void)unloadDaemonJob {
@@ -149,8 +216,18 @@
 
 + (void)removeBlock {
     [SCBlockUtilities removeBlockFromSettings];
-    [[BlockManager new] clearBlock];
-    
+    [self applyDesiredLayers: [self desiredLayersWithOverrideActive: NO]];   // deep layer only, or teardown
+    [self finishRemovingBlock];
+}
+
++ (void)removeAllBlocks {
+    [SCBlockUtilities removeDeepBlockFromSettings];
+    [SCBlockUtilities removeBlockFromSettings];
+    [self applyDesiredLayers: @[]];   // explicit: the deep layer goes too
+    [self finishRemovingBlock];
+}
+
++ (void)finishRemovingBlock {
     [SCHelperToolUtilities clearCachesIfRequested];
 
     // play a sound letting

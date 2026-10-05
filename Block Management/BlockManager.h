@@ -37,6 +37,8 @@
 	BOOL includeCommonSubdomains;
 	BOOL includeLinkedDomains;
     NSMutableSet* addedBlockEntries;
+	NSMutableArray<NSDictionary*>* collectedSpecs;    // non-nil => collect mode: resolve only, touch nothing
+	NSMutableOrderedSet<NSString*>* collectedDomains;
 }
 
 - (BlockManager*)initAsAllowlist:(BOOL)allowlist;
@@ -51,6 +53,14 @@
 - (void)addBlockEntryFromString:(NSString*)entry;
 - (void)addBlockEntry:(SCBlockEntry*)entry;
 - (void)addBlockEntriesFromStrings:(NSArray<NSString*>*)blockList;
+// Resolves entries exactly as a block start would (related entries, common
+// subdomains, Google ranges, DNS) without touching pf or hosts.
+- (void)resolveEntries:(NSArray<NSString*>*)entries
+                 specs:(NSArray<NSDictionary*>**)outSpecs
+           hostDomains:(NSArray<NSString*>**)outDomains;
+// Replaces the hosts block (if hostDomains is non-nil; an empty array still
+// writes the header/footer) and the pf anchor in one go, then reloads pf.
+- (BOOL)installAnchorText:(NSString*)anchorText hostDomains:(NSArray<NSString*>*)hostDomains;
 - (BOOL)clearBlock;
 - (BOOL)forceClearBlock;
 - (BOOL)blockIsActive;

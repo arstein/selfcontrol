@@ -193,8 +193,9 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     }
 
     NSLog(@"Adding firewall rules...");
-    [SCHelperToolUtilities installBlockRulesFromSettings];
+    // BlockIsRunning first: the desired layers derive from it.
     [settings setValue: @YES forKey: @"BlockIsRunning"];
+    [SCHelperToolUtilities installBlockRulesFromSettings];
     
     NSError* syncErr = [settings syncSettingsAndWait: 5]; // synchronize ASAP since BlockIsRunning is a really important one
     if (syncErr != nil) {
@@ -268,22 +269,29 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         NSLog(@"WARNING: Active blocklist has removed items; these will not be updated. Removed items are %@", removed);
     }
     
-    // Argument order matches SCHelperToolUtilities installBlockRulesFromSettings
-    // (these two were previously swapped).
-    BlockManager* blockManager = [[BlockManager alloc] initAsAllowlist: [settings boolForKey: @"ActiveBlockAsWhitelist"]
-                                                            allowLocal: [settings boolForKey: @"AllowLocalNetworks"]
-                                               includeCommonSubdomains: [settings boolForKey: @"EvaluateCommonSubdomains"]
-                                                  includeLinkedDomains: [settings boolForKey: @"IncludeLinkedDomains"]];
-    [blockManager enterAppendMode];
-    [blockManager addBlockEntriesFromStrings: added];
-    [blockManager finishAppending];
-    
     // Preserve active entries even if a caller omitted them; mid-block edits
     // are tighten-only.
     NSMutableArray* storedBlocklist = [activeBlocklist mutableCopy];
     [storedBlocklist addObjectsFromArray:added];
     [settings setValue:storedBlocklist forKey:@"ActiveBlocklist"];
-    
+
+    // Re-resolve and rewrite every layer (no partial appends). If an override is
+    // active the base layer must stay lifted: compute that exactly as checkupBlock does.
+    NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
+    NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState
+                                                    reading:[SCTrustedClock currentReading]];
+    NSDate* overrideEndDate = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:NULL];
+    BOOL clockAnchored = [clockState isKindOfClass:[NSDictionary class]] && clockState[@"wallAnchor"] != nil;
+    BOOL overrideActive = [SCOverrideDecision liftRemainingSecsWithTrustedNow:trustedNow
+                                                               overrideEndDate:overrideEndDate
+                                                                 clockAnchored:clockAnchored
+                                                                   maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS] > 0;
+    if (overrideActive) {
+        [SCHelperToolUtilities clearBlockRulesOnly];
+    } else {
+        [SCHelperToolUtilities installBlockRulesFromSettings];
+    }
+
     // make sure everyone knows about our new list
     NSError* syncErr = [settings syncSettingsAndWait: 5];
     if (syncErr != nil) {

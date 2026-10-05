@@ -14,13 +14,16 @@ NS_ASSUME_NONNULL_BEGIN
 // note that this is NOT included in SCUtility.h currently!
 @interface SCHelperToolUtilities : NSObject
 
-// Reads the domain block list from the settings for SelfControl, and adds deny
-// rules for all of the IPs (or the A DNS record IPS for doamin names) to the
-// ipfw firewall.
+// The single enforcement path: installs exactly these layers (SCLayerBase,
+// SCLayerDeep) from settings, replacing whatever was there. Empty -> teardown.
+// If a layer can't be resolved (deep layer with neither record nor anchor
+// payload) nothing is changed (fail-closed).
++ (void)applyDesiredLayers:(NSArray<NSString*>*)layerNames;
+
+// Installs the regular block's layer (plus the deep layer if a deep block exists).
 + (void)installBlockRulesFromSettings;
 
-// Removes the hosts/pf block rules WITHOUT touching settings/flags or playing
-// the end sound. Used to temporarily lift the base block during an override.
+// Lifts the regular block's layer for an override; a deep layer stays.
 + (void)clearBlockRulesOnly;
 
 // exits the daemon process cleanly once settings are synced; launchd's
@@ -38,9 +41,11 @@ NS_ASSUME_NONNULL_BEGIN
 // Clear only the OS-level DNS cache
 + (void)clearOSDNSCache;
 
-// Removes block via settings, host file rules and ipfw rules,
-// deleting user caches if requested, and migrating legacy settings.
+// Removes the regular block (settings + its rules, sound, caches); a running deep block stays enforced.
 + (void)removeBlock;
+
+// Emergency unlock: removes the regular block and the deep block.
++ (void)removeAllBlocks;
 
 + (void)sendConfigurationChangedNotification;
 
