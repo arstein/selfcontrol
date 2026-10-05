@@ -29,6 +29,7 @@
 #import "SCBlockFileReaderWriter.h"
 #import "SCUIUtilities.h"
 #import "SCDurationSlider.h"
+#import "SCDeepBlockDecision.h"
 #import "SelfControl-Swift.h"
 
 @interface AppController () {}
@@ -453,7 +454,8 @@
         return;
     }
     if (self.addingDeepBlock) return;
-    NSInteger minutes = [defaults_ integerForKey: @"DeepBlockDuration"];
+    // Same clamp the window shows (DeepBlockLimits), so the dialog and the daemon agree.
+    NSInteger minutes = MIN(MAX([defaults_ integerForKey: @"DeepBlockDuration"], 5), 240);
     NSString* length = [SCDurationSlider timeSliderDisplayStringFromNumberOfMinutes: minutes];
     // Cancel answers both Esc and Return: Return must never start an irreversible block.
     SCDialogResult* result = [SCDialog runWithTitle: [NSString stringWithFormat: NSLocalizedString(@"Start a deep block for %@?", @"Deep block confirmation title, e.g. Start a deep block for 45 minutes?"), length]
@@ -632,8 +634,12 @@
         // Match the daemon's own gate (SCDaemonBlockMethods rejects the
         // challenge with error 321 unless a modern block is running).
         // The block may also have been started with emergency unlock turned off.
-        return [SCBlockUtilities modernBlockIsRunning] &&
-               [SCBlockUtilities emergencyUnlockAllowedForSettingsValue: [[SCSettings sharedSettings] valueForKey: @"EmergencyUnlockEnabled"]];
+        // A deep block (or its rules without a record) counts too; the gate follows
+        // the regular block's captured value, else the deep block's.
+        return ([SCBlockUtilities modernBlockIsRunning] ||
+                [SCBlockUtilities deepBlockIsRunning] ||
+                [[SCBlockUtilities installedLayerNames] containsObject: SCLayerDeep]) &&
+               [SCBlockUtilities emergencyUnlockAllowedForCurrentBlocks];
     }
     // No edits while a block is starting: installBlock reads Blocklist,
     // BlockAsWhitelist and the override settings only after the auth prompt.

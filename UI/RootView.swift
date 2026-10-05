@@ -134,6 +134,7 @@ struct HeaderBar: View {
 
     private var statusText: String {
         if model.isAddingBlock { return NSLocalizedString("Starting block…", comment: "header while starting") }
+        if model.isAddingDeepBlock { return NSLocalizedString("Starting deep block…", comment: "header while starting a deep block") }
         if !model.isBlockRunning {
             return model.deepRunning ? NSLocalizedString("Deep block running", comment: "header during deep-only block")
                                      : NSLocalizedString("Not blocking", comment: "header idle")
