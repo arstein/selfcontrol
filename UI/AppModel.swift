@@ -227,11 +227,11 @@ final class AppModel: ObservableObject {
         updateTime()
         refreshOverride()
 
-        if wasDeep != deepRunning && wasRunning == isBlockRunning && !path.isEmpty && path.last != .emergencyUnlock {
-            assign(\.path, [])
-        }
-        if wasRunning != isBlockRunning || (wasDeep && !deepRunning && path.last == .emergencyUnlock && tedium.blockRemoved) {
-            if !isBlockRunning && !deepRunning && tedium.blockRemoved {
+        let wasAny = wasRunning || wasDeep
+        let isAny = isBlockRunning || deepRunning
+        if wasAny && !isAny {
+            // Everything ended (expiry or emergency unlock), whichever block went last.
+            if tedium.blockRemoved {
                 // let the "Block removed." state show briefly before resetting
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
                     guard let self, !self.isBlockRunning, !self.deepRunning else { return }
@@ -240,6 +240,16 @@ final class AppModel: ObservableObject {
             } else {
                 resetNavigation()
             }
+        } else if wasRunning != isBlockRunning {
+            // The regular block started or ended. If it ended under a deep block while an
+            // emergency unlock is under way, stay on it: the unlock still applies.
+            if wasAny && isAny && path.last == .emergencyUnlock && emergencyUnlockAvailable {
+                assign(\.sheet, nil)
+            } else {
+                resetNavigation()
+            }
+        } else if wasDeep != deepRunning && !path.isEmpty && path.last != .emergencyUnlock {
+            assign(\.path, [])
         }
     }
 
