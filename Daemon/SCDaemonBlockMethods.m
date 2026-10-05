@@ -296,15 +296,17 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     [[SCDaemon sharedDaemon] resetInactivityTimer];
     [SCSentry addBreadcrumb: @"Daemon method startDeepBlock called" category: @"daemon"];
 
-    NSError* err = nil;
     NSArray<NSString*>* filtered = [SCBlockUtilities blocklistByRemovingTimeSources: blocklist ?: @[]];
     NSDictionary* reading = [SCTrustedClock currentReading];
-    if ([SCBlockUtilities deepBlockIsRunning]) err = [SCErr errorWithCode: 325];
-    else if (![SCDeepBlockDecision durationSecsIsValid: durationSecs]) err = [SCErr errorWithCode: 326];
-    else if (filtered.count == 0 && !isAllowlist) err = [SCErr errorWithCode: 302];
-    else if (reading[@"wall"] == nil) err = [SCErr errorWithCode: 327];
-    if (err != nil) {
-        reply(err);
+    // "Already running" also covers deep rules installed without a record (tampered
+    // away, awaiting heal): a new record would replace what that layer enforces.
+    NSInteger refusal = [SCDeepBlockDecision startRefusalCodeWithDeepEnforced: [SCHelperToolUtilities deepShouldEnforce]
+                                                                 durationSecs: durationSecs
+                                                                   entryCount: filtered.count
+                                                                  isAllowlist: isAllowlist
+                                                                clockReadable: reading[@"wall"] != nil];
+    if (refusal != 0) {
+        reply([SCErr errorWithCode: refusal]);
         [self.daemonMethodLock unlock];
         return;
     }
@@ -337,7 +339,17 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     }
 
     // Derives base (if running) + deep. Starts always run: not throttled.
-    if (![SCHelperToolUtilities installBlockRulesFromSettings]) {
+    BOOL installed = [SCHelperToolUtilities installBlockRulesFromSettings];
+    if (!installed && [[SCBlockUtilities installedLayerNames] containsObject: SCLayerDeep]) {
+        // pf took the deep layer but a later step (e.g. the hosts write) failed.
+        // Rolling the record back would orphan installed deep rules, which the heal
+        // path would then rebuild as a 4-hour block. Keep the record: the block has
+        // started, and the checkup's integrity check repairs the rest.
+        NSLog(@"WARNING: Deep block rules are in pf but the install reported a failure; keeping the deep block, the checkup will repair it.");
+        [SCSentry addBreadcrumb: @"Deep block start: partial install kept" category: @"daemon"];
+        installed = YES;
+    }
+    if (!installed) {
         // A start that didn't install must not leave a record behind.
         NSLog(@"ERROR: Installing the deep block's rules failed; not starting it.");
         [SCBlockUtilities removeDeepBlockFromSettings];
@@ -345,8 +357,7 @@ static NSTimeInterval sInstallBackoffSecs = 0;
         NSError* syncErr = [settings syncSettingsAndWait: 5];
         if (syncErr != nil) NSLog(@"WARNING: Sync failed after rolling back deep block start: %@", syncErr);
         [SCSentry addBreadcrumb: @"Daemon failed to install deep block rules at start" category: @"daemon"];
-        err = [SCErr errorWithCode: 327];
-        reply(err);
+        reply([SCErr errorWithCode: 327]);
         [[SCDaemon sharedDaemon] resetInactivityTimer];
         [self.daemonMethodLock unlock];
         return;
@@ -1220,7 +1231,9 @@ static NSTimeInterval sInstallBackoffSecs = 0;
         reply(0, 0, 0, [SCErr errorWithCode: 320]); // busy; app may retry
         return;
     }
-    if (![SCBlockUtilities modernBlockIsRunning] && ![SCBlockUtilities deepBlockIsRunning]) {
+    // A deep layer installed without its record counts too: emergency unlock is
+    // the way out when that record can't be rebuilt (no permanent block).
+    if (![SCBlockUtilities modernBlockIsRunning] && ![SCHelperToolUtilities deepShouldEnforce]) {
         [self.daemonMethodLock unlock];
         reply(0, 0, 0, [SCErr errorWithCode: 321]); // no block to override
         return;
@@ -1246,7 +1259,7 @@ static NSTimeInterval sInstallBackoffSecs = 0;
         reply(0, 0, 0, NO, [SCErr errorWithCode: 320]);
         return;
     }
-    if (![SCBlockUtilities modernBlockIsRunning] && ![SCBlockUtilities deepBlockIsRunning]) {
+    if (![SCBlockUtilities modernBlockIsRunning] && ![SCHelperToolUtilities deepShouldEnforce]) {
         // The block is actually gone (removed, expired, or never modern).
         tediumChallenge = nil;
         [self.daemonMethodLock unlock];

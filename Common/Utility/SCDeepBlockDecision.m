@@ -10,6 +10,18 @@ NSString* const SCLayerDeep = @"deep";
     return isfinite(secs) && secs >= SC_DEEP_MIN_SECS && secs <= SC_DEEP_MAX_SECS;
 }
 
++ (NSInteger)startRefusalCodeWithDeepEnforced:(BOOL)deepEnforced
+                                 durationSecs:(NSTimeInterval)durationSecs
+                                   entryCount:(NSUInteger)entryCount
+                                  isAllowlist:(BOOL)isAllowlist
+                                clockReadable:(BOOL)clockReadable {
+    if (deepEnforced) return 325;
+    if (![self durationSecsIsValid:durationSecs]) return 326;
+    if (entryCount == 0 && !isAllowlist) return 302;
+    if (!clockReadable) return 327;
+    return 0;
+}
+
 + (NSArray<NSString*>*)desiredLayersWithBaseRunning:(BOOL)baseRunning
                                      overrideActive:(BOOL)overrideActive
                                        deepShouldEnforce:(BOOL)deepShouldEnforce {

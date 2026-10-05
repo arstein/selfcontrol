@@ -15,6 +15,14 @@ typedef NS_ENUM(NSInteger, SCDeepAction) {
 
 @interface SCDeepBlockDecision : NSObject
 + (BOOL)durationSecsIsValid:(NSTimeInterval)secs;
+/// Why a deep-block start must be refused, or 0 to proceed. In order: 325 a deep
+/// block is already enforced (record present OR its rules installed), 326 duration
+/// out of range, 302 empty blocklist (an empty allowlist is fine), 327 no clock reading.
++ (NSInteger)startRefusalCodeWithDeepEnforced:(BOOL)deepEnforced
+                                 durationSecs:(NSTimeInterval)durationSecs
+                                   entryCount:(NSUInteger)entryCount
+                                  isAllowlist:(BOOL)isAllowlist
+                                clockReadable:(BOOL)clockReadable;
 /// Ordered layer names that should be installed. The regular block is lifted only
 /// by an override, and an override never lifts it while a deep block is enforced.
 /// deepShouldEnforce: YES while the deep block's record exists OR its rules are

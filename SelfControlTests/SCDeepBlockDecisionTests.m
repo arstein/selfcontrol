@@ -15,6 +15,19 @@
     XCTAssertFalse([SCDeepBlockDecision durationSecsIsValid:NAN]);
 }
 
+- (void)testStartRefusalCodes {
+    // Order: already enforced (325) > duration (326) > empty blocklist (302) > no clock (327).
+    XCTAssertEqual([SCDeepBlockDecision startRefusalCodeWithDeepEnforced:NO durationSecs:600 entryCount:1 isAllowlist:NO clockReadable:YES], 0);
+    XCTAssertEqual([SCDeepBlockDecision startRefusalCodeWithDeepEnforced:YES durationSecs:600 entryCount:1 isAllowlist:NO clockReadable:YES], 325);
+    XCTAssertEqual([SCDeepBlockDecision startRefusalCodeWithDeepEnforced:YES durationSecs:NAN entryCount:0 isAllowlist:NO clockReadable:NO], 325);
+    XCTAssertEqual([SCDeepBlockDecision startRefusalCodeWithDeepEnforced:NO durationSecs:299 entryCount:1 isAllowlist:NO clockReadable:YES], 326);
+    XCTAssertEqual([SCDeepBlockDecision startRefusalCodeWithDeepEnforced:NO durationSecs:SC_DEEP_MAX_SECS + 1 entryCount:0 isAllowlist:NO clockReadable:NO], 326);
+    XCTAssertEqual([SCDeepBlockDecision startRefusalCodeWithDeepEnforced:NO durationSecs:600 entryCount:0 isAllowlist:NO clockReadable:YES], 302);
+    // An empty allowlist is accepted (blocks everything but infrastructure).
+    XCTAssertEqual([SCDeepBlockDecision startRefusalCodeWithDeepEnforced:NO durationSecs:600 entryCount:0 isAllowlist:YES clockReadable:YES], 0);
+    XCTAssertEqual([SCDeepBlockDecision startRefusalCodeWithDeepEnforced:NO durationSecs:600 entryCount:1 isAllowlist:NO clockReadable:NO], 327);
+}
+
 - (void)testDesiredLayers {
     XCTAssertEqualObjects([SCDeepBlockDecision desiredLayersWithBaseRunning:NO overrideActive:NO deepShouldEnforce:NO], @[]);
     XCTAssertEqualObjects([SCDeepBlockDecision desiredLayersWithBaseRunning:YES overrideActive:NO deepShouldEnforce:NO], @[SCLayerBase]);
