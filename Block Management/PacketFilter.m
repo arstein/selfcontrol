@@ -120,7 +120,7 @@ NSFileHandle* appendFileHandle;
     }
 }
 
-- (void)writeConfiguration {
+- (NSString*)configurationText {
 	NSMutableString* filterConfiguration = [NSMutableString stringWithCapacity: 1000];
 
 	[self addBlockHeader: filterConfiguration];
@@ -129,8 +129,11 @@ NSFileHandle* appendFileHandle;
 	if (isAllowlist) {
 		[self addAllowlistFooter: filterConfiguration];
 	}
+	return filterConfiguration;
+}
 
-	[filterConfiguration writeToFile: @"/etc/pf.anchors/org.eyebeam" atomically: true encoding: NSUTF8StringEncoding error: nil];
+- (void)writeConfiguration {
+	[[self configurationText] writeToFile: @"/etc/pf.anchors/org.eyebeam" atomically: true encoding: NSUTF8StringEncoding error: nil];
 }
 
 - (void)enterAppendMode {

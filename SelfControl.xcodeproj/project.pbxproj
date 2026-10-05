@@ -36,6 +36,7 @@
 		7B22F65F8C9AF39C7B2AA7F0 /* SCBlockEndVerifier.m in Sources */ = {isa = PBXBuildFile; fileRef = D5E8B4627CAD0BF0737808C7 /* SCBlockEndVerifier.m */; };
 		804B13BC7121D0ED56402698 /* SCSNTPClientTests.m in Sources */ = {isa = PBXBuildFile; fileRef = EF40A558EA4A4D4E9BD3D7E6 /* SCSNTPClientTests.m */; };
 		852E43B3F649D630AA026647 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
+		86EF8AB37951183C3963D3A2 /* SCAllowlistRegressionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 536F52DBF0D6D44BBCA6B720 /* SCAllowlistRegressionTests.m */; };
 		87A35CA1E461AF70A4D7B1BB /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		8D11072D0486CEB800E47090 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 29B97316FDCFA39411CA2CEA /* main.m */; settings = {ATTRIBUTES = (); }; };
 		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
@@ -593,11 +594,13 @@
 		3BC40DCB86D4ECF8D096D80B /* SCEnforcementDecisionTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCEnforcementDecisionTests.m; sourceTree = "<group>"; };
 		3EF418F71CC7F7FA002D99E8 /* nl */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/Localizable.strings; sourceTree = "<group>"; };
 		3EF418F81CC7F7FA002D99E8 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		536F52DBF0D6D44BBCA6B720 /* SCAllowlistRegressionTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCAllowlistRegressionTests.m; sourceTree = "<group>"; };
 		6101B237ACEA2EE24946BE6F /* RestrictionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RestrictionsView.swift; sourceTree = "<group>"; };
 		61ABD3209F87AF240A040533 /* SCOverrideDecision.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCOverrideDecision.h; sourceTree = "<group>"; };
 		640D40CB16D6E962003034B3 /* it */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/Localizable.strings; sourceTree = "<group>"; };
 		640D40CC16D6E962003034B3 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		6479EB6CF190B8EFEE10956C /* BlockingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BlockingView.swift; sourceTree = "<group>"; };
+		6708BF7BF916F762E5A4650D /* SCPFTestSupport.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCPFTestSupport.h; sourceTree = "<group>"; };
 		677AFCACBB571EC535202ABD /* SCEnforcementConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCEnforcementConfig.h; sourceTree = "<group>"; };
 		69A871EF1511ACFE38C668EE /* Sheets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Sheets.swift; sourceTree = "<group>"; };
 		753FA509E7CA7437599F493B /* SCSNTPClient.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCSNTPClient.m; sourceTree = "<group>"; };
@@ -1700,6 +1703,8 @@
 				3BC40DCB86D4ECF8D096D80B /* SCEnforcementDecisionTests.m */,
 				DCEA07FD085A8419CC837CD7 /* SCOverrideDecisionTests.m */,
 				7C9867E1F58D960865388A88 /* UIFormattingTests.swift */,
+				6708BF7BF916F762E5A4650D /* SCPFTestSupport.h */,
+				536F52DBF0D6D44BBCA6B720 /* SCAllowlistRegressionTests.m */,
 			);
 			path = SelfControlTests;
 			sourceTree = "<group>";
@@ -3821,6 +3826,7 @@
 				4053EE283E702AA169E1963F /* SCOverrideDecisionTests.m in Sources */,
 				30F48D88C3698773586040F6 /* UIFormatting.swift in Sources */,
 				CF3F309ED00220E6467F6729 /* UIFormattingTests.swift in Sources */,
+				86EF8AB37951183C3963D3A2 /* SCAllowlistRegressionTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

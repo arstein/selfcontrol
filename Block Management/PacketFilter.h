@@ -22,6 +22,7 @@
 - (void)addAllowlistFooter:(NSMutableString*)configText;
 - (void)addRuleWithIP:(NSString*)ip port:(NSInteger)port maskLen:(NSInteger)maskLen;
 - (void)writeConfiguration;
+- (NSString*)configurationText;
 - (int)startBlock;
 - (int)stopBlock:(BOOL)force;
 - (void)addSelfControlConfig;
