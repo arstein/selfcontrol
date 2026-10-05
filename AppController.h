@@ -37,9 +37,11 @@
 	NSLock* refreshUILock_;
 	BOOL blockIsOn;
 	BOOL addingBlock;
+	BOOL addingDeepBlock;
 }
 
 @property (assign) BOOL addingBlock;
+@property (assign) BOOL addingDeepBlock;
 
 // Shared daemon XPC connection. Exposed read-only so the SwiftUI window
 // (AppModel) can reuse the same connection instead of opening its own.
@@ -100,6 +102,15 @@
 // updateBlocklist. Returns errors instead of presenting them (no-block 102, legacy 303, allowlist 305, invalid input,
 // no network, busy, or the daemon's error).
 - (void)addEntriesToRunningBlock:(NSString*)rawInput completion:(void (^)(NSError* _Nullable error))completion;
+
+// Starts a deep block from the DeepBlocklist/DeepBlockAsWhitelist/DeepBlockDuration
+// defaults after a confirmation dialog. Completion on the main queue; error nil on
+// success, or an auth-cancel / NSError otherwise. Not called at all if the user cancels the dialog.
+- (void)startDeepBlockWithCompletion:(void (^)(NSError* _Nullable error))completion;
+
+// Export/import a list (and its Block/Allow mode) to/from a .selfcontrol file.
+- (void)exportListForKey:(NSString*)listKey allowlistKey:(NSString*)allowlistKey;
+- (void)importListForKey:(NSString*)listKey allowlistKey:(NSString*)allowlistKey;
 
 // Extends the RUNNING block (clamped to
 // MaxBlockLength; daemon still enforces its 24h-per-call cap, error 309).
