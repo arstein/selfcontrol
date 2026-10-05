@@ -1,4 +1,5 @@
 #import "SCRuleCompiler.h"
+#include <arpa/inet.h>
 
 static NSString* const kLayersPrefix = @"# sc-layers: ";
 static NSString* const kDeepPrefix = @"# sc-deep: ";
@@ -26,9 +27,14 @@ static NSString* const kBlockPrefix = @"block return out quick proto { tcp udp }
 + (NSString*)addressForSpec:(NSDictionary*)spec {
     NSString* ip = spec[@"ip"];
     if (![ip isKindOfClass:[NSString class]] || ip.length == 0) return nil;
-    NSCharacterSet* allowed = [NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF:."];
-    if ([ip rangeOfCharacterFromSet:allowed.invertedSet].location != NSNotFound) return nil;
-    NSInteger maxMask = [ip containsString:@":"] ? 128 : 32;
+    // Strict parse: anything inet_pton rejects would make pf reject the whole ruleset.
+    const char* cip = ip.UTF8String;
+    struct in_addr a4;
+    struct in6_addr a6;
+    NSInteger maxMask;
+    if (inet_pton(AF_INET, cip, &a4) == 1) maxMask = 32;
+    else if (inet_pton(AF_INET6, cip, &a6) == 1) maxMask = 128;
+    else return nil;
     NSInteger mask = [spec[@"maskLen"] integerValue];
     if (mask < 0 || mask > maxMask) return nil;
     return mask > 0 ? [NSString stringWithFormat:@"%@/%ld", ip, (long)mask] : ip;
@@ -49,41 +55,57 @@ static NSString* const kBlockPrefix = @"block return out quick proto { tcp udp }
 }
 
 + (NSString*)anchorTextForLayers:(NSArray<SCRuleLayer*>*)layers {
+    // Only well-formed, unique layer names are emitted: the name goes into the
+    // marker line and a pf table name, so anything else could break parsing.
+    NSMutableArray<SCRuleLayer*>* emitted = [NSMutableArray array];
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    NSCharacterSet* nonLower = [NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyz"].invertedSet;
+    for (SCRuleLayer* layer in layers) {
+        NSString* name = layer.name;
+        if (![name isKindOfClass:[NSString class]] || name.length == 0) continue;
+        if ([name rangeOfCharacterFromSet:nonLower].location != NSNotFound) continue;
+        if ([names containsObject:name]) continue;
+        [names addObject:name];
+        [emitted addObject:layer];
+    }
+    layers = emitted;
+
     NSMutableString* t = [NSMutableString string];
-    NSMutableArray* names = [NSMutableArray array];
-    for (SCRuleLayer* layer in layers) [names addObject:layer.name];
     [t appendFormat:@"%@%@\n", kLayersPrefix, [names componentsJoinedByString:@","]];
     for (SCRuleLayer* layer in layers) {
-        if (layer.payload == nil) continue;
+        if (layer.payload == nil || ![NSJSONSerialization isValidJSONObject:layer.payload]) continue;
         NSData* json = [NSJSONSerialization dataWithJSONObject:layer.payload options:0 error:nil];
         if (json != nil) [t appendFormat:@"%@%@\n", kDeepPrefix, [json base64EncodedStringWithOptions:0]];
     }
 
-    [t appendString:@"set block-policy drop\n"
-     "set fingerprints \"/etc/pf.os\"\n"
-     "set ruleset-optimization basic\n"
-     "set skip on lo0\n"
-     "\n"
-     "# Always reachable, whatever the lists say: time checks (fail-closed timing), DNS, DHCP, mDNS.\n"
+    // No `set` options: pf ignores them inside an anchor. Loopback and the
+    // infrastructure below must always pass, so they come before every block.
+    [t appendString:@"\n"
+     "# Always reachable, whatever the lists say: loopback, time checks (fail-closed timing), DNS, DHCP/DHCPv6, mDNS.\n"
+     "pass quick on lo0 all\n"
      "pass out quick proto udp from any to any port 123\n"
      "pass out quick proto { tcp udp } from any to any port 53\n"
-     "pass out quick proto { tcp udp } from any to any port { 67 68 5353 }\n"];
+     "pass out quick proto udp from any to any port { 67 68 546 547 5353 }\n"];
 
     for (SCRuleLayer* layer in layers) {
         NSString* table = [NSString stringWithFormat:@"sc_%@", layer.name];
         [t appendFormat:@"\n# layer %@ (%@)\n", layer.name, layer.isAllowlist ? @"allowlist" : @"blocklist"];
         if (layer.isAllowlist) {
-            // A "*" entry allows everything: this layer restricts nothing.
+            // A portless "*" entry allows everything: this layer restricts nothing.
+            // A "*" entry with a port is ignored (the table can't express it; stricter = fail-closed).
             BOOL allowsAll = NO;
             NSMutableOrderedSet<NSString*>* allowed = [NSMutableOrderedSet orderedSet];
             for (NSDictionary* spec in layer.specs) {
-                if ([self specIsStar:spec]) { allowsAll = YES; break; }
+                if ([self specIsStar:spec]) {
+                    if ([self portForSpec:spec] == 0) { allowsAll = YES; break; }
+                    continue;
+                }
                 NSString* address = [self addressForSpec:spec];
                 if (address != nil) [allowed addObject:address];
             }
             if (allowsAll) continue;
             if (layer.allowLocal) {
-                [allowed addObjectsFromArray:@[@"10.0.0.0/8", @"172.16.0.0/12", @"192.168.0.0/16", @"169.254.0.0/16"]];
+                [allowed addObjectsFromArray:@[@"10.0.0.0/8", @"172.16.0.0/12", @"192.168.0.0/16", @"169.254.0.0/16", @"fe80::/10", @"fc00::/7"]];
             }
             [t appendString:[self tableLineNamed:table addresses:allowed]];
             [t appendFormat:@"%@! <%@>\n", kBlockPrefix, table];
