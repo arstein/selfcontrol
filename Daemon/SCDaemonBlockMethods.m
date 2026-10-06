@@ -22,6 +22,9 @@
 #import "SCOverrideDecision.h"
 #import "SCOverrideConfig.h"
 #import "SCSNTPClient.h"
+#import "SCDeepBlockDecision.h"
+#import "SCDeepBlockConfig.h"
+#import "SCRuleCompiler.h"
 #import <stdatomic.h>
 
 NSTimeInterval METHOD_LOCK_TIMEOUT = 5.0;
@@ -37,6 +40,8 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
 + (NSDate*)overrideEndDateFromSettings:(SCSettings*)settings
                            outStateOut:(NSDictionary**)outState;
 + (NSTimeZone*)activationTimeZoneFromSettings:(SCSettings*)settings;
++ (BOOL)overrideActiveNowInSettings:(SCSettings*)settings;
++ (void)installBaseLayerIfMissing;
 // Applies a verified-time trusted-timing decision (and, if verified-expired,
 // removes the block). Caller holds daemonMethodLock and has already checked
 // modernBlockIsRunning + verifier generation. Does NOT sync or notify, except
@@ -57,6 +62,27 @@ NSTimeInterval CHECKUP_LOCK_TIMEOUT = 0.5; // use a shorter lock timeout for che
 // anchored TrustedClockState; `verifiedNow` is only a nil-guard). Writes
 // OverrideState (no sync). Returns YES iff a reset was written.
 + (BOOL)applyOverrideResetForVerifiedNow:(NSDate*)verifiedNow settings:(SCSettings*)settings;
++ (void)stopCheckupTimerIfIdle;
++ (void)requestVerifiedTime;
++ (void)handleDeepSelfHealVerifiedTime:(NSDate*)verifiedNow
+                               reading:(NSDictionary*)reading
+                            generation:(NSUInteger)generation;
+// Deep-block side of a verified network time: heals a broken/missing record, else
+// corrects/rebases its timing and removes it when verified-expired. Caller holds
+// daemonMethodLock and has checked the verifier generation. Syncs and notifies.
++ (void)applyDeepVerifiedTime:(NSDate*)verifiedNow reading:(NSDictionary*)reading settings:(SCSettings*)settings
+              playEndSound:(BOOL)playEndSound;
+// Shared throttle for TIGHTENING re-installs only (checkup Install, a missing
+// regular-block layer, a missing deep layer, integrity re-apply): runs `attempt`
+// unless a recent failure put it in backoff (then returns NO without trying).
+// Failures back off 5 s, doubling to 300 s; a success resets it. Never used for
+// removals, overrides, block starts or verified-expiry applies, which always run.
+// Caller holds daemonMethodLock.
++ (BOOL)installThrottled:(BOOL (^)(void))attempt;
++ (void)resetInstallBackoff;
+// Heals the deep record to verified now + SC_DEEP_HEAL_SECS when still needed.
+// Caller holds daemonMethodLock. Returns YES iff a heal was written (and synced).
++ (BOOL)healDeepBlockIfNeededWithVerifiedTime:(NSDate*)verifiedNow reading:(NSDictionary*)reading settings:(SCSettings*)settings;
 @end
 
 // Single daemon-held tedium override challenge instance. All access is
@@ -67,6 +93,11 @@ static SCTediumChallenge* tediumChallenge = nil;
 // YES while an invoke's live SNTP worker is running (see invokeOverrideWithReply:).
 // Set by the invoker just before dispatch; cleared only by the worker itself.
 static atomic_bool sOverrideSNTPWorkerInFlight = false;
+
+// Install backoff state (see installThrottled:). Guarded by daemonMethodLock.
+// Continuous uptime: monotonic and counts sleep, so wall-clock changes can't skew it.
+static NSTimeInterval sNextInstallAttemptUptime = 0;
+static NSTimeInterval sInstallBackoffSecs = 0;
 
 @implementation SCDaemonBlockMethods
 
@@ -96,6 +127,38 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
 }
 + (BOOL)lockOrTimeout:(void(^)(NSError* error))reply {
     return [self lockOrTimeout: reply timeout: METHOD_LOCK_TIMEOUT];
+}
+
+// Stops checkups only when neither block is left (nor any rules for them).
++ (void)stopCheckupTimerIfIdle {
+    if (![SCBlockUtilities modernBlockIsRunning] && ![SCBlockUtilities deepBlockIsRunning] &&
+        ![[SCBlockUtilities installedLayerNames] containsObject:SCLayerDeep]) {
+        [[SCDaemon sharedDaemon] stopCheckupTimer];
+    }
+}
+
++ (void)resetInstallBackoff {
+    sInstallBackoffSecs = 0;
+    sNextInstallAttemptUptime = 0;
+}
+
++ (BOOL)installThrottled:(BOOL (^)(void))attempt {
+    NSTimeInterval now = [SCTrustedClock continuousUptimeSecs];
+    if (sInstallBackoffSecs > 0 && now < sNextInstallAttemptUptime) return NO;
+    if (attempt()) {
+        [self resetInstallBackoff];
+        return YES;
+    }
+    sInstallBackoffSecs = [SCEnforcementDecision installBackoffSecsAfterFailureWithCurrent:sInstallBackoffSecs];
+    sNextInstallAttemptUptime = now + sInstallBackoffSecs;
+    NSLog(@"WARNING: Rule install failed; next re-install attempt in %.0f s.", sInstallBackoffSecs);
+    return NO;
+}
+
++ (void)requestVerifiedTime {
+    [[SCBlockEndVerifier sharedVerifier] requestVerificationWithCompletion:^(NSDate* v, NSDictionary* r, NSUInteger g) {
+        [SCDaemonBlockMethods handleVerifiedTime:v reading:r generation:g];
+    }];
 }
 
 
@@ -193,8 +256,17 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     }
 
     NSLog(@"Adding firewall rules...");
-    [SCHelperToolUtilities installBlockRulesFromSettings];
+    // BlockIsRunning first: the desired layers derive from it.
     [settings setValue: @YES forKey: @"BlockIsRunning"];
+    if ([SCHelperToolUtilities installBlockRulesFromSettings]) {
+        [SCDaemonBlockMethods resetInstallBackoff];   // a fresh block's repairs start unthrottled
+    } else {
+        // BlockIsRunning stays YES: a failed install leaves the previous rules in
+        // place (PacketFilter rolls back, and takes out pf.conf lines it added), so
+        // the checkup sees the regular block's rules missing and retries the install.
+        NSLog(@"ERROR: Installing the block's rules failed; the checkup will retry.");
+        [SCSentry addBreadcrumb: @"Daemon failed to install block rules at start" category: @"daemon"];
+    }
     
     NSError* syncErr = [settings syncSettingsAndWait: 5]; // synchronize ASAP since BlockIsRunning is a really important one
     if (syncErr != nil) {
@@ -217,6 +289,93 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     [[SCDaemon sharedDaemon] resetInactivityTimer];
     [[SCDaemon sharedDaemon] startCheckupTimer];
     [self.daemonMethodLock unlock];
+}
+
++ (void)startDeepBlockWithBlocklist:(NSArray<NSString*>*)blocklist isAllowlist:(BOOL)isAllowlist durationSecs:(double)durationSecs blockSettings:(NSDictionary*)blockSettings reply:(void(^)(NSError* error))reply {
+    if (![SCDaemonBlockMethods lockOrTimeout: reply]) return;
+    [[SCDaemon sharedDaemon] resetInactivityTimer];
+    [SCSentry addBreadcrumb: @"Daemon method startDeepBlock called" category: @"daemon"];
+
+    NSArray<NSString*>* filtered = [SCBlockUtilities blocklistByRemovingTimeSources: blocklist ?: @[]];
+    NSDictionary* reading = [SCTrustedClock currentReading];
+    // "Already running" also covers deep rules installed without a record (tampered
+    // away, awaiting heal): a new record would replace what that layer enforces.
+    NSInteger refusal = [SCDeepBlockDecision startRefusalCodeWithDeepEnforced: [SCHelperToolUtilities deepShouldEnforce]
+                                                                 durationSecs: durationSecs
+                                                                   entryCount: filtered.count
+                                                                  isAllowlist: isAllowlist
+                                                                clockReadable: reading[@"wall"] != nil];
+    if (refusal != 0) {
+        reply([SCErr errorWithCode: refusal]);
+        [self.daemonMethodLock unlock];
+        return;
+    }
+
+    SCSettings* settings = [SCSettings sharedSettings];
+    NSMutableDictionary* record = [@{
+        @"blocklist": filtered,
+        @"isAllowlist": @(isAllowlist),
+        @"durationSecs": @(durationSecs),
+        @"startWall": reading[@"wall"],
+        @"startIsVerified": @NO,
+        @"needsVerification": @YES,
+        @"clockState": [SCTrustedClock freshStateWithReading: reading],
+        @"allowLocal": @([blockSettings[@"AllowLocalNetworks"] boolValue]),
+        @"evaluateCommonSubdomains": @([blockSettings[@"EvaluateCommonSubdomains"] boolValue]),
+        @"includeLinkedDomains": @([blockSettings[@"IncludeLinkedDomains"] boolValue]),
+    } mutableCopy];
+    if (blockSettings[@"EmergencyUnlockEnabled"] != nil) record[@"emergencyUnlockEnabled"] = blockSettings[@"EmergencyUnlockEnabled"];
+    [settings setValue: record forKey: @"DeepBlock"];
+
+    // Overrides are off for the whole deep block: end one that's running now.
+    id originalOverrideState = [settings valueForKey: @"OverrideState"];
+    BOOL overrideEnded = NO;
+    if ([originalOverrideState isKindOfClass: [NSDictionary class]] && originalOverrideState[@"overrideEndDate"] != nil) {
+        NSMutableDictionary* ended = [originalOverrideState mutableCopy];
+        [ended removeObjectForKey: @"overrideEndDate"];
+        [settings setValue: ended forKey: @"OverrideState"];
+        overrideEnded = YES;
+        NSLog(@"INFO: Deep block starting; ending the active override.");
+    }
+
+    // Derives base (if running) + deep. Starts always run: not throttled.
+    BOOL installed = [SCHelperToolUtilities installBlockRulesFromSettings];
+    if (!installed && [[SCBlockUtilities installedLayerNames] containsObject: SCLayerDeep]) {
+        // pf took the deep layer but a later step (e.g. the hosts write) failed.
+        // Rolling the record back would orphan installed deep rules, which the heal
+        // path would then rebuild as a 4-hour block. Keep the record: the block has
+        // started, and the checkup's integrity check repairs the rest.
+        NSLog(@"WARNING: Deep block rules are in pf but the install reported a failure; keeping the deep block, the checkup will repair it.");
+        [SCSentry addBreadcrumb: @"Deep block start: partial install kept" category: @"daemon"];
+        installed = YES;
+    }
+    if (!installed) {
+        // A start that didn't install must not leave a record behind.
+        NSLog(@"ERROR: Installing the deep block's rules failed; not starting it.");
+        [SCBlockUtilities removeDeepBlockFromSettings];
+        if (overrideEnded) [settings setValue: originalOverrideState forKey: @"OverrideState"];
+        NSError* syncErr = [settings syncSettingsAndWait: 5];
+        if (syncErr != nil) NSLog(@"WARNING: Sync failed after rolling back deep block start: %@", syncErr);
+        [SCSentry addBreadcrumb: @"Daemon failed to install deep block rules at start" category: @"daemon"];
+        reply([SCErr errorWithCode: 327]);
+        [[SCDaemon sharedDaemon] resetInactivityTimer];
+        [self.daemonMethodLock unlock];
+        return;
+    }
+    [SCDaemonBlockMethods resetInstallBackoff];
+    [SCDaemonBlockMethods invalidateTediumChallenge];
+
+    NSError* syncErr = [settings syncSettingsAndWait: 5];
+    if (syncErr != nil) NSLog(@"WARNING: Sync failed after starting deep block: %@", syncErr);
+    [SCHelperToolUtilities sendConfigurationChangedNotification];
+    if ([blockSettings[@"ClearCaches"] boolValue]) [SCHelperToolUtilities clearBrowserCaches];
+
+    NSLog(@"INFO: Deep block started (%.0fs, %@).", durationSecs, isAllowlist ? @"allowlist" : @"blocklist");
+    reply(nil);
+    [[SCDaemon sharedDaemon] resetInactivityTimer];
+    [[SCDaemon sharedDaemon] startCheckupTimer];
+    [self.daemonMethodLock unlock];
+    [SCDaemonBlockMethods requestVerifiedTime];
 }
 
 + (void)updateBlocklist:(NSArray<NSString*>*)newBlocklist authorization:(NSData *)authData reply:(void(^)(NSError* error))reply {
@@ -268,22 +427,19 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         NSLog(@"WARNING: Active blocklist has removed items; these will not be updated. Removed items are %@", removed);
     }
     
-    // Argument order matches SCHelperToolUtilities installBlockRulesFromSettings
-    // (these two were previously swapped).
-    BlockManager* blockManager = [[BlockManager alloc] initAsAllowlist: [settings boolForKey: @"ActiveBlockAsWhitelist"]
-                                                            allowLocal: [settings boolForKey: @"AllowLocalNetworks"]
-                                               includeCommonSubdomains: [settings boolForKey: @"EvaluateCommonSubdomains"]
-                                                  includeLinkedDomains: [settings boolForKey: @"IncludeLinkedDomains"]];
-    [blockManager enterAppendMode];
-    [blockManager addBlockEntriesFromStrings: added];
-    [blockManager finishAppending];
-    
     // Preserve active entries even if a caller omitted them; mid-block edits
     // are tighten-only.
     NSMutableArray* storedBlocklist = [activeBlocklist mutableCopy];
     [storedBlocklist addObjectsFromArray:added];
     [settings setValue:storedBlocklist forKey:@"ActiveBlocklist"];
-    
+
+    // Re-resolve and rewrite every layer (no partial appends). If an override is
+    // active the base layer must stay lifted: computed exactly as checkupBlock does.
+    BOOL overrideActive = [SCDaemonBlockMethods overrideActiveNowInSettings:settings];
+    BOOL applied = overrideActive ? [SCHelperToolUtilities clearBlockRulesOnly]
+                                  : [SCHelperToolUtilities installBlockRulesFromSettings];
+    if (!applied) NSLog(@"ERROR: Failed to apply block rules after updating the blocklist.");
+
     // make sure everyone knows about our new list
     NSError* syncErr = [settings syncSettingsAndWait: 5];
     if (syncErr != nil) {
@@ -395,6 +551,39 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     return tz ?: [NSTimeZone timeZoneForSecondsFromGMT:0];
 }
 
+// "Rules installed" above is coarse (pf.conf anchor line OR hosts block), so a
+// deep layer alone counts. When the regular block runs (and no override lifts
+// it) but its layer is not in the installed anchor - a failed install that was
+// rolled back onto the deep layer, or an override that just ended - install it.
+// Tightening only; no network needed.
++ (void)installBaseLayerIfMissing {
+    if (![SCBlockUtilities modernBlockIsRunning] || [SCBlockUtilities baseRulesFoundOnSystem]) return;
+    __block BOOL attempted = NO;
+    BOOL installed = [SCDaemonBlockMethods installThrottled:^BOOL{
+        attempted = YES;
+        NSLog(@"INFO: Regular block running but its rules are missing; installing.");
+        return [SCHelperToolUtilities installBlockRulesFromSettings];
+    }];
+    if (!attempted) return;   // backing off after a recent failure
+    if (!installed) NSLog(@"ERROR: Installing the regular block's rules failed; will retry.");
+    [SCHelperToolUtilities sendConfigurationChangedNotification];
+}
+
+// Fail-closed override state: requires a genuinely ANCHORED trusted clock
+// (trustedNowForState: silently returns the raw wall clock when wallAnchor is
+// absent), and the lift is bounded so a corrupt overrideEndDate can't lift forever.
++ (BOOL)overrideActiveNowInSettings:(SCSettings*)settings {
+    NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
+    NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState
+                                                    reading:[SCTrustedClock currentReading]];
+    NSDate* overrideEndDate = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:NULL];
+    BOOL clockAnchored = [clockState isKindOfClass:[NSDictionary class]] && clockState[@"wallAnchor"] != nil;
+    return [SCOverrideDecision liftRemainingSecsWithTrustedNow:trustedNow
+                                               overrideEndDate:overrideEndDate
+                                                 clockAnchored:clockAnchored
+                                                   maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS] > 0;
+}
+
 + (void)checkupBlock {
     if (![SCDaemonBlockMethods lockOrTimeout: nil timeout: CHECKUP_LOCK_TIMEOUT]) {
         return;
@@ -411,7 +600,9 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     SCSettings* settings = [SCSettings sharedSettings];
 
     // --- Resolve enforcement inputs (all reads, no side effects). ---
-    BOOL rulesInstalled = [SCBlockUtilities blockRulesFoundOnSystem];
+    // The regular block's own rules: a deep layer alone must not look like them.
+    NSArray* installedLayers = [SCBlockUtilities installedLayerNames];
+    BOOL rulesInstalled = [installedLayers containsObject:SCLayerBase];
     BOOL modernRunning = [SCBlockUtilities modernBlockIsRunning];
     BOOL legacyRunning = [SCBlockUtilities legacyBlockIsRunning];
 
@@ -439,12 +630,13 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     // bound the lift so a corrupt/oversized overrideEndDate cannot lift indefinitely.
     NSDate* trustedNow = [SCTrustedClock trustedNowForState:clockState
                                                     reading:[SCTrustedClock currentReading]];
-    NSDate* overrideEndDate = [SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:NULL];
     BOOL clockAnchored = [clockState isKindOfClass:[NSDictionary class]] && clockState[@"wallAnchor"] != nil;
-    BOOL overrideActive = [SCOverrideDecision liftRemainingSecsWithTrustedNow:trustedNow
-                                                               overrideEndDate:overrideEndDate
-                                                                 clockAnchored:clockAnchored
-                                                                   maxLiftSecs:SC_OVERRIDE_MAX_LIFT_SECS] > 0;
+    BOOL overrideActive = [SCDaemonBlockMethods overrideActiveNowInSettings:settings];
+    // An override never lifts the regular block while the deep block is enforced
+    // (record present, or its rules installed without one).
+    NSDictionary* deep = [SCBlockUtilities deepBlockRecord];
+    BOOL deepEnforced = deep != nil || [installedLayers containsObject:SCLayerDeep];
+    BOOL baseLifted = overrideActive && !deepEnforced;
 
     // Midnight reset must be driven by VERIFIED time (master spec §4). trustedNow advances
     // monotonically offline, so it may only DETECT that a reset is due; the reset itself is
@@ -469,10 +661,11 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
 
     switch (action) {
         case SCEnforcementActionStopNoBlock: {
+            if (deepEnforced) break;   // the deep block keeps checkups running
             NSLog(@"INFO: Checkup ran; no block in settings and no rules on system; stopping checkups.");
             [SCDaemonBlockMethods invalidateTediumChallenge];
             // once the checkups stop, the daemon will clear itself in a while due to inactivity
-            [[SCDaemon sharedDaemon] stopCheckupTimer];
+            [SCDaemonBlockMethods stopCheckupTimerIfIdle];
             break;
         }
         case SCEnforcementActionLegacyExpireCheck: {
@@ -480,9 +673,13 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
             // (anti-permablock for old blocks). Otherwise leave checkups running.
             if ([SCBlockUtilities currentBlockIsExpired]) {
                 NSLog(@"INFO: Legacy block expired; preserving upstream removal behavior.");
-                [SCHelperToolUtilities removeBlock];
-                [SCDaemonBlockMethods invalidateTediumChallenge];
-                [[SCDaemon sharedDaemon] stopCheckupTimer];
+                if ([SCHelperToolUtilities removeBlock]) {
+                    [SCDaemonBlockMethods invalidateTediumChallenge];
+                    // A deep block may still be enforced: only stop when nothing is left.
+                    [SCDaemonBlockMethods stopCheckupTimerIfIdle];
+                } else {
+                    NSLog(@"ERROR: Removing the expired legacy block failed; will retry.");
+                }
             }
             break;
         }
@@ -493,7 +690,7 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
             NSLog(@"WARNING: Rules present but BlockIsRunning was off; re-asserting.");
             [settings setValue:@YES forKey:@"BlockIsRunning"];
             [settings syncSettingsAndWait:5];
-            if (overrideActive) {
+            if (baseLifted) {
                 [SCHelperToolUtilities clearBlockRulesOnly];
             }
             [SCHelperToolUtilities sendConfigurationChangedNotification];
@@ -511,7 +708,7 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         }
         case SCEnforcementActionInstall: {
             // Tightening: rules should be up but aren't. Install immediately (no network).
-            if (overrideActive) {
+            if (baseLifted) {
                 // Override running: desired base rules = none. Ensure lifted.
                 if (rulesInstalled) {
                     [SCHelperToolUtilities clearBlockRulesOnly];
@@ -519,22 +716,32 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
                 }
                 break;
             }
-            NSLog(@"INFO: Desired enforcement on but rules missing; installing.");
-            [SCHelperToolUtilities installBlockRulesFromSettings];
-            [SCHelperToolUtilities sendConfigurationChangedNotification];
+            __block BOOL attempted = NO;
+            [SCDaemonBlockMethods installThrottled:^BOOL{
+                attempted = YES;
+                NSLog(@"INFO: Desired enforcement on but rules missing; installing.");
+                return [SCHelperToolUtilities installBlockRulesFromSettings];
+            }];
+            if (attempted) [SCHelperToolUtilities sendConfigurationChangedNotification];
             break;
         }
         case SCEnforcementActionSeekVerifiedExpiry: {
             // Trusted-expired: ask for verified time. handleVerifiedTime remains
-            // the ONLY place expiry removes rules. No integrity check (about to remove).
+            // the ONLY place expiry removes rules. While waiting (e.g. offline) pf may
+            // be disabled or flushed, so the integrity check (add-only) still runs.
             [[SCBlockEndVerifier sharedVerifier]
                 requestVerificationWithCompletion:^(NSDate* verifiedNow, NSDictionary* reading, NSUInteger generation) {
                     [SCDaemonBlockMethods handleVerifiedTime:verifiedNow reading:reading generation:generation];
                 }];
+            if ([[NSDate date] timeIntervalSinceDate:lastBlockIntegrityCheck] > integrityCheckIntervalSecs) {
+                lastBlockIntegrityCheck = [NSDate date];
+                shouldRunIntegrityCheck = YES;
+            }
             break;
         }
         case SCEnforcementActionSeekVerifiedStart: {
             // Start not yet verified / re-verification flagged: ask for verified time.
+            if (!baseLifted) [SCDaemonBlockMethods installBaseLayerIfMissing];
             [[SCBlockEndVerifier sharedVerifier]
                 requestVerificationWithCompletion:^(NSDate* verifiedNow, NSDictionary* reading, NSUInteger generation) {
                     [SCDaemonBlockMethods handleVerifiedTime:verifiedNow reading:reading generation:generation];
@@ -547,19 +754,81 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         }
         case SCEnforcementActionSteady: {
             // Enforced, installed, verified. Periodic integrity check only.
-            if (overrideActive) {
+            if (baseLifted) {
                 if (rulesInstalled) {
                     [SCHelperToolUtilities clearBlockRulesOnly];
                     [SCHelperToolUtilities sendConfigurationChangedNotification];
                 }
                 break; // no integrity check while base is intentionally lifted
             }
+            [SCDaemonBlockMethods installBaseLayerIfMissing];
             if ([[NSDate date] timeIntervalSinceDate:lastBlockIntegrityCheck] > integrityCheckIntervalSecs) {
                 lastBlockIntegrityCheck = [NSDate date];
                 shouldRunIntegrityCheck = YES;
             }
             break;
         }
+    }
+
+    // --- Deep block (Phase 5): parallel record, same fail-closed timing rules. ---
+    // Re-read: the regular-block branch may have just installed layers (or re-armed).
+    deep = [SCBlockUtilities deepBlockRecord];
+    installedLayers = [SCBlockUtilities installedLayerNames];
+    BOOL deepInstalled = [installedLayers containsObject:SCLayerDeep];
+    NSNumber* deepRemaining = [SCBlockUtilities trustedRemainingDeepBlockSecs];
+    SCDeepAction deepAction = [SCDeepBlockDecision
+        actionForRecordPresent:deep != nil
+                timingComplete:[SCDeepBlockDecision recordTimingIsComplete:deep]
+                remainingKnown:deepRemaining != nil
+                       expired:deepRemaining != nil && deepRemaining.doubleValue <= 0
+               startIsVerified:[deep[@"startIsVerified"] boolValue]
+             needsVerification:[deep[@"needsVerification"] boolValue]
+                layerInstalled:deepInstalled];
+    switch (deepAction) {
+        case SCDeepActionNone:
+        case SCDeepActionSteady:
+            break;
+        case SCDeepActionInstall: {
+            // Tightening, no network. Union with what's installed so this can only add
+            // (e.g. regular-block rules whose running flag was just re-armed stay put).
+            NSMutableOrderedSet* layers = [NSMutableOrderedSet orderedSetWithArray:
+                [SCDeepBlockDecision desiredLayersWithBaseRunning:[SCBlockUtilities modernBlockIsRunning]
+                                                   overrideActive:overrideActive
+                                                deepShouldEnforce:YES]];
+            [layers addObjectsFromArray:installedLayers];
+            __block BOOL attempted = NO;
+            BOOL installed = [SCDaemonBlockMethods installThrottled:^BOOL{
+                attempted = YES;
+                NSLog(@"INFO: Deep block rules missing; installing.");
+                return [SCHelperToolUtilities applyDesiredLayers:layers.array];
+            }];
+            if (attempted) {
+                if (!installed) NSLog(@"ERROR: Installing the deep block's rules failed; will retry.");
+                [SCHelperToolUtilities sendConfigurationChangedNotification];
+            }
+            if (![deep[@"startIsVerified"] boolValue] || [deep[@"needsVerification"] boolValue]) {
+                [SCDaemonBlockMethods requestVerifiedTime];
+            }
+            break;
+        }
+        case SCDeepActionSeekVerifiedStart:
+        case SCDeepActionSeekVerifiedExpiry:
+            // handleVerifiedTime: is the only place a deep block's expiry removes it.
+            [SCDaemonBlockMethods requestVerifiedTime];
+            break;
+        case SCDeepActionHeal:
+            // Online: heal to verified now + SC_DEEP_HEAL_SECS. Offline: rules untouched.
+            NSLog(@"WARNING: Deep block end undeterminable (or record missing); attempting self-heal.");
+            [[SCBlockEndVerifier sharedVerifier] requestVerificationWithCompletion:^(NSDate* v, NSDictionary* r, NSUInteger g) {
+                [SCDaemonBlockMethods handleDeepSelfHealVerifiedTime:v reading:r generation:g];
+            }];
+            break;
+    }
+    // Integrity also covers a deep-only block (it only ever adds rules).
+    if ((deepAction == SCDeepActionSteady || deepAction == SCDeepActionSeekVerifiedStart || deepAction == SCDeepActionSeekVerifiedExpiry || deepAction == SCDeepActionHeal) &&
+        [[NSDate date] timeIntervalSinceDate:lastBlockIntegrityCheck] > integrityCheckIntervalSecs) {
+        lastBlockIntegrityCheck = [NSDate date];
+        shouldRunIntegrityCheck = YES;
     }
 
     [[SCDaemon sharedDaemon] resetInactivityTimer];
@@ -584,34 +853,128 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
 
     // A reset (startBlock, or a removal) between the fetch completing and us
     // acquiring the lock means this result belongs to a block that is gone.
-    if (![SCBlockUtilities modernBlockIsRunning] ||
+    // One verification serves both blocks (and a deep layer whose record is gone).
+    BOOL baseRunning = [SCBlockUtilities modernBlockIsRunning];
+    BOOL deepPresent = [SCBlockUtilities deepBlockIsRunning] ||
+                       [[SCBlockUtilities installedLayerNames] containsObject:SCLayerDeep];
+    if ((!baseRunning && !deepPresent) ||
         ![[SCBlockEndVerifier sharedVerifier] isCurrentGeneration:generation]) {
         [self.daemonMethodLock unlock];
         return;
     }
 
     SCSettings* settings = [SCSettings sharedSettings];
-    BOOL removed = NO;
-    BOOL correctedStart = NO;
-    if (![SCDaemonBlockMethods applyVerifiedTime:verifiedNow
-                                         reading:reading
-                                        settings:settings
-                                  didRemoveBlock:&removed
-                                  startCorrected:&correctedStart]) {
-        [self.daemonMethodLock unlock];
+    BOOL baseRemoved = NO;
+    if (baseRunning) {
+        BOOL removed = NO;
+        BOOL correctedStart = NO;
+        // NO = the regular block's timing is incomplete: keep it, but still serve the deep block.
+        if ([SCDaemonBlockMethods applyVerifiedTime:verifiedNow
+                                            reading:reading
+                                           settings:settings
+                                     didRemoveBlock:&removed
+                                     startCorrected:&correctedStart] && !removed) {
+            // Verified time in hand: this is the ONLY place the daily override
+            // ration resets (the checkup merely detects that one is due).
+            BOOL resetApplied = [SCDaemonBlockMethods applyOverrideResetForVerifiedNow:verifiedNow settings:settings];
+            if (resetApplied) NSLog(@"INFO: Daily override ration reset against verified network time.");
+            NSError* syncError = [settings syncSettingsAndWait:5];
+            if (syncError != nil) NSLog(@"WARNING: failed to persist verified time: %@", syncError);
+            if (correctedStart || resetApplied) [SCHelperToolUtilities sendConfigurationChangedNotification];
+        }
+        baseRemoved = removed;
+    }
+
+    if (deepPresent) {
+        // Both blocks ending on the same verified time: the end sound plays once.
+        [SCDaemonBlockMethods applyDeepVerifiedTime:verifiedNow reading:reading settings:settings
+                                       playEndSound:!baseRemoved];
+    }
+
+    [self.daemonMethodLock unlock];
+}
+
++ (void)applyDeepVerifiedTime:(NSDate*)verifiedNow reading:(NSDictionary*)reading settings:(SCSettings*)settings
+              playEndSound:(BOOL)playEndSound {
+    // A broken or missing record can't be timed: heal it (never remove on doubt).
+    if ([SCDaemonBlockMethods healDeepBlockIfNeededWithVerifiedTime:verifiedNow reading:reading settings:settings]) return;
+
+    NSDictionary* deep = [SCBlockUtilities deepBlockRecord];
+    if (deep == nil) return;
+    NSDictionary* decision = [SCBlockUtilities trustedTimingDecisionForSettings:[SCDeepBlockDecision timingSnapshotForRecord:deep]
+                                                                   verifiedNow:verifiedNow
+                                                                       reading:reading];
+    if (decision == nil) {
+        NSLog(@"WARNING: Verified network time received, but deep-block timing is incomplete; keeping it.");
         return;
     }
-
-    if (!removed) {
-        // Verified time in hand: this is the ONLY place the daily override
-        // ration resets (the checkup merely detects that one is due).
-        BOOL resetApplied = [SCDaemonBlockMethods applyOverrideResetForVerifiedNow:verifiedNow settings:settings];
-        if (resetApplied) NSLog(@"INFO: Daily override ration reset against verified network time.");
-        NSError* syncError = [settings syncSettingsAndWait:5];
-        if (syncError != nil) NSLog(@"WARNING: failed to persist verified time: %@", syncError);
-        if (correctedStart || resetApplied) [SCHelperToolUtilities sendConfigurationChangedNotification];
+    NSDictionary* updated = [SCDeepBlockDecision record:deep byApplyingTimingWrites:decision[SCTrustedTimingSettingsWritesKey]];
+    if ([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
+        NSLog(@"INFO: Deep block expiry verified against network time; removing it.");
+        [SCBlockUtilities removeDeepBlockFromSettings];
+        // Explicit layers: the deep rules are still installed, so the default
+        // derivation (record OR installed) would keep them. overrideActive:NO -
+        // an override can't be running alongside a deep block (fail-closed if one is;
+        // the checkup lifts the regular block again on its next tick).
+        NSArray* layers = [SCDeepBlockDecision desiredLayersWithBaseRunning:[SCBlockUtilities modernBlockIsRunning]
+                                                             overrideActive:NO
+                                                          deepShouldEnforce:NO];
+        if ([SCHelperToolUtilities applyDesiredLayers:layers]) {
+            [SCSentry addBreadcrumb:@"Daemon verified and cleared expired deep block" category:@"daemon"];
+            if (playEndSound) [SCHelperToolUtilities playBlockEndSound];
+            [SCDaemonBlockMethods stopCheckupTimerIfIdle];
+        } else {
+            // Keep the record (verified-expired) so the next verification retries the
+            // removal; without it the still-installed layer would be healed to +4 h.
+            NSLog(@"ERROR: Removing the deep block's rules failed; will retry on the next verification.");
+            [settings setValue:updated forKey:@"DeepBlock"];
+        }
+    } else {
+        [settings setValue:updated forKey:@"DeepBlock"];
+        if ([decision[SCTrustedTimingStartWasCorrectedKey] boolValue]) NSLog(@"INFO: Corrected deep block start against verified network time.");
     }
+    NSError* syncError = [settings syncSettingsAndWait:5];
+    if (syncError != nil) NSLog(@"WARNING: failed to persist deep-block verified time: %@", syncError);
+    [SCHelperToolUtilities sendConfigurationChangedNotification];
+}
 
++ (BOOL)healDeepBlockIfNeededWithVerifiedTime:(NSDate*)verifiedNow reading:(NSDictionary*)reading settings:(SCSettings*)settings {
+    NSDictionary* deep = [SCBlockUtilities deepBlockRecord];
+    // Only heal when it's still needed (never over a legitimate teardown).
+    BOOL needed = [SCDeepBlockDecision healNeededForRecord:deep
+                                            remainingKnown:[SCBlockUtilities trustedRemainingDeepBlockSecs] != nil
+                                            layerInstalled:[[SCBlockUtilities installedLayerNames] containsObject:SCLayerDeep]];
+    if (!needed || verifiedNow == nil || reading == nil) return NO;
+
+    NSString* anchor = [NSString stringWithContentsOfFile:@"/etc/pf.anchors/org.eyebeam" encoding:NSUTF8StringEncoding error:nil];
+    NSDictionary* payload = [SCRuleCompiler deepPayloadFromAnchorText:anchor];
+    if (deep == nil && payload == nil) {
+        // Can't rebuild the list: leave the installed rules alone and retry next checkup.
+        NSLog(@"WARNING: Deep block rules present with no record or payload; holding.");
+        return NO;
+    }
+    NSMutableDictionary* verifiedReading = [reading mutableCopy];
+    verifiedReading[@"wall"] = verifiedNow;
+    NSDictionary* healed = [SCDeepBlockDecision healedRecordFromRecord:deep
+                                                               payload:payload
+                                                           verifiedNow:verifiedNow
+                                                            clockState:[SCTrustedClock freshStateWithReading:verifiedReading]];
+    [settings setValue:healed forKey:@"DeepBlock"];
+    NSError* syncError = [settings syncSettingsAndWait:5];
+    if (syncError != nil) NSLog(@"WARNING: failed to persist deep self-heal: %@", syncError);
+    [SCHelperToolUtilities sendConfigurationChangedNotification];
+    [SCSentry addBreadcrumb:@"Daemon self-healed the deep block" category:@"daemon"];
+    NSLog(@"INFO: Self-healed deep block to verified now + %ds.", SC_DEEP_HEAL_SECS);
+    return YES;
+}
+
++ (void)handleDeepSelfHealVerifiedTime:(NSDate*)verifiedNow
+                               reading:(NSDictionary*)reading
+                            generation:(NSUInteger)generation {
+    if (![SCDaemonBlockMethods lockOrTimeout:nil timeout:CHECKUP_LOCK_TIMEOUT]) return;
+    if ([[SCBlockEndVerifier sharedVerifier] isCurrentGeneration:generation]) {
+        [SCDaemonBlockMethods healDeepBlockIfNeededWithVerifiedTime:verifiedNow reading:reading settings:[SCSettings sharedSettings]];
+    }
     [self.daemonMethodLock unlock];
 }
 
@@ -642,12 +1005,17 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
 
     if ([decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
         NSLog(@"INFO: Block expiry verified against network time; removing block.");
-        [SCHelperToolUtilities removeBlock];
-        [SCDaemonBlockMethods invalidateTediumChallenge];
-        [[SCBlockEndVerifier sharedVerifier] reset];
-        [[SCDaemon sharedDaemon] stopCheckupTimer];
-        [SCSentry addBreadcrumb:@"Daemon verified and cleared expired block" category:@"daemon"];
-        if (outRemoved != NULL) *outRemoved = YES;
+        if ([SCHelperToolUtilities removeBlock]) {
+            [SCDaemonBlockMethods invalidateTediumChallenge];
+            [[SCBlockEndVerifier sharedVerifier] reset];
+            [SCDaemonBlockMethods stopCheckupTimerIfIdle];
+            [SCSentry addBreadcrumb:@"Daemon verified and cleared expired block" category:@"daemon"];
+            if (outRemoved != NULL) *outRemoved = YES;
+        } else {
+            // The block stays "running and expired" (the timing writes above are
+            // persisted by the caller), so the next verified time retries removal.
+            NSLog(@"ERROR: Removing the verified-expired block failed; will retry on the next verification.");
+        }
     }
     return YES;
 }
@@ -710,15 +1078,22 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
                         generation:(NSUInteger)generation {
     if (![SCDaemonBlockMethods lockOrTimeout:nil timeout:CHECKUP_LOCK_TIMEOUT]) return;
 
-    // Only heal if rules are genuinely still on the system (never over a
-    // legitimate teardown) and this result belongs to the current generation.
-    if (![SCBlockUtilities blockRulesFoundOnSystem] ||
-        ![[SCBlockEndVerifier sharedVerifier] isCurrentGeneration:generation]) {
+    // Only heal if the regular block's rules are genuinely still on the system (never
+    // over a legitimate teardown; a deep layer alone doesn't count) and this result
+    // belongs to the current generation.
+    if (![[SCBlockEndVerifier sharedVerifier] isCurrentGeneration:generation]) {
+        [self.daemonMethodLock unlock];
+        return;
+    }
+    SCSettings* settings = [SCSettings sharedSettings];
+    // One verifier serves both blocks and drops requests while a fetch is in flight,
+    // so a pending deep heal must not wait on this result's completion getting a turn.
+    [SCDaemonBlockMethods healDeepBlockIfNeededWithVerifiedTime:verifiedNow reading:reading settings:settings];
+    if (![SCBlockUtilities baseRulesFoundOnSystem]) {
         [self.daemonMethodLock unlock];
         return;
     }
 
-    SCSettings* settings = [SCSettings sharedSettings];
     // Heal to at least SC_SELFHEAL_BLOCK_SECS, but never shorter than the block's
     // own stored duration when it's still known: tampering can only extend the
     // block, never shorten it (fail-closed).
@@ -759,39 +1134,78 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     [SCSentry addBreadcrumb: @"Daemon method checkBlockIntegrity called" category: @"daemon"];
 
     SCSettings* settings = [SCSettings sharedSettings];
-    PacketFilter* pf = [[PacketFilter alloc] init];
-    HostFileBlockerSet* hostFileBlockerSet = [[HostFileBlockerSet alloc] init];
-    if(![pf containsSelfControlBlock] || (![settings boolForKey: @"ActiveBlockAsWhitelist"] && ![hostFileBlockerSet.defaultBlocker containsSelfControlBlock])) {
-        NSLog(@"INFO: Block is missing in PF or hosts, re-adding...");
-        // The firewall is missing at least the block header.  Let's clear everything
-        // before we re-add to make sure everything goes smoothly.
-
-        [pf stopBlock: false];
-
-        [hostFileBlockerSet removeSelfControlBlock];
-        BOOL success = [hostFileBlockerSet writeNewFileContents];
-        // Revert the host file blocker's file contents to disk so we can check
-        // whether or not it still contains the block after our write (aka we messed up).
-        [hostFileBlockerSet revertFileContentsToDisk];
-        if(!success || [hostFileBlockerSet.defaultBlocker containsSelfControlBlock]) {
-            NSLog(@"WARNING: Error removing host file block.  Attempting to restore backup.");
-
-            if([hostFileBlockerSet restoreBackupHostsFile])
-                NSLog(@"INFO: Host file backup restored.");
-            else
-                NSLog(@"ERROR: Host file backup could not be restored.  This may result in a permanent block.");
+    NSArray* installed = [SCBlockUtilities installedLayerNames];
+    NSDictionary* deep = [SCBlockUtilities deepBlockRecord];
+    BOOL deepEnforced = deep != nil || [installed containsObject:SCLayerDeep];
+    // The real override state (not NO): the hosts watcher calls this during an
+    // override too, and re-adding the lifted regular block would undo the override.
+    NSArray* desired = [SCDeepBlockDecision desiredLayersWithBaseRunning:[SCBlockUtilities modernBlockIsRunning]
+                                                          overrideActive:[SCDaemonBlockMethods overrideActiveNowInSettings:settings]
+                                                       deepShouldEnforce:deepEnforced];
+    BOOL missingLayer = NO;
+    for (NSString* name in desired) if (![installed containsObject:name]) missingLayer = YES;
+    BOOL desiredHasBlocklist = NO;
+    if ([desired containsObject:SCLayerBase] && ![settings boolForKey:@"ActiveBlockAsWhitelist"]) desiredHasBlocklist = YES;
+    if ([desired containsObject:SCLayerDeep]) {
+        NSDictionary* deepInfo = [SCDeepBlockDecision recordListIsUsable:deep] ? deep : nil;
+        if (deepInfo == nil) {
+            NSString* anchor = [NSString stringWithContentsOfFile:@"/etc/pf.anchors/org.eyebeam" encoding:NSUTF8StringEncoding error:nil];
+            deepInfo = [SCRuleCompiler deepPayloadFromAnchorText:anchor];
         }
+        // Unknown mode (no usable record or payload) counts as a blocklist: expecting
+        // hosts entries can only add enforcement.
+        id deepMode = deepInfo[@"isAllowlist"];
+        if (![deepMode isKindOfClass:[NSNumber class]] || ![deepMode boolValue]) desiredHasBlocklist = YES;
+    }
+    HostFileBlockerSet* hostFileBlockerSet = [[HostFileBlockerSet alloc] init];
+    BOOL hostsMissing = desiredHasBlocklist && ![hostFileBlockerSet.defaultBlocker containsSelfControlBlock];
+    // The files above can say "installed" while nothing is enforced: macOS loads
+    // /etc/pf.conf at boot without enabling pf, `pfctl -d` turns pf off, and the
+    // anchor can be flushed. Ask pf itself (re-apply takes a fresh -E reference).
+    BOOL pfNotEnforcing = NO;
+    if (desired.count > 0) {
+        BOOL pfEnabled = [PacketFilter pfIsEnabled];
+        BOOL anchorLoaded = pfEnabled && [PacketFilter anchorRulesLoaded];
+        pfNotEnforcing = !pfEnabled || !anchorLoaded;
+        if (pfNotEnforcing) NSLog(@"WARNING: pf is %@; SelfControl rules aren't being enforced.",
+                                  pfEnabled ? @"enabled but our anchor has no rules loaded" : @"disabled");
+    }
 
-        // Get rid of the backup file since we're about to make a new one.
-        [hostFileBlockerSet deleteBackupHostsFile];
-
-        // Perform the re-add of the rules
-        [SCHelperToolUtilities installBlockRulesFromSettings];
-        
-        [SCHelperToolUtilities clearCachesIfRequested];
-
-        [SCSentry addBreadcrumb: @"Daemon found compromised block integrity and re-added rules" category: @"daemon"];
-        NSLog(@"INFO: Integrity check ran; readded block rules.");
+    // Only ever ADDS missing enforcement (tightening): no teardown first, and every
+    // installed layer is kept. Removing a layer is a relaxing transition and happens
+    // solely on verified paths (or an override / emergency unlock).
+    // Known limitation: with the deep record gone, a deep layer that was also removed
+    // can't be restored here (no record, no anchor payload); the heal path rebuilds it
+    // from the payload while the anchor still carries it. An attacker with root
+    // deleting both the record and the anchor is out of scope.
+    if (missingLayer || hostsMissing || pfNotEnforcing) {
+        // applyDesiredLayers rebuilds a record-less deep layer from the anchor payload.
+        NSMutableOrderedSet* layers = [NSMutableOrderedSet orderedSetWithArray:desired];
+        [layers addObjectsFromArray:installed];
+        __block BOOL attempted = NO;
+        BOOL reapplied = [SCDaemonBlockMethods installThrottled:^BOOL{
+            attempted = YES;
+            NSLog(@"INFO: Block enforcement missing (installed [%@], desired [%@], hosts %@, pf %@); re-adding...",
+                  [installed componentsJoinedByString:@","], [desired componentsJoinedByString:@","],
+                  hostsMissing ? @"missing" : @"ok", pfNotEnforcing ? @"not enforcing" : @"ok");
+            if (![SCHelperToolUtilities applyDesiredLayers:layers.array]) return NO;
+            // A "successful" load that still leaves pf off or our anchor empty is a
+            // failure too: back off instead of flushing states every check.
+            if (pfNotEnforcing && !([PacketFilter pfIsEnabled] && [PacketFilter anchorRulesLoaded])) {
+                NSLog(@"ERROR: Rules re-applied but pf still isn't enforcing them.");
+                return NO;
+            }
+            return YES;
+        }];
+        if (!attempted) {
+            NSLog(@"INFO: Integrity check found missing enforcement; re-install backing off.");
+        } else if (reapplied) {
+            [SCHelperToolUtilities clearCachesIfRequested];
+            NSLog(@"INFO: Integrity check ran; re-added block rules.");
+            [SCSentry addBreadcrumb: @"Daemon found compromised block integrity and re-added rules" category: @"daemon"];
+        } else {
+            NSLog(@"ERROR: Integrity check failed to re-add block rules; will retry.");
+        }
     } else NSLog(@"INFO: Integrity check ran; no action needed.");
 
     NSDictionary* clockState = [settings valueForKey:@"TrustedClockState"];
@@ -799,6 +1213,12 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         [settings setValue:[SCTrustedClock checkpointState:clockState
                                                    reading:[SCTrustedClock currentReading]]
                     forKey:@"TrustedClockState"];
+    }
+    NSDictionary* deepClock = deep[@"clockState"];
+    if ([deepClock isKindOfClass:[NSDictionary class]] && deepClock.count > 0) {
+        NSMutableDictionary* updated = [deep mutableCopy];
+        updated[@"clockState"] = [SCTrustedClock checkpointState:deepClock reading:[SCTrustedClock currentReading]];
+        [settings setValue:updated forKey:@"DeepBlock"];
     }
     
     [self.daemonMethodLock unlock];
@@ -811,12 +1231,14 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         reply(0, 0, 0, [SCErr errorWithCode: 320]); // busy; app may retry
         return;
     }
-    if (![SCBlockUtilities modernBlockIsRunning]) {
+    // A deep layer installed without its record counts too: emergency unlock is
+    // the way out when that record can't be rebuilt (no permanent block).
+    if (![SCBlockUtilities modernBlockIsRunning] && ![SCHelperToolUtilities deepShouldEnforce]) {
         [self.daemonMethodLock unlock];
         reply(0, 0, 0, [SCErr errorWithCode: 321]); // no block to override
         return;
     }
-    if (![SCBlockUtilities emergencyUnlockAllowedForSettingsValue: [[SCSettings sharedSettings] valueForKey: @"EmergencyUnlockEnabled"]]) {
+    if (![SCBlockUtilities emergencyUnlockAllowedForCurrentBlocks]) {
         tediumChallenge = nil;
         [self.daemonMethodLock unlock];
         reply(0, 0, 0, [SCErr errorWithCode: 324]); // turned off for this block
@@ -837,14 +1259,14 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         reply(0, 0, 0, NO, [SCErr errorWithCode: 320]);
         return;
     }
-    if (![SCBlockUtilities modernBlockIsRunning]) {
+    if (![SCBlockUtilities modernBlockIsRunning] && ![SCHelperToolUtilities deepShouldEnforce]) {
         // The block is actually gone (removed, expired, or never modern).
         tediumChallenge = nil;
         [self.daemonMethodLock unlock];
         reply(0, 0, 0, NO, [SCErr errorWithCode: 322]); // no active challenge/block
         return;
     }
-    if (![SCBlockUtilities emergencyUnlockAllowedForSettingsValue: [[SCSettings sharedSettings] valueForKey: @"EmergencyUnlockEnabled"]]) {
+    if (![SCBlockUtilities emergencyUnlockAllowedForCurrentBlocks]) {
         tediumChallenge = nil;
         [self.daemonMethodLock unlock];
         reply(0, 0, 0, NO, [SCErr errorWithCode: 324]); // turned off for this block
@@ -867,12 +1289,20 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
 
     if (outcome == SCTediumSubmitComplete) {
         NSLog(@"INFO: Tedium override completed (%ld entries); removing block.", (long)progress);
-        [SCSentry addBreadcrumb: @"Block removed via tedium override" category: @"daemon"];
-        [SCHelperToolUtilities removeBlock];
-        [[SCBlockEndVerifier sharedVerifier] reset];
-        [[SCDaemon sharedDaemon] stopCheckupTimer];
-        tediumChallenge = nil;
-        removed = YES;
+        if ([SCHelperToolUtilities removeAllBlocks]) {
+            [SCSentry addBreadcrumb: @"Block removed via tedium override" category: @"daemon"];
+            [[SCBlockEndVerifier sharedVerifier] reset];
+            [SCDaemonBlockMethods stopCheckupTimerIfIdle];
+            tediumChallenge = nil;
+            removed = YES;
+        } else {
+            // Block (and its settings) stay. The completed challenge is kept, so the
+            // next correct digit completes it again and retries the removal.
+            NSLog(@"ERROR: Tedium override completed but removing the block failed.");
+            reply(outcome, progress, nextDigit, NO, [SCErr errorWithCode: 300]);   // try again in a moment
+            [self.daemonMethodLock unlock];
+            return;
+        }
     }
 
     reply(outcome, progress, nextDigit, removed, nil);
@@ -906,12 +1336,11 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
     return gate;
 }
 
-// Reads the Phase 5 deep-block guard (DeepBlock key absent today => not active).
+// Phase 5: a deep block's presence alone denies overrides (fail-closed; its
+// expiry is a verified transition that deletes the record). deepShouldEnforce
+// also counts an installed deep layer, so a tampered-away record still denies.
 + (BOOL)deepBlockActiveInSettings:(SCSettings*)settings trustedNow:(NSDate*)trustedNow clockAnchored:(BOOL)clockAnchored {
-    NSDictionary* deep = [settings valueForKey:@"DeepBlock"];
-    if (![deep isKindOfClass:[NSDictionary class]]) return NO;
-    id de = deep[@"endDate"];
-    return [de isKindOfClass:[NSDate class]] && trustedNow != nil && clockAnchored && [trustedNow compare:de] == NSOrderedAscending;
+    return [SCHelperToolUtilities deepShouldEnforce];
 }
 
 + (void)invokeOverrideWithReply:(void(^)(NSInteger remainingAfter, NSDate* _Nullable overrideEndDate, NSError* _Nullable error))reply {
@@ -1063,6 +1492,17 @@ static atomic_bool sOverrideSNTPWorkerInFlight = false;
         [self.daemonMethodLock unlock];
         [gate unlock];
         reply(0, nil, [SCErr errorWithCode: 330]);
+        return;
+    }
+    NSNumber* remainingAfterVerify = [SCBlockUtilities trustedRemainingBlockDurationSecs];
+    if (remainingAfterVerify != nil && remainingAfterVerify.doubleValue <= 0) {
+        // Verified-expired but the removal failed: never spend an override on it.
+        // Persist the verified-time writes; the next verification retries removal.
+        NSError* syncError = [settings syncSettingsAndWait:5];
+        if (syncError != nil) NSLog(@"WARNING: failed to persist verified time: %@", syncError);
+        [self.daemonMethodLock unlock];
+        [gate unlock];
+        reply(0, nil, [SCErr errorWithCode: 300]);
         return;
     }
 

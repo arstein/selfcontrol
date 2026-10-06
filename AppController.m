@@ -29,6 +29,7 @@
 #import "SCBlockFileReaderWriter.h"
 #import "SCUIUtilities.h"
 #import "SCDurationSlider.h"
+#import "SCDeepBlockDecision.h"
 #import "SelfControl-Swift.h"
 
 @interface AppController () {}
@@ -447,38 +448,95 @@
 	}
 }
 
+- (void)startDeepBlockWithCompletion:(void (^)(NSError* _Nullable error))completion {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{ [self startDeepBlockWithCompletion: completion]; });
+        return;
+    }
+    if (self.addingDeepBlock) return;
+    // Same clamp the window shows (DeepBlockLimits), so the dialog and the daemon agree.
+    NSInteger minutes = MIN(MAX([defaults_ integerForKey: @"DeepBlockDuration"], 5), 240);
+    NSString* length = [SCDurationSlider timeSliderDisplayStringFromNumberOfMinutes: minutes];
+    // Cancel answers both Esc and Return: Return must never start an irreversible block.
+    SCDialogResult* result = [SCDialog runWithTitle: [NSString stringWithFormat: NSLocalizedString(@"Start a deep block for %@?", @"Deep block confirmation title, e.g. Start a deep block for 45 minutes?"), length]
+                                            message: NSLocalizedString(@"It can't be overridden. Only emergency unlock can end it early.", @"Deep block confirmation message")
+                                            buttons: @[NSLocalizedString(@"Cancel", @"Cancel button"),
+                                                       NSLocalizedString(@"Start Deep Block", @"Button to start a deep block")]
+                                       primaryIndex: 1
+                                        cancelIndex: 0
+                                       defaultIndex: 0
+                                   suppressionTitle: nil];
+    if (result.buttonIndex != 1) return;
+
+    self.addingDeepBlock = YES;
+    [self refreshUserInterface];
+    void (^finish)(NSError*) = ^(NSError* error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.addingDeepBlock = NO;
+            [self->settings_ synchronizeSettingsWithCompletion:^(NSError * _Nullable syncError) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [self refreshUserInterface];
+                    completion(error);
+                });
+            }];
+        });
+    };
+    [self.xpc installDaemon:^(NSError * _Nonnull error) {
+        if (error != nil) { finish(error); return; }
+        [self->defaults_ synchronize];
+        [self.xpc refreshConnectionAndRun:^{
+            [self.xpc startDeepBlockWithBlocklist: [self->defaults_ arrayForKey: @"DeepBlocklist"] ?: @[]
+                                      isAllowlist: [self->defaults_ boolForKey: @"DeepBlockAsWhitelist"]
+                                     durationSecs: (double)MAX(minutes, 0) * 60.0
+                                    blockSettings: @{
+                                        @"ClearCaches": [self->defaults_ valueForKey: @"ClearCaches"] ?: @NO,
+                                        @"AllowLocalNetworks": [self->defaults_ valueForKey: @"AllowLocalNetworks"] ?: @YES,
+                                        @"EvaluateCommonSubdomains": [self->defaults_ valueForKey: @"EvaluateCommonSubdomains"] ?: @YES,
+                                        @"IncludeLinkedDomains": [self->defaults_ valueForKey: @"IncludeLinkedDomains"] ?: @YES,
+                                        @"EmergencyUnlockEnabled": [self->defaults_ valueForKey: @"EmergencyUnlockEnabled"] ?: @YES,
+                                    }
+                                            reply:^(NSError * _Nullable error) {
+                if (error == nil) [SCSentry addBreadcrumb: @"Deep block started successfully" category:@"app"];
+                finish(error);
+            }];
+        }];
+    }];
+}
+
 - (IBAction)save:(id)sender {
-	NSSavePanel *sp;
-	long runResult;
+    [self exportListForKey: @"Blocklist" allowlistKey: @"BlockAsWhitelist"];
+}
 
-	/* create or get the shared instance of NSSavePanel */
-	sp = [NSSavePanel savePanel];
+- (void)exportListForKey:(NSString*)listKey allowlistKey:(NSString*)allowlistKey {
+	NSSavePanel* sp = [NSSavePanel savePanel];
 	sp.allowedFileTypes = @[@"selfcontrol"];
+	if ([sp runModal] != NSModalResponseOK) return;
+    NSError* err;
+    [SCBlockFileReaderWriter writeBlocklistToFileURL: sp.URL
+                                           blockInfo: @{ @"Blocklist": [defaults_ arrayForKey: listKey] ?: @[],
+                                                         @"BlockAsWhitelist": [defaults_ objectForKey: allowlistKey] ?: @NO }
+                                               error: &err];
+    if (err != nil) {
+        NSError* displayErr = [SCErr errorWithCode: 101 subDescription: err.localizedDescription];
+        [SCSentry captureError: displayErr];
+        NSBeep();
+        [SCUIUtilities presentError: displayErr];
+    } else {
+        [SCSentry addBreadcrumb: @"Saved blocklist to file" category:@"app"];
+    }
+}
 
-	/* display the NSSavePanel */
-	runResult = [sp runModal];
-
-	/* if successful, save file under designated name */
-	if (runResult == NSModalResponseOK) {
-        NSError* err;
-        [SCBlockFileReaderWriter writeBlocklistToFileURL: sp.URL
-                                   blockInfo: @{
-                                       @"Blocklist": [defaults_ arrayForKey: @"Blocklist"],
-                                       @"BlockAsWhitelist": [defaults_ objectForKey: @"BlockAsWhitelist"]
-                                       
-                                   }
-                                   error: &err];
-
-        if (err != nil) {
-            NSError* displayErr = [SCErr errorWithCode: 101 subDescription: err.localizedDescription];
-            [SCSentry captureError: displayErr];
-            NSBeep();
-            [SCUIUtilities presentError: displayErr];
-			return;
-        } else {
-            [SCSentry addBreadcrumb: @"Saved blocklist to file" category:@"app"];
-        }
-	}
+- (void)importListForKey:(NSString*)listKey allowlistKey:(NSString*)allowlistKey {
+	NSOpenPanel* oPanel = [NSOpenPanel openPanel];
+	oPanel.allowedFileTypes = @[@"selfcontrol"];
+	oPanel.allowsMultipleSelection = NO;
+	if ([oPanel runModal] != NSModalResponseOK || oPanel.URLs.count == 0) return;
+    NSDictionary* fromFile = [SCBlockFileReaderWriter readBlocklistFromFile: oPanel.URLs[0]];
+    if (fromFile == nil) { NSLog(@"WARNING: Could not read a valid blocklist from file - ignoring."); return; }
+    [defaults_ setObject: fromFile[@"Blocklist"] forKey: listKey];
+    [defaults_ setObject: fromFile[@"BlockAsWhitelist"] forKey: allowlistKey];
+    [[NSNotificationCenter defaultCenter] postNotificationName: @"SCConfigurationChangedNotification" object: self];
+    [self refreshUserInterface];
 }
 
 - (BOOL)openSavedBlockFileAtURL:(NSURL*)fileURL {
@@ -501,16 +559,7 @@
 }
 
 - (IBAction)open:(id)sender {
-	NSOpenPanel* oPanel = [NSOpenPanel openPanel];
-	oPanel.allowedFileTypes = @[@"selfcontrol"];
-	oPanel.allowsMultipleSelection = NO;
-
-	long result = [oPanel runModal];
-	if (result == NSModalResponseOK) {
-		if([oPanel.URLs count] > 0) {
-            [self openSavedBlockFileAtURL: oPanel.URLs[0]];
-		}
-	}
+    [self importListForKey: @"Blocklist" allowlistKey: @"BlockAsWhitelist"];
 }
 
 - (BOOL)application:(NSApplication*)theApplication openFile:(NSString*)filename {
@@ -585,8 +634,12 @@
         // Match the daemon's own gate (SCDaemonBlockMethods rejects the
         // challenge with error 321 unless a modern block is running).
         // The block may also have been started with emergency unlock turned off.
-        return [SCBlockUtilities modernBlockIsRunning] &&
-               [SCBlockUtilities emergencyUnlockAllowedForSettingsValue: [[SCSettings sharedSettings] valueForKey: @"EmergencyUnlockEnabled"]];
+        // A deep block (or its rules without a record) counts too; the gate follows
+        // the regular block's captured value, else the deep block's.
+        return ([SCBlockUtilities modernBlockIsRunning] ||
+                [SCBlockUtilities deepBlockIsRunning] ||
+                [[SCBlockUtilities installedLayerNames] containsObject: SCLayerDeep]) &&
+               [SCBlockUtilities emergencyUnlockAllowedForCurrentBlocks];
     }
     // No edits while a block is starting: installBlock reads Blocklist,
     // BlockAsWhitelist and the override settings only after the auth prompt.

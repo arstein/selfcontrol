@@ -82,10 +82,10 @@
 
 + (BOOL)blockIsRunning {
     // we'll say a block is running if we find the block info, but
-    // also, importantly, if we find a block still going in the hosts file
+    // also, importantly, if we find the regular block's rules still on the system
     // that way if this happens, the user will still see the timer window -
     // which will let them manually clear the remaining block info after 10 seconds
-    return [SCBlockUtilities anyBlockIsRunning] || [SCBlockUtilities blockRulesFoundOnSystem];
+    return [SCBlockUtilities anyBlockIsRunning] || [SCBlockUtilities baseRulesFoundOnSystem];
 }
 
 + (nullable NSError*)displayableError:(nullable NSError*)err {

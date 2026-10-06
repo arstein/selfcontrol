@@ -6,6 +6,7 @@ struct ReadyView: View {
 
     var body: some View {
         VStack(spacing: Theme.gap) {
+            if model.deepRunning { DeepBlockBanner() }
             durationCard
             Card {
                 NavRow(title: NSLocalizedString("Restrictions", comment: "row"),
@@ -22,6 +23,14 @@ struct ReadyView: View {
                     PillsView(states: OverridePills.states(perDay: model.overridePerDayDefault,
                                                            remainingToday: model.overridePerDayDefault,
                                                            activeFraction: nil, pendingSpend: false), width: 16)
+                }
+                .disabled(model.isAddingBlock)
+                .opacity(model.isAddingBlock ? 0.5 : 1)
+                RowDivider()
+                NavRow(title: NSLocalizedString("Deep Block", comment: "row"),
+                       subtitle: model.deepRowSubtitle,
+                       action: { model.push(.deepBlock) }) {
+                    Text("\(model.entries(.deep).count)").foregroundColor(Theme.sub)
                 }
                 .disabled(model.isAddingBlock)
                 .opacity(model.isAddingBlock ? 0.5 : 1)
@@ -74,7 +83,7 @@ struct ReadyView: View {
 }
 
 /// Tick marks + tappable labels at their true slider positions (1h, 8h, 1 day, 1 week, max).
-private struct DurationTicks: View {
+struct DurationTicks: View {
     let maxMinutes: Int
     let scale: DurationScale
     let selectedMinutes: Int
@@ -114,7 +123,7 @@ private struct DurationTicks: View {
     }
 }
 
-private struct TickLabelStyle: ButtonStyle {
+struct TickLabelStyle: ButtonStyle {
     var selected = false
     func makeBody(configuration: Configuration) -> some View {
         configuration.label

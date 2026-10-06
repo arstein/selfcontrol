@@ -27,6 +27,7 @@
 #include <netdb.h>
 #import "HostFileBlockerSet.h"
 #import "SCSNTPClient.h"
+#import "SCRuleCompiler.h"
 
 @implementation BlockManager
 
@@ -127,6 +128,94 @@ BOOL appendMode = NO;
 	[pf startBlock];
 }
 
++ (BOOL)isSinkholeAddress:(NSString*)ip maskLen:(NSInteger)maskLen {
+    if (![ip isKindOfClass: [NSString class]] || ![@[@"0.0.0.0", @"::", @"127.0.0.1", @"::1"] containsObject: ip]) return NO;
+    NSInteger fullLen = [ip containsString: @":"] ? 128 : 32;
+    return maskLen == 0 || maskLen == fullLen;
+}
+
+- (void)emitIP:(NSString*)ip port:(NSInteger)port maskLen:(NSInteger)maskLen {
+    // While a blocklist block runs, /etc/hosts maps blocked domains to 0.0.0.0 / ::
+    // and CFHost honors /etc/hosts, so re-resolving returns our own sinkhole
+    // addresses. They are never real destinations (and loopback always passes
+    // anyway), so drop them in every mode - but only as single hosts (no mask, or
+    // the full /32 or /128). A range a user typed, like 0.0.0.0/1, is kept.
+    //
+    // Known gap (documented, not fixed): a domain listed in two blocklist layers
+    // is resolved for the second layer while the first layer's hosts sinkhole is
+    // already active, so the second resolution only sees these sinkhole addresses
+    // and that layer's pf rules lack the domain's real IPs. /etc/hosts still
+    // blocks the domain, and the tighten-only union keeps any IPs a layer already
+    // had in the installed anchor.
+    if ([BlockManager isSinkholeAddress: ip maskLen: maskLen]) return;
+    if (collectedSpecs != nil) {
+        @synchronized (collectedSpecs) {
+            [collectedSpecs addObject:[SCRuleCompiler specWithIP:ip maskLen:maskLen port:port]];
+        }
+        return;
+    }
+    [pf addRuleWithIP:ip port:port maskLen:maskLen];
+}
+
+- (void)resolveEntries:(NSArray<NSString*>*)entries specs:(NSArray<NSDictionary*>**)outSpecs hostDomains:(NSArray<NSString*>**)outDomains {
+    collectedSpecs = [NSMutableArray array];
+    collectedDomains = [NSMutableOrderedSet orderedSet];
+    [self addBlockEntriesFromStrings: entries];
+    [opQueue waitUntilAllOperationsAreFinished];
+    // Deterministic output (resolution runs concurrently): star specs first,
+    // then by ip string, mask, port; domains alphabetically.
+    *outSpecs = [collectedSpecs sortedArrayUsingComparator:^NSComparisonResult(NSDictionary* a, NSDictionary* b) {
+        NSString* ipA = [a[@"ip"] isKindOfClass: [NSString class]] ? a[@"ip"] : nil;
+        NSString* ipB = [b[@"ip"] isKindOfClass: [NSString class]] ? b[@"ip"] : nil;
+        if (ipA == nil && ipB != nil) return NSOrderedAscending;
+        if (ipA != nil && ipB == nil) return NSOrderedDescending;
+        if (ipA != nil) {
+            NSComparisonResult r = [ipA compare: ipB];
+            if (r != NSOrderedSame) return r;
+        }
+        NSComparisonResult r = [@([a[@"maskLen"] integerValue]) compare: @([b[@"maskLen"] integerValue])];
+        if (r != NSOrderedSame) return r;
+        return [@([a[@"port"] integerValue]) compare: @([b[@"port"] integerValue])];
+    }];
+    *outDomains = [collectedDomains.array sortedArrayUsingSelector: @selector(compare:)];
+    collectedSpecs = nil;
+    collectedDomains = nil;
+}
+
+// pf first: if it fails, PacketFilter has already put the previous rules back
+// and /etc/hosts was never touched, so the system is exactly as before and the
+// next checkup retries. Hosts is then rewritten with a single write per file
+// (old SC block removed and new one added in memory), so there is never a
+// moment with no hosts block.
+- (BOOL)installAnchorText:(NSString*)anchorText hostDomains:(NSArray<NSString*>*)hostDomains {
+    if ([pf installAnchorText: anchorText] != 0) {
+        NSLog(@"ERROR: pf install failed; hosts file left unchanged.");
+        return NO;
+    }
+
+    BOOL hostsOK = YES;
+    for (HostFileBlocker* blocker in hostBlockerSet.blockers) {
+        BOOL hadBlock = [blocker containsSelfControlBlock];
+        // Back up only a clean file. When a block is already there, the backup
+        // made (from a clean file) by the install that wrote it is kept.
+        if (hostDomains != nil && !hadBlock) [blocker createBackupHostsFile];
+        if (hadBlock) [blocker removeSelfControlBlock];
+        if (hostDomains != nil) {
+            [blocker addSelfControlBlockHeader];
+            for (NSString* domain in hostDomains) {
+                [blocker addRuleBlockingDomain: domain];
+            }
+            [blocker addSelfControlBlockFooter];
+        }
+        if (hadBlock || hostDomains != nil) {
+            hostsOK = [blocker writeNewFileContents] && hostsOK;
+        }
+    }
+    if (hostDomains == nil) [hostBlockerSet deleteBackupHostsFile];
+    if (!hostsOK) NSLog(@"ERROR: Failed to write the SelfControl hosts block.");
+    return hostsOK;
+}
+
 - (void)enqueueBlockEntry:(SCBlockEntry*)entry {
 	NSBlockOperation* op = [NSBlockOperation blockOperationWithBlock:^{
         [self addBlockEntry: entry];
@@ -157,12 +246,11 @@ BOOL appendMode = NO;
     }
 
 	BOOL isIP = [entry.hostname isValidIPAddress];
-	BOOL isIPv4 = [entry.hostname isValidIPv4Address];
 
 	if([entry.hostname isEqualToString: @"*"]) {
-		[pf addRuleWithIP: nil port: entry.port maskLen: 0];
-	} else if(isIPv4) { // current we do NOT do ipfw blocking for IPv6
-		[pf addRuleWithIP: entry.hostname port: entry.port maskLen: entry.maskLen];
+		[self emitIP: nil port: entry.port maskLen: 0];
+	} else if(isIP) { // IPv4 or IPv6 literal; the rule compiler validates the address
+		[self emitIP: entry.hostname port: entry.port maskLen: entry.maskLen];
 	} else if(!isIP) { // domain name
         // Google requires special handling
         if ([self domainIsGoogle: entry.hostname]) {
@@ -181,12 +269,16 @@ BOOL appendMode = NO;
             for(NSUInteger i = 0; i < [addresses count]; i++) {
                 NSString* ip = addresses[i];
 
-                [pf addRuleWithIP: ip port: entry.port maskLen: entry.maskLen];
+                [self emitIP: ip port: entry.port maskLen: entry.maskLen];
             }
         }
 	}
 
-	if(hostsBlockingEnabled && ![entry.hostname isEqualToString: @"*"] && !entry.port && !isIP) {
+	if (collectedDomains != nil) {
+		if (!isAllowlist && ![entry.hostname isEqualToString: @"*"] && !entry.port && !isIP) {
+			@synchronized (collectedDomains) { [collectedDomains addObject: entry.hostname]; }
+		}
+	} else if(hostsBlockingEnabled && ![entry.hostname isEqualToString: @"*"] && !entry.port && !isIP) {
         if (appendMode) {
             [hostBlockerSet appendExistingBlockWithRuleForDomain: entry.hostname];
         } else {
@@ -460,82 +552,77 @@ BOOL appendMode = NO;
 }
 
 - (void)addGoogleIPsToPF {
-    [pf addRuleWithIP: @"8.8.4.0" port: 0 maskLen: 24];
-    [pf addRuleWithIP: @"8.34.208.0" port: 0 maskLen: 20];
-    [pf addRuleWithIP: @"8.35.192.0" port: 0 maskLen: 20];
-    [pf addRuleWithIP: @"23.236.48.0" port: 0 maskLen: 240];
-    [pf addRuleWithIP: @"23.251.128.0" port: 0 maskLen: 19];
-    [pf addRuleWithIP: @"34.64.0.0" port: 0 maskLen: 10];
-    [pf addRuleWithIP: @"8.8.4.0" port: 0 maskLen: 24];
-    [pf addRuleWithIP: @"8.8.4.0" port: 0 maskLen: 24];
-    [pf addRuleWithIP: @"8.8.4.0" port: 0 maskLen: 24];
-    [pf addRuleWithIP: @"8.8.4.0" port: 0 maskLen: 24];
-    [pf addRuleWithIP: @"8.8.4.0" port: 0 maskLen: 24];
-    [pf addRuleWithIP: @"34.128.0.0" port: 0 maskLen: 10];
-    [pf addRuleWithIP: @"35.184.0.0" port: 0 maskLen: 13];
-    [pf addRuleWithIP: @"35.192.0.0" port: 0 maskLen: 14];
-    [pf addRuleWithIP: @"35.196.0.0" port: 0 maskLen: 15];
-    [pf addRuleWithIP: @"35.198.0.0" port: 0 maskLen: 16];
-    [pf addRuleWithIP: @"35.199.0.0" port: 0 maskLen: 17];
-    [pf addRuleWithIP: @"35.199.128.0" port: 0 maskLen: 18];
-    [pf addRuleWithIP: @"35.200.0.0" port: 0 maskLen: 13];
-    [pf addRuleWithIP: @"35.208.0.0" port: 0 maskLen: 12];
-    [pf addRuleWithIP: @"35.224.0.0" port: 0 maskLen: 12];
-    [pf addRuleWithIP: @"35.240.0.0" port: 0 maskLen: 13];
-    [pf addRuleWithIP: @"64.15.112.0" port: 0 maskLen: 20];
-    [pf addRuleWithIP: @"64.233.160.0" port: 0 maskLen: 19];
-    [pf addRuleWithIP: @"66.102.0.0" port: 0 maskLen: 20];
-    [pf addRuleWithIP: @"66.249.64.0" port: 0 maskLen: 19];
-    [pf addRuleWithIP: @"70.32.128.0" port: 0 maskLen: 19];
-    [pf addRuleWithIP: @"72.14.192.0" port: 0 maskLen: 18];
-    [pf addRuleWithIP: @"74.114.24.0" port: 0 maskLen: 21];
-    [pf addRuleWithIP: @"74.125.0.0" port: 0 maskLen: 16];
-    [pf addRuleWithIP: @"104.154.0.0" port: 0 maskLen: 16];
-    [pf addRuleWithIP: @"104.196.0.0" port: 0 maskLen: 14];
-    [pf addRuleWithIP: @"104.237.160.0" port: 0 maskLen: 19];
-    [pf addRuleWithIP: @"107.167.160.0" port: 0 maskLen: 19];
-    [pf addRuleWithIP: @"107.178.192.0" port: 0 maskLen: 18];
-    [pf addRuleWithIP: @"108.59.80.0" port: 0 maskLen: 20];
-    [pf addRuleWithIP: @"108.170.192.0" port: 0 maskLen: 18];
-    [pf addRuleWithIP: @"108.177.0.0" port: 0 maskLen: 17];
-    [pf addRuleWithIP: @"130.211.0.0" port: 0 maskLen: 16];
-    [pf addRuleWithIP: @"136.112.0.0" port: 0 maskLen: 12];
-    [pf addRuleWithIP: @"142.250.0.0" port: 0 maskLen: 15];
-    [pf addRuleWithIP: @"146.148.0.0" port: 0 maskLen: 17];
-    [pf addRuleWithIP: @"162.216.148.0" port: 0 maskLen: 22];
-    [pf addRuleWithIP: @"162.222.176.0" port: 0 maskLen: 21];
-    [pf addRuleWithIP: @"172.110.32.0" port: 0 maskLen: 21];
-    [pf addRuleWithIP: @"172.217.0.0" port: 0 maskLen: 16];
-    [pf addRuleWithIP: @"172.253.0.0" port: 0 maskLen: 16];
-    [pf addRuleWithIP: @"173.194.0.0" port: 0 maskLen: 16];
-    [pf addRuleWithIP: @"173.255.112.0" port: 0 maskLen: 20];
-    [pf addRuleWithIP: @"192.158.28.0" port: 0 maskLen: 22];
-    [pf addRuleWithIP: @"192.178.0.0" port: 0 maskLen: 15];
-    [pf addRuleWithIP: @"193.186.4.0" port: 0 maskLen: 24];
-    [pf addRuleWithIP: @"199.36.154.0" port: 0 maskLen: 23];
-    [pf addRuleWithIP: @"199.36.156.0" port: 0 maskLen: 24];
-    [pf addRuleWithIP: @"199.192.112.0" port: 0 maskLen: 22];
-    [pf addRuleWithIP: @"199.223.232.0" port: 0 maskLen: 21];
-    [pf addRuleWithIP: @"207.223.160.0" port: 0 maskLen: 20];
-    [pf addRuleWithIP: @"208.65.152.0" port: 0 maskLen: 22];
-    [pf addRuleWithIP: @"208.68.108.0" port: 0 maskLen: 22];
-    [pf addRuleWithIP: @"208.81.188.0" port: 0 maskLen: 22];
-    [pf addRuleWithIP: @"208.117.224.0" port: 0 maskLen: 19];
-    [pf addRuleWithIP: @"209.85.128.0" port: 0 maskLen: 17];
-    [pf addRuleWithIP: @"216.58.192.0" port: 0 maskLen: 19];
-    [pf addRuleWithIP: @"216.73.80.0" port: 0 maskLen: 20];
-    [pf addRuleWithIP: @"216.239.32.0" port: 0 maskLen: 19];
-    [pf addRuleWithIP: @"2001:4860::" port: 0 maskLen: 32];
-    [pf addRuleWithIP: @"2404:6800::" port: 0 maskLen: 32];
-    [pf addRuleWithIP: @"2404:f340::" port: 0 maskLen: 32];
-    [pf addRuleWithIP: @"2600:1900::" port: 0 maskLen: 28];
-    [pf addRuleWithIP: @"2606:73c0::" port: 0 maskLen: 32];
-    [pf addRuleWithIP: @"2607:f8b0::" port: 0 maskLen: 32];
-    [pf addRuleWithIP: @"2620:11a:a000::" port: 0 maskLen: 40];
-    [pf addRuleWithIP: @"2620:120:e000::" port: 0 maskLen: 40];
-    [pf addRuleWithIP: @"2800:3f0::" port: 0 maskLen: 32];
-    [pf addRuleWithIP: @"2a00:1450::" port: 0 maskLen: 32];
-    [pf addRuleWithIP: @"2c0f:fb50::" port: 0 maskLen: 32];
+    [self emitIP: @"8.8.4.0" port: 0 maskLen: 24];
+    [self emitIP: @"8.34.208.0" port: 0 maskLen: 20];
+    [self emitIP: @"8.35.192.0" port: 0 maskLen: 20];
+    [self emitIP: @"23.236.48.0" port: 0 maskLen: 20];
+    [self emitIP: @"23.251.128.0" port: 0 maskLen: 19];
+    [self emitIP: @"34.64.0.0" port: 0 maskLen: 10];
+    [self emitIP: @"34.128.0.0" port: 0 maskLen: 10];
+    [self emitIP: @"35.184.0.0" port: 0 maskLen: 13];
+    [self emitIP: @"35.192.0.0" port: 0 maskLen: 14];
+    [self emitIP: @"35.196.0.0" port: 0 maskLen: 15];
+    [self emitIP: @"35.198.0.0" port: 0 maskLen: 16];
+    [self emitIP: @"35.199.0.0" port: 0 maskLen: 17];
+    [self emitIP: @"35.199.128.0" port: 0 maskLen: 18];
+    [self emitIP: @"35.200.0.0" port: 0 maskLen: 13];
+    [self emitIP: @"35.208.0.0" port: 0 maskLen: 12];
+    [self emitIP: @"35.224.0.0" port: 0 maskLen: 12];
+    [self emitIP: @"35.240.0.0" port: 0 maskLen: 13];
+    [self emitIP: @"64.15.112.0" port: 0 maskLen: 20];
+    [self emitIP: @"64.233.160.0" port: 0 maskLen: 19];
+    [self emitIP: @"66.102.0.0" port: 0 maskLen: 20];
+    [self emitIP: @"66.249.64.0" port: 0 maskLen: 19];
+    [self emitIP: @"70.32.128.0" port: 0 maskLen: 19];
+    [self emitIP: @"72.14.192.0" port: 0 maskLen: 18];
+    [self emitIP: @"74.114.24.0" port: 0 maskLen: 21];
+    [self emitIP: @"74.125.0.0" port: 0 maskLen: 16];
+    [self emitIP: @"104.154.0.0" port: 0 maskLen: 16];
+    [self emitIP: @"104.196.0.0" port: 0 maskLen: 14];
+    [self emitIP: @"104.237.160.0" port: 0 maskLen: 19];
+    [self emitIP: @"107.167.160.0" port: 0 maskLen: 19];
+    [self emitIP: @"107.178.192.0" port: 0 maskLen: 18];
+    [self emitIP: @"108.59.80.0" port: 0 maskLen: 20];
+    [self emitIP: @"108.170.192.0" port: 0 maskLen: 18];
+    [self emitIP: @"108.177.0.0" port: 0 maskLen: 17];
+    [self emitIP: @"130.211.0.0" port: 0 maskLen: 16];
+    [self emitIP: @"136.112.0.0" port: 0 maskLen: 12];
+    [self emitIP: @"142.250.0.0" port: 0 maskLen: 15];
+    [self emitIP: @"146.148.0.0" port: 0 maskLen: 17];
+    [self emitIP: @"162.216.148.0" port: 0 maskLen: 22];
+    [self emitIP: @"162.222.176.0" port: 0 maskLen: 21];
+    [self emitIP: @"172.110.32.0" port: 0 maskLen: 21];
+    [self emitIP: @"172.217.0.0" port: 0 maskLen: 16];
+    [self emitIP: @"172.253.0.0" port: 0 maskLen: 16];
+    [self emitIP: @"173.194.0.0" port: 0 maskLen: 16];
+    [self emitIP: @"173.255.112.0" port: 0 maskLen: 20];
+    [self emitIP: @"192.158.28.0" port: 0 maskLen: 22];
+    [self emitIP: @"192.178.0.0" port: 0 maskLen: 15];
+    [self emitIP: @"193.186.4.0" port: 0 maskLen: 24];
+    [self emitIP: @"199.36.154.0" port: 0 maskLen: 23];
+    [self emitIP: @"199.36.156.0" port: 0 maskLen: 24];
+    [self emitIP: @"199.192.112.0" port: 0 maskLen: 22];
+    [self emitIP: @"199.223.232.0" port: 0 maskLen: 21];
+    [self emitIP: @"207.223.160.0" port: 0 maskLen: 20];
+    [self emitIP: @"208.65.152.0" port: 0 maskLen: 22];
+    [self emitIP: @"208.68.108.0" port: 0 maskLen: 22];
+    [self emitIP: @"208.81.188.0" port: 0 maskLen: 22];
+    [self emitIP: @"208.117.224.0" port: 0 maskLen: 19];
+    [self emitIP: @"209.85.128.0" port: 0 maskLen: 17];
+    [self emitIP: @"216.58.192.0" port: 0 maskLen: 19];
+    [self emitIP: @"216.73.80.0" port: 0 maskLen: 20];
+    [self emitIP: @"216.239.32.0" port: 0 maskLen: 19];
+    [self emitIP: @"2001:4860::" port: 0 maskLen: 32];
+    [self emitIP: @"2404:6800::" port: 0 maskLen: 32];
+    [self emitIP: @"2404:f340::" port: 0 maskLen: 32];
+    [self emitIP: @"2600:1900::" port: 0 maskLen: 28];
+    [self emitIP: @"2606:73c0::" port: 0 maskLen: 32];
+    [self emitIP: @"2607:f8b0::" port: 0 maskLen: 32];
+    [self emitIP: @"2620:11a:a000::" port: 0 maskLen: 40];
+    [self emitIP: @"2620:120:e000::" port: 0 maskLen: 40];
+    [self emitIP: @"2800:3f0::" port: 0 maskLen: 32];
+    [self emitIP: @"2a00:1450::" port: 0 maskLen: 32];
+    [self emitIP: @"2c0f:fb50::" port: 0 maskLen: 32];
 }
 
 @end

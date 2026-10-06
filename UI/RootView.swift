@@ -57,6 +57,8 @@ struct RootView: View {
         case .overrides: OverridesView()
         case .settings: SettingsView()
         case .emergencyUnlock: EmergencyUnlockView()
+        case .deepBlock: DeepBlockView()
+        case .deepList: RestrictionsView(list: .deep)
         }
     }
 
@@ -120,17 +122,23 @@ struct HeaderBar: View {
         case .overrides: return NSLocalizedString("Overrides", comment: "card title")
         case .settings: return NSLocalizedString("Settings", comment: "card title")
         case .emergencyUnlock: return NSLocalizedString("Emergency Unlock", comment: "card title")
+        case .deepBlock: return NSLocalizedString("Deep Block", comment: "card title")
+        case .deepList: return NSLocalizedString("Deep list", comment: "card title")
         }
     }
 
     private var statusColor: Color {
-        if !model.isBlockRunning { return Theme.idleDot }
+        if !model.isBlockRunning { return model.deepRunning ? Theme.accent : Theme.idleDot }
         return model.overrideRunning ? Theme.green : Theme.accent
     }
 
     private var statusText: String {
         if model.isAddingBlock { return NSLocalizedString("Starting block…", comment: "header while starting") }
-        if !model.isBlockRunning { return NSLocalizedString("Not blocking", comment: "header idle") }
+        if model.isAddingDeepBlock { return NSLocalizedString("Starting deep block…", comment: "header while starting a deep block") }
+        if !model.isBlockRunning {
+            return model.deepRunning ? NSLocalizedString("Deep block running", comment: "header during deep-only block")
+                                     : NSLocalizedString("Not blocking", comment: "header idle")
+        }
         if model.overrideRunning { return NSLocalizedString("Override running", comment: "header during override") }
         return RestrictionsSummary.headline(count: model.shownEntries.count, isAllowlist: model.shownAllowlist)
     }

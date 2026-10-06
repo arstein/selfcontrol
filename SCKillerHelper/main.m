@@ -19,6 +19,8 @@
 #import "SCSentry.h"
 #import "SCSNTPClient.h"
 #import "SCBlockUtilities.h"
+#import "SCDeepBlockDecision.h"
+#import "SCRuleCompiler.h"
 
 #define LOG_FILE @"~/Documents/SelfControl-Killer.log"
 
@@ -130,8 +132,27 @@ int main(int argc, char* argv[]) {
         // same decision the daemon makes (an unverified start is corrected to
         // verifiedNow - monotonic elapsed, so a block started offline becomes
         // clearable once its full duration has truly elapsed).
-        if ([settings boolForKey:@"BlockIsRunning"] &&
-            [[settings valueForKey:@"TrustedClockState"] count] > 0) {
+        BOOL baseNeedsProof = [settings boolForKey:@"BlockIsRunning"] &&
+            [[settings valueForKey:@"TrustedClockState"] count] > 0;
+        NSDictionary* deepRecord = [SCBlockUtilities deepBlockRecord];
+        // Deep rules installed with their record gone (tampered away): the daemon
+        // rebuilds the record from the anchor payload once it has verified time, so
+        // expiry can't be shown yet. Refuse while that payload is readable; with no
+        // payload nothing can rebuild it, so recovery stays possible (no permanent block).
+        if (deepRecord == nil && [[SCBlockUtilities installedLayerNames] containsObject:SCLayerDeep]) {
+            NSString* anchor = [NSString stringWithContentsOfFile:@"/etc/pf.anchors/org.eyebeam" encoding:NSUTF8StringEncoding error:nil];
+            if ([SCRuleCompiler deepPayloadFromAnchorText:anchor] != nil) {
+                NSString* refusal = @"deep block rules are installed but their record is missing (SelfControl rebuilds it once it can verify the time)";
+                NSLog(@"ERROR: Refusing recovery: %@.", refusal);
+                [log appendFormat:@"REFUSED TO CLEAR BLOCK: %@. The block was left in place.\n", refusal];
+                [log appendString:@"\n===SelfControl-Killer complete (block not cleared)==="];
+                [log writeToFile:logFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                printf("%s\n", SCKillerExpiryNotVerifiedMarker.UTF8String);
+                fflush(stdout);
+                exit(SCKillerExitStatusExpiryNotVerified);
+            }
+        }
+        if (baseNeedsProof || deepRecord != nil) {
             NSString* refusal = nil;
             NSDictionary* readingAtResponse = nil;
             NSDate* verifiedNow = [SCSNTPClient fetchNetworkTimeWithTimeout:3.0
@@ -139,16 +160,30 @@ int main(int argc, char* argv[]) {
             if (verifiedNow == nil) {
                 refusal = @"network time could not be reached";
             } else {
-                NSDictionary* decision = [SCBlockUtilities
-                    trustedTimingDecisionForSettings:[SCBlockUtilities trustedTimingSettingsSnapshot]
-                                         verifiedNow:verifiedNow
-                                             reading:readingAtResponse];
-                if (decision == nil) {
-                    refusal = @"the active block's trusted-timing state is incomplete";
-                } else if (![decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
-                    refusal = @"network time does not confirm the block has expired";
-                } else {
-                    [log appendFormat:@"Network time %@ confirms the block has expired.\n\n", verifiedNow];
+                if (baseNeedsProof) {
+                    NSDictionary* decision = [SCBlockUtilities
+                        trustedTimingDecisionForSettings:[SCBlockUtilities trustedTimingSettingsSnapshot]
+                                             verifiedNow:verifiedNow
+                                                 reading:readingAtResponse];
+                    if (decision == nil) {
+                        refusal = @"the active block's trusted-timing state is incomplete";
+                    } else if (![decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
+                        refusal = @"network time does not confirm the block has expired";
+                    }
+                }
+                if (refusal == nil && deepRecord != nil) {
+                    NSDictionary* decision = [SCBlockUtilities
+                        trustedTimingDecisionForSettings:[SCDeepBlockDecision timingSnapshotForRecord:deepRecord]
+                                             verifiedNow:verifiedNow
+                                                 reading:readingAtResponse];
+                    if (decision == nil) {
+                        refusal = @"the deep block's trusted-timing state is incomplete";
+                    } else if (![decision[SCTrustedTimingShouldRemoveBlockKey] boolValue]) {
+                        refusal = @"network time does not confirm the deep block has expired";
+                    }
+                }
+                if (refusal == nil) {
+                    [log appendFormat:@"Network time %@ confirms the block(s) have expired.\n\n", verifiedNow];
                 }
             }
 
@@ -239,6 +274,9 @@ int main(int argc, char* argv[]) {
         
         // clear all modern secured settings (the user's copies of each setting will still be stored in defaults)
         [settings resetAllSettingsToDefaults];
+        // Keys outside the defaults dict survive the reset. The deep record must go
+        // (its expiry was verified above), or the daemon would reinstall its rules.
+        [settings setValue:nil forKey:@"DeepBlock"];
         [settings synchronizeSettings];
         [log appendFormat: @"Reset all modern secured settings to default values.\n"];
         

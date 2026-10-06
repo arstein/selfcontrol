@@ -14,14 +14,20 @@ NS_ASSUME_NONNULL_BEGIN
 // note that this is NOT included in SCUtility.h currently!
 @interface SCHelperToolUtilities : NSObject
 
-// Reads the domain block list from the settings for SelfControl, and adds deny
-// rules for all of the IPs (or the A DNS record IPS for doamin names) to the
-// ipfw firewall.
-+ (void)installBlockRulesFromSettings;
+// The single enforcement path: installs exactly these layers (SCLayerBase,
+// SCLayerDeep) from settings, replacing whatever was there. Empty -> teardown.
+// If a layer can't be resolved (deep layer with neither record nor anchor
+// payload) nothing is changed (fail-closed). Running blocklist layers are
+// tighten-only: addresses already in the installed anchor are kept.
+// Returns YES when the rules were installed (or cleared); NO when a layer
+// couldn't be resolved or the install failed (the previous rules then stay).
++ (BOOL)applyDesiredLayers:(NSArray<NSString*>*)layerNames;
 
-// Removes the hosts/pf block rules WITHOUT touching settings/flags or playing
-// the end sound. Used to temporarily lift the base block during an override.
-+ (void)clearBlockRulesOnly;
+// Installs the regular block's layer (plus the deep layer if a deep block exists).
++ (BOOL)installBlockRulesFromSettings;
+
+// Lifts the regular block's layer for an override; a deep layer stays.
++ (BOOL)clearBlockRulesOnly;
 
 // exits the daemon process cleanly once settings are synced; launchd's
 // KeepAlive={SuccessfulExit=false} keeps it dead until relaunched on-demand
@@ -38,9 +44,21 @@ NS_ASSUME_NONNULL_BEGIN
 // Clear only the OS-level DNS cache
 + (void)clearOSDNSCache;
 
-// Removes block via settings, host file rules and ipfw rules,
-// deleting user caches if requested, and migrating legacy settings.
-+ (void)removeBlock;
+// Plays the user's block-end sound, if they asked for one.
++ (void)playBlockEndSound;
+
+// YES while the deep layer must be enforced: its record exists OR its rules are
+// installed (a tampered-away record never relaxes enforcement).
++ (BOOL)deepShouldEnforce;
+
+// Removes the regular block (its rules, then settings, sound, caches); a running
+// deep block stays enforced. Rules first: settings are cleared only when the rules
+// came off. Returns NO (settings untouched, block still "running") on failure.
++ (BOOL)removeBlock;
+
+// Emergency unlock: removes the regular block and the deep block, rules first as
+// above. Returns NO (settings untouched) when the rules couldn't be cleared.
++ (BOOL)removeAllBlocks;
 
 + (void)sendConfigurationChangedNotification;
 

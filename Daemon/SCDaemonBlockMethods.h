@@ -16,6 +16,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (class, readonly) NSLock* daemonMethodLock;
 
 // Starts a block
++ (void)startDeepBlockWithBlocklist:(NSArray<NSString*>*)blocklist isAllowlist:(BOOL)isAllowlist durationSecs:(double)durationSecs blockSettings:(NSDictionary*)blockSettings reply:(void(^)(NSError* error))reply;
 + (void)startBlockWithControllingUID:(uid_t)controllingUID blocklist:(NSArray<NSString*>*)blocklist isAllowlist:(BOOL)isAllowlist endDate:(NSDate*)endDate blockSettings:(NSDictionary*)blockSettings authorization:(NSData *)authData reply:(void(^)(NSError* error))reply;
 
 // Checks whether the block is expired or compromised, and takes action to fix

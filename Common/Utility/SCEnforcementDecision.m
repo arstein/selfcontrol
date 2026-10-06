@@ -44,4 +44,10 @@
     }
     return healSecs;
 }
+
++ (NSTimeInterval)installBackoffSecsAfterFailureWithCurrent:(NSTimeInterval)current {
+    const NSTimeInterval first = 5.0, cap = 300.0;
+    if (isnan(current) || current <= 0) return first;
+    return MIN(current * 2.0, cap);
+}
 @end

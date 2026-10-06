@@ -44,6 +44,9 @@ OSStatus const AUTH_CANCELLED_STATUS = -60006;
         defaultDefaultsDict = @{
             @"Blocklist": @[],
             @"BlockAsWhitelist": @NO,
+            @"DeepBlocklist": @[],
+            @"DeepBlockAsWhitelist": @NO,
+            @"DeepBlockDuration": @45,
             @"HighlightInvalidHosts": @YES,
             @"VerifyInternetConnection": @YES,
             @"TimerWindowFloats": @NO,

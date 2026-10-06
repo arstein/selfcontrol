@@ -312,4 +312,11 @@ final class UIFormattingTests: XCTestCase {
         XCTAssertEqual(OverridePolicyLimits.clampPerDay(-1), 0)
         XCTAssertEqual(OverridePolicyLimits.clampPerDay(11), 10)
     }
+
+    func testDeepBlockLimitsClamp() {
+        XCTAssertEqual(DeepBlockLimits.clamp(1), 5)
+        XCTAssertEqual(DeepBlockLimits.clamp(45), 45)
+        XCTAssertEqual(DeepBlockLimits.clamp(500), 240)
+        XCTAssertEqual(DeepBlockLimits.scale.maxMinutes, 240)
+    }
 }
