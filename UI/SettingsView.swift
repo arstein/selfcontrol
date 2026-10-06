@@ -143,7 +143,7 @@ struct SettingsView: View {
             NSLog("WARNING: User selected unknown alert sound index %ld.", index)
             let err = SCErr.error(withCode: 310)
             SCSentry.captureError(err)
-            SCUIUtilities.presentError(err)
+            Dialog.afterCurrentAction { SCUIUtilities.presentError(err) }
             return
         }
         soundIndex = index
@@ -154,7 +154,7 @@ struct SettingsView: View {
             NSLog("WARNING: Alert sound not found.")
             let err = SCErr.error(withCode: 311)
             SCSentry.captureError(err)
-            SCUIUtilities.presentError(err)
+            Dialog.afterCurrentAction { SCUIUtilities.presentError(err) }
         }
     }
 }
