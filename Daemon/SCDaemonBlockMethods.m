@@ -378,6 +378,59 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     [SCDaemonBlockMethods requestVerifiedTime];
 }
 
++ (void)addToDeepBlocklist:(NSArray<NSString*>*)entries authorization:(NSData *)authData reply:(void(^)(NSError* error))reply {
+    if (![SCDaemonBlockMethods lockOrTimeout: reply]) return;
+    [SCSentry addBreadcrumb: @"Daemon method addToDeepBlocklist called" category: @"daemon"];
+
+    SCSettings* settings = [SCSettings sharedSettings];
+    NSDictionary* record = [SCBlockUtilities deepBlockRecord];
+    // Additions only, and only to a blocklist deep block with a list we can trust.
+    NSInteger refusal = [SCDeepBlockDecision addRefusalCodeForRecord: record];
+    if (refusal != 0) {
+        NSLog(@"ERROR: Can't add to the deep blocklist (code %ld)", (long)refusal);
+        reply([SCErr errorWithCode: refusal]);
+        [[SCDaemon sharedDaemon] resetInactivityTimer];
+        [self.daemonMethodLock unlock];
+        return;
+    }
+
+    NSArray<NSString*>* filtered = [SCBlockUtilities blocklistByRemovingTimeSources: entries ?: @[]];
+    NSArray<NSString*>* merged = [SCDeepBlockDecision blocklist: record[@"blocklist"] byAdding: filtered];
+    if (merged.count == [record[@"blocklist"] count]) {
+        reply(nil);
+        [[SCDaemon sharedDaemon] resetInactivityTimer];
+        [self.daemonMethodLock unlock];
+        return;
+    }
+
+    NSMutableDictionary* updated = [record mutableCopy];
+    updated[@"blocklist"] = merged;
+    [settings setValue: updated forKey: @"DeepBlock"];
+
+    // Re-resolve and rewrite every layer, override-aware exactly as updateBlocklist.
+    BOOL overrideActive = [SCDaemonBlockMethods overrideActiveNowInSettings: settings];
+    BOOL applied = overrideActive ? [SCHelperToolUtilities clearBlockRulesOnly]
+                                  : [SCHelperToolUtilities installBlockRulesFromSettings];
+
+    NSError* syncErr = [settings syncSettingsAndWait: 5];
+    if (syncErr != nil) NSLog(@"WARNING: Sync failed or timed out with error %@ after adding to the deep blocklist", syncErr);
+
+    if (!applied) {
+        // Never roll back (that would relax). The record keeps the new sites and the
+        // checkup's integrity check re-applies until the installed payload covers them.
+        NSLog(@"ERROR: Failed to apply deep block rules after adding sites; keeping them, the checkup will retry.");
+        [SCSentry addBreadcrumb: @"Daemon failed to apply deep blocklist addition" category: @"daemon"];
+        reply([SCErr errorWithCode: 336]);
+    } else {
+        [SCHelperToolUtilities sendConfigurationChangedNotification];
+        [SCHelperToolUtilities clearCachesIfRequested];
+        NSLog(@"INFO: Deep blocklist successfully updated.");
+        reply(nil);
+    }
+    [[SCDaemon sharedDaemon] resetInactivityTimer];
+    [self.daemonMethodLock unlock];
+}
+
 + (void)updateBlocklist:(NSArray<NSString*>*)newBlocklist authorization:(NSData *)authData reply:(void(^)(NSError* error))reply {
     if (![SCDaemonBlockMethods lockOrTimeout: reply]) {
         return;
@@ -1146,12 +1199,13 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     for (NSString* name in desired) if (![installed containsObject:name]) missingLayer = YES;
     BOOL desiredHasBlocklist = NO;
     if ([desired containsObject:SCLayerBase] && ![settings boolForKey:@"ActiveBlockAsWhitelist"]) desiredHasBlocklist = YES;
+    BOOL deepListStale = NO;
     if ([desired containsObject:SCLayerDeep]) {
-        NSDictionary* deepInfo = [SCDeepBlockDecision recordListIsUsable:deep] ? deep : nil;
-        if (deepInfo == nil) {
-            NSString* anchor = [NSString stringWithContentsOfFile:@"/etc/pf.anchors/org.eyebeam" encoding:NSUTF8StringEncoding error:nil];
-            deepInfo = [SCRuleCompiler deepPayloadFromAnchorText:anchor];
-        }
+        NSString* anchor = [NSString stringWithContentsOfFile:@"/etc/pf.anchors/org.eyebeam" encoding:NSUTF8StringEncoding error:nil];
+        NSDictionary* installedPayload = [SCRuleCompiler deepPayloadFromAnchorText:anchor];
+        NSDictionary* deepInfo = [SCDeepBlockDecision recordListIsUsable:deep] ? deep : installedPayload;
+        // A failed add leaves the record ahead of what's installed: re-apply until it's covered.
+        deepListStale = ![SCDeepBlockDecision installedPayload:installedPayload coversRecord:deep];
         // Unknown mode (no usable record or payload) counts as a blocklist: expecting
         // hosts entries can only add enforcement.
         id deepMode = deepInfo[@"isAllowlist"];
@@ -1178,16 +1232,17 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     // can't be restored here (no record, no anchor payload); the heal path rebuilds it
     // from the payload while the anchor still carries it. An attacker with root
     // deleting both the record and the anchor is out of scope.
-    if (missingLayer || hostsMissing || pfNotEnforcing) {
+    if (missingLayer || hostsMissing || pfNotEnforcing || deepListStale) {
         // applyDesiredLayers rebuilds a record-less deep layer from the anchor payload.
         NSMutableOrderedSet* layers = [NSMutableOrderedSet orderedSetWithArray:desired];
         [layers addObjectsFromArray:installed];
         __block BOOL attempted = NO;
         BOOL reapplied = [SCDaemonBlockMethods installThrottled:^BOOL{
             attempted = YES;
-            NSLog(@"INFO: Block enforcement missing (installed [%@], desired [%@], hosts %@, pf %@); re-adding...",
+            NSLog(@"INFO: Block enforcement missing (installed [%@], desired [%@], hosts %@, pf %@, deep list %@); re-adding...",
                   [installed componentsJoinedByString:@","], [desired componentsJoinedByString:@","],
-                  hostsMissing ? @"missing" : @"ok", pfNotEnforcing ? @"not enforcing" : @"ok");
+                  hostsMissing ? @"missing" : @"ok", pfNotEnforcing ? @"not enforcing" : @"ok",
+                  deepListStale ? @"stale" : @"ok");
             if (![SCHelperToolUtilities applyDesiredLayers:layers.array]) return NO;
             // A "successful" load that still leaves pf off or our anchor empty is a
             // failure too: back off instead of flushing states every check.

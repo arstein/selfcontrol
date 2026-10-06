@@ -63,6 +63,24 @@
     [SCDaemonBlockMethods updateBlocklist: newBlocklist authorization: authData reply: reply];
 }
 
+- (void)addToDeepBlocklist:(NSArray<NSString*>*)entries authorization:(NSData *)authData reply:(void(^)(NSError* error))reply {
+    NSLog(@"XPC method called: addToDeepBlocklist");
+    
+    NSError* error = [SCXPCAuthorization checkAuthorization: authData command: _cmd];
+    if (error != nil) {
+        if (![SCMiscUtilities errorIsAuthCanceled: error]) {
+            NSLog(@"ERROR: XPC authorization failed due to error %@", error);
+            [SCSentry captureError: error];
+        }
+        reply(error);
+        return;
+    } else {
+        NSLog(@"AUTHORIZATION ACCEPTED for addToDeepBlocklist with authData %@ and command %s", authData, sel_getName(_cmd));
+    }
+    
+    [SCDaemonBlockMethods addToDeepBlocklist: entries authorization: authData reply: reply];
+}
+
 - (void)updateBlockEndDate:(NSDate*)newEndDate authorization:(NSData *)authData reply:(void(^)(NSError* error))reply {
     NSLog(@"XPC method called: updateBlockEndDate");
     
