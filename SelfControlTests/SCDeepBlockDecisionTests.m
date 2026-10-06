@@ -1,5 +1,6 @@
 #import <XCTest/XCTest.h>
 #import "SCDeepBlockDecision.h"
+#import "SCRuleCompiler.h"
 #import "SCDeepBlockConfig.h"
 
 @interface SCDeepBlockDecisionTests : XCTestCase
@@ -229,6 +230,40 @@ static NSMutableDictionary* CompleteRecord(void) {
     XCTAssertFalse([SCDeepBlockDecision installedPayload:(@{@"blocklist": @"a.com"}) coversRecord:rec]);
     XCTAssertTrue([SCDeepBlockDecision installedPayload:nil coversRecord:nil]);
     XCTAssertTrue([SCDeepBlockDecision installedPayload:nil coversRecord:(@{@"blocklist": @"x"})]);
+}
+
+- (void)testAddingMoreEdgeCases {
+    XCTAssertEqualObjects([SCDeepBlockDecision blocklist:(@[@"a.com", @"a.com", @"b.com"]) byAdding:(@[@"c.com", @"a.com"])],
+                          (@[@"a.com", @"a.com", @"b.com", @"c.com"]));
+    XCTAssertEqual([SCDeepBlockDecision addRefusalCodeForRecord:(@{@"blocklist": @[@"a.com"], @"isAllowlist": @"NO"})], 328);
+    NSDictionary* allow = @{@"blocklist": @[@"a.com"], @"isAllowlist": @YES};
+    XCTAssertTrue([SCDeepBlockDecision installedPayload:(@{@"blocklist": @[@"a.com"]}) coversRecord:allow]);
+    XCTAssertFalse([SCDeepBlockDecision installedPayload:(id)@"junk" coversRecord:allow]);
+}
+
+- (void)testDeepListIsStale {
+    NSDictionary* payload = @{@"blocklist": @[@"a.com"]};
+    NSDictionary* rec = @{@"blocklist": @[@"a.com"], @"isAllowlist": @NO};
+    NSDictionary* no = @{@"blocklist": @[@"a.com"], @"isAllowlist": @NO, @"applyPending": @NO};
+    NSDictionary* pending = @{@"blocklist": @[@"a.com"], @"isAllowlist": @NO, @"applyPending": @YES};
+    XCTAssertFalse([SCDeepBlockDecision deepListIsStaleForRecord:rec installedPayload:payload]);
+    XCTAssertFalse([SCDeepBlockDecision deepListIsStaleForRecord:no installedPayload:payload]);
+    XCTAssertTrue([SCDeepBlockDecision deepListIsStaleForRecord:pending installedPayload:payload]);
+    XCTAssertTrue([SCDeepBlockDecision deepListIsStaleForRecord:rec installedPayload:nil]);
+    XCTAssertFalse([SCDeepBlockDecision deepListIsStaleForRecord:nil installedPayload:nil]);
+    XCTAssertFalse([SCDeepBlockDecision deepListIsStaleForRecord:(@{@"applyPending": @YES}) installedPayload:nil]);
+}
+
+- (void)testAnchorRoundTripCoversRecord {
+    NSDictionary* rec = @{@"blocklist": @[@"a.com", @"b.com"], @"isAllowlist": @NO, @"applyPending": @YES};
+    SCRuleLayer* layer = [SCRuleLayer layerWithName:SCLayerDeep isAllowlist:NO allowLocal:NO specs:@[]];
+    layer.payload = @{@"blocklist": rec[@"blocklist"], @"isAllowlist": rec[@"isAllowlist"]};
+    NSString* text = [SCRuleCompiler anchorTextForLayers:@[layer]];
+    NSDictionary* parsed = [SCRuleCompiler deepPayloadFromAnchorText:text];
+    XCTAssertTrue([SCDeepBlockDecision installedPayload:parsed coversRecord:rec]);
+    XCTAssertNil(parsed[@"applyPending"]);
+    NSDictionary* bigger = @{@"blocklist": @[@"a.com", @"b.com", @"c.com"], @"isAllowlist": @NO};
+    XCTAssertFalse([SCDeepBlockDecision installedPayload:parsed coversRecord:bigger]);
 }
 
 @end

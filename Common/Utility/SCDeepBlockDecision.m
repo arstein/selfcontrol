@@ -145,9 +145,20 @@ static NSDictionary<NSString*, NSString*>* SCDeepTimingKeyMap(void) {
 }
 
 + (NSArray<NSString*>*)blocklist:(NSArray<NSString*>*)current byAdding:(NSArray<NSString*>*)additions {
-    NSMutableOrderedSet* merged = [NSMutableOrderedSet orderedSetWithArray: current];
-    [merged addObjectsFromArray: additions];
-    return merged.array;
+    // `current` is kept exactly as stored (even with duplicates); only genuinely new entries are appended.
+    NSMutableArray* merged = [current mutableCopy];
+    NSMutableSet* seen = [NSMutableSet setWithArray: current];
+    for (NSString* entry in additions) {
+        if ([seen containsObject: entry]) continue;
+        [seen addObject: entry];
+        [merged addObject: entry];
+    }
+    return merged;
+}
+
++ (BOOL)deepListIsStaleForRecord:(NSDictionary*)record installedPayload:(NSDictionary*)payload {
+    if (![self recordListIsUsable:record]) return NO;
+    return [record[@"applyPending"] boolValue] || ![self installedPayload:payload coversRecord:record];
 }
 
 + (BOOL)installedPayload:(NSDictionary*)payload coversRecord:(NSDictionary*)record {

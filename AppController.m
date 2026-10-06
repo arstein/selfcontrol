@@ -744,10 +744,6 @@
     }
     self.modifyingBlock = YES;
 
-    // Save the new sites for the next deep block too: append the missing ones, keep the rest.
-    NSArray* saved = [defaults_ arrayForKey: @"DeepBlocklist"] ?: @[];
-    [defaults_ setValue: [SCDeepBlockDecision blocklist: saved byAdding: cleanedEntries] forKey: @"DeepBlocklist"];
-
     // we're about to launch a helper tool which will read settings, so make sure the ones on disk are valid
     [settings_ synchronizeSettings];
     [defaults_ synchronize];
@@ -757,7 +753,18 @@
             if (error == nil) {
                 [SCSentry addBreadcrumb: @"Deep blocklist updated successfully" category:@"app"];
             }
-            finishAndRelease(error);
+            // Save the new sites for the next deep block only when the daemon took them
+            // (success, or 336: recorded and still being applied).
+            BOOL saveEntries = error == nil || ([error.domain isEqualToString: kSelfControlErrorDomain] && error.code == 336);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (saveEntries) {
+                    NSArray* saved = [self->defaults_ arrayForKey: @"DeepBlocklist"] ?: @[];
+                    [self->defaults_ setValue: [SCDeepBlockDecision blocklist: saved byAdding: cleanedEntries] forKey: @"DeepBlocklist"];
+                    [self->defaults_ synchronize];
+                }
+                self.modifyingBlock = NO;
+                completion(error);
+            });
         }];
     }];
 }

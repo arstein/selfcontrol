@@ -73,6 +73,9 @@ typedef NS_ENUM(NSInteger, SCDeepAction) {
 /// blocklist contains every entry of the record's. NO when a usable record has an
 /// entry the payload lacks (including a nil or malformed payload).
 + (BOOL)installedPayload:(nullable NSDictionary*)payload coversRecord:(nullable NSDictionary*)record;
+/// YES when a usable record's list still needs applying: a failed add left applyPending set, or the
+/// installed payload doesn't cover the record. NO for no/unusable record.
++ (BOOL)deepListIsStaleForRecord:(nullable NSDictionary*)record installedPayload:(nullable NSDictionary*)payload;
 @end
 
 NS_ASSUME_NONNULL_END

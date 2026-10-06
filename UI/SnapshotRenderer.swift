@@ -108,10 +108,10 @@ final class SnapshotRenderer: NSObject {
             ("34-deep-list-locked", AppModel.preview { m in
                 m.path = [.deepList]; m.deepRunning = true; m.deepTimeState = .countdown(seconds: 1932)
                 m.deepActiveEntries = ["docs.google.com", "github.com"]; m.isDeepActiveAllowlist = true }),
+            ("35-deep-verifying", AppModel.preview { m in m.deepRunning = true; m.deepTimeState = .verifyingEnd }),
             ("36-deep-list-addable", AppModel.preview { m in
                 m.path = [.deepList]; m.deepRunning = true; m.deepRecordUsable = true; m.deepTimeState = .countdown(seconds: 1932)
                 m.deepActiveEntries = ["reddit.com", "youtube.com"]; m.isDeepActiveAllowlist = false }),
-            ("35-deep-verifying", AppModel.preview { m in m.deepRunning = true; m.deepTimeState = .verifyingEnd }),
         ]
     }
 
