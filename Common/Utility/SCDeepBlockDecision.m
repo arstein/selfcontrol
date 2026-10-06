@@ -158,7 +158,8 @@ static NSDictionary<NSString*, NSString*>* SCDeepTimingKeyMap(void) {
 
 + (BOOL)deepListIsStaleForRecord:(NSDictionary*)record installedPayload:(NSDictionary*)payload {
     if (![self recordListIsUsable:record]) return NO;
-    return [record[@"applyPending"] boolValue] || ![self installedPayload:payload coversRecord:record];
+    id pending = record[@"applyPending"];
+    return ([pending isKindOfClass:[NSNumber class]] && [pending boolValue]) || ![self installedPayload:payload coversRecord:record];
 }
 
 + (BOOL)installedPayload:(NSDictionary*)payload coversRecord:(NSDictionary*)record {

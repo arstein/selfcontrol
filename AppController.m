@@ -717,13 +717,6 @@
     void (^finish)(NSError*) = ^(NSError* err) {
         dispatch_async(dispatch_get_main_queue(), ^{ completion(err); });
     };
-    // Used only once modifyingBlock has been claimed by this call.
-    void (^finishAndRelease)(NSError*) = ^(NSError* err) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self.modifyingBlock = NO;
-            completion(err);
-        });
-    };
 
     // Mirror the daemon's refusals so the user gets them without a round trip.
     NSInteger refusal = [SCDeepBlockDecision addRefusalCodeForRecord: [SCBlockUtilities deepBlockRecord]];

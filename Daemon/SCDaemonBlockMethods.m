@@ -401,7 +401,10 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     NSArray<NSString*>* filtered = [SCBlockUtilities blocklistByRemovingTimeSources: valid];
     NSArray<NSString*>* merged = [SCDeepBlockDecision blocklist: record[@"blocklist"] byAdding: filtered];
     if (merged.count == [record[@"blocklist"] count]) {   // byAdding keeps the record's list as-is, so equal counts means nothing new
-        reply(nil);
+        // Nothing new, but an earlier add may still be waiting to be applied.
+        id pendingFlag = record[@"applyPending"];
+        BOOL pending = [pendingFlag isKindOfClass: [NSNumber class]] && [pendingFlag boolValue];
+        reply(pending ? [SCErr errorWithCode: 336] : nil);
         [[SCDaemon sharedDaemon] resetInactivityTimer];
         [self.daemonMethodLock unlock];
         return;
