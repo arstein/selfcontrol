@@ -26,6 +26,9 @@ NS_ASSUME_NONNULL_BEGIN
 // (i.e. adds new sites to the list)
 + (void)updateBlocklist:(NSArray<NSString*>*)newBlocklist authorization:(NSData *)authData reply:(void(^)(NSError* error))reply;
 
+// adds sites to the running deep block (blocklist deep blocks only)
++ (void)addToDeepBlocklist:(NSArray<NSString*>*)entries authorization:(NSData *)authData reply:(void(^)(NSError* error))reply;
+
 // updates the block end date for the currently running block
 // (i.e. extends the block)
 + (void)updateBlockEndDate:(NSDate*)newEndDate authorization:(NSData *)authData reply:(void(^)(NSError* error))reply;

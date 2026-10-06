@@ -20,6 +20,9 @@ NS_ASSUME_NONNULL_BEGIN
 // XPC method to add to blocklist
 - (void)updateBlocklist:(NSArray<NSString*>*)newBlocklist authorization:(NSData *)authData reply:(void(^)(NSError* error))reply;
 
+// XPC method to add sites to a running (blocklist) deep block
+- (void)addToDeepBlocklist:(NSArray<NSString*>*)entries authorization:(NSData *)authData reply:(void(^)(NSError* error))reply;
+
 // XPC method to extend block
 - (void)updateBlockEndDate:(NSDate*)newEndDate authorization:(NSData *)authData reply:(void(^)(NSError* error))reply;
 

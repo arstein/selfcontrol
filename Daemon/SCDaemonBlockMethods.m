@@ -378,6 +378,73 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     [SCDaemonBlockMethods requestVerifiedTime];
 }
 
++ (void)addToDeepBlocklist:(NSArray<NSString*>*)entries authorization:(NSData *)authData reply:(void(^)(NSError* error))reply {
+    if (![SCDaemonBlockMethods lockOrTimeout: reply]) return;
+    [SCSentry addBreadcrumb: @"Daemon method addToDeepBlocklist called" category: @"daemon"];
+
+    SCSettings* settings = [SCSettings sharedSettings];
+    NSDictionary* record = [SCBlockUtilities deepBlockRecord];
+    // Additions only, and only to a blocklist deep block with a list we can trust.
+    NSInteger refusal = [SCDeepBlockDecision addRefusalCodeForRecord: record];
+    if (refusal != 0) {
+        NSLog(@"ERROR: Can't add to the deep blocklist (code %ld)", (long)refusal);
+        reply([SCErr errorWithCode: refusal]);
+        [[SCDaemon sharedDaemon] resetInactivityTimer];
+        [self.daemonMethodLock unlock];
+        return;
+    }
+
+    NSMutableArray<NSString*>* valid = [NSMutableArray array];
+    for (id entry in entries ?: @[]) {
+        if ([entry isKindOfClass: [NSString class]] && [entry length] > 0) [valid addObject: entry];
+    }
+    NSArray<NSString*>* filtered = [SCBlockUtilities blocklistByRemovingTimeSources: valid];
+    NSArray<NSString*>* merged = [SCDeepBlockDecision blocklist: record[@"blocklist"] byAdding: filtered];
+    if (merged.count == [record[@"blocklist"] count]) {   // byAdding keeps the record's list as-is, so equal counts means nothing new
+        // Nothing new, but an earlier add may still be waiting to be applied.
+        id pendingFlag = record[@"applyPending"];
+        BOOL pending = [pendingFlag isKindOfClass: [NSNumber class]] && [pendingFlag boolValue];
+        reply(pending ? [SCErr errorWithCode: 336] : nil);
+        [[SCDaemon sharedDaemon] resetInactivityTimer];
+        [self.daemonMethodLock unlock];
+        return;
+    }
+
+    NSMutableDictionary* updated = [record mutableCopy];
+    updated[@"blocklist"] = merged;
+    // Until the rules are applied, the checkup keeps retrying (a hosts failure after pf succeeded
+    // leaves the installed payload covering the record, so it needs its own flag).
+    updated[@"applyPending"] = @YES;
+    [settings setValue: updated forKey: @"DeepBlock"];
+
+    // Re-resolve and rewrite every layer, override-aware exactly as updateBlocklist.
+    BOOL overrideActive = [SCDaemonBlockMethods overrideActiveNowInSettings: settings];
+    BOOL applied = overrideActive ? [SCHelperToolUtilities clearBlockRulesOnly]
+                                  : [SCHelperToolUtilities installBlockRulesFromSettings];
+
+    if (applied) {
+        [updated removeObjectForKey: @"applyPending"];
+        [settings setValue: updated forKey: @"DeepBlock"];
+    }
+    NSError* syncErr = [settings syncSettingsAndWait: 5];
+    if (syncErr != nil) NSLog(@"WARNING: Sync failed or timed out with error %@ after adding to the deep blocklist", syncErr);
+
+    if (!applied) {
+        // Never roll back (that would relax). The record keeps the new sites and the
+        // checkup's integrity check re-applies until the installed payload covers them.
+        NSLog(@"ERROR: Failed to apply deep block rules after adding sites; keeping them, the checkup will retry.");
+        [SCSentry addBreadcrumb: @"Daemon failed to apply deep blocklist addition" category: @"daemon"];
+        reply([SCErr errorWithCode: 336]);
+    } else {
+        [SCHelperToolUtilities sendConfigurationChangedNotification];
+        [SCHelperToolUtilities clearCachesIfRequested];
+        NSLog(@"INFO: Deep blocklist successfully updated.");
+        reply(nil);
+    }
+    [[SCDaemon sharedDaemon] resetInactivityTimer];
+    [self.daemonMethodLock unlock];
+}
+
 + (void)updateBlocklist:(NSArray<NSString*>*)newBlocklist authorization:(NSData *)authData reply:(void(^)(NSError* error))reply {
     if (![SCDaemonBlockMethods lockOrTimeout: reply]) {
         return;
@@ -1146,12 +1213,13 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     for (NSString* name in desired) if (![installed containsObject:name]) missingLayer = YES;
     BOOL desiredHasBlocklist = NO;
     if ([desired containsObject:SCLayerBase] && ![settings boolForKey:@"ActiveBlockAsWhitelist"]) desiredHasBlocklist = YES;
+    BOOL deepListStale = NO;
     if ([desired containsObject:SCLayerDeep]) {
-        NSDictionary* deepInfo = [SCDeepBlockDecision recordListIsUsable:deep] ? deep : nil;
-        if (deepInfo == nil) {
-            NSString* anchor = [NSString stringWithContentsOfFile:@"/etc/pf.anchors/org.eyebeam" encoding:NSUTF8StringEncoding error:nil];
-            deepInfo = [SCRuleCompiler deepPayloadFromAnchorText:anchor];
-        }
+        NSString* anchor = [NSString stringWithContentsOfFile:@"/etc/pf.anchors/org.eyebeam" encoding:NSUTF8StringEncoding error:nil];
+        NSDictionary* installedPayload = [SCRuleCompiler deepPayloadFromAnchorText:anchor];
+        NSDictionary* deepInfo = [SCDeepBlockDecision recordListIsUsable:deep] ? deep : installedPayload;
+        // A failed add leaves the record ahead of what's installed: re-apply until it's covered.
+        deepListStale = [SCDeepBlockDecision deepListIsStaleForRecord:deep installedPayload:installedPayload];
         // Unknown mode (no usable record or payload) counts as a blocklist: expecting
         // hosts entries can only add enforcement.
         id deepMode = deepInfo[@"isAllowlist"];
@@ -1178,17 +1246,25 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     // can't be restored here (no record, no anchor payload); the heal path rebuilds it
     // from the payload while the anchor still carries it. An attacker with root
     // deleting both the record and the anchor is out of scope.
-    if (missingLayer || hostsMissing || pfNotEnforcing) {
+    if (missingLayer || hostsMissing || pfNotEnforcing || deepListStale) {
         // applyDesiredLayers rebuilds a record-less deep layer from the anchor payload.
         NSMutableOrderedSet* layers = [NSMutableOrderedSet orderedSetWithArray:desired];
         [layers addObjectsFromArray:installed];
         __block BOOL attempted = NO;
         BOOL reapplied = [SCDaemonBlockMethods installThrottled:^BOOL{
             attempted = YES;
-            NSLog(@"INFO: Block enforcement missing (installed [%@], desired [%@], hosts %@, pf %@); re-adding...",
+            NSLog(@"INFO: Block enforcement missing (installed [%@], desired [%@], hosts %@, pf %@, deep list %@); re-adding...",
                   [installed componentsJoinedByString:@","], [desired componentsJoinedByString:@","],
-                  hostsMissing ? @"missing" : @"ok", pfNotEnforcing ? @"not enforcing" : @"ok");
+                  hostsMissing ? @"missing" : @"ok", pfNotEnforcing ? @"not enforcing" : @"ok",
+                  deepListStale ? @"stale" : @"ok");
             if (![SCHelperToolUtilities applyDesiredLayers:layers.array]) return NO;
+            if (deepListStale) {
+                NSString* after = [NSString stringWithContentsOfFile:@"/etc/pf.anchors/org.eyebeam" encoding:NSUTF8StringEncoding error:nil];
+                if (![SCDeepBlockDecision installedPayload:[SCRuleCompiler deepPayloadFromAnchorText:after] coversRecord:deep]) {
+                    NSLog(@"ERROR: Rules re-applied but the installed deep list still lacks the record's sites.");
+                    return NO;
+                }
+            }
             // A "successful" load that still leaves pf off or our anchor empty is a
             // failure too: back off instead of flushing states every check.
             if (pfNotEnforcing && !([PacketFilter pfIsEnabled] && [PacketFilter anchorRulesLoaded])) {
@@ -1201,6 +1277,16 @@ static NSTimeInterval sInstallBackoffSecs = 0;
             NSLog(@"INFO: Integrity check found missing enforcement; re-install backing off.");
         } else if (reapplied) {
             [SCHelperToolUtilities clearCachesIfRequested];
+            if (deepListStale && [deep[@"applyPending"] boolValue]) {
+                NSDictionary* current = [SCBlockUtilities deepBlockRecord];
+                if (current != nil) {
+                    NSMutableDictionary* cleared = [current mutableCopy];
+                    [cleared removeObjectForKey: @"applyPending"];
+                    [settings setValue: cleared forKey: @"DeepBlock"];
+                    NSError* clearErr = [settings syncSettingsAndWait: 5];
+                    if (clearErr != nil) NSLog(@"WARNING: Sync failed after clearing applyPending: %@", clearErr);
+                }
+            }
             NSLog(@"INFO: Integrity check ran; re-added block rules.");
             [SCSentry addBreadcrumb: @"Daemon found compromised block integrity and re-added rules" category: @"daemon"];
         } else {
@@ -1214,9 +1300,11 @@ static NSTimeInterval sInstallBackoffSecs = 0;
                                                    reading:[SCTrustedClock currentReading]]
                     forKey:@"TrustedClockState"];
     }
-    NSDictionary* deepClock = deep[@"clockState"];
+    // Re-read: the re-apply above may have just cleared applyPending on the record.
+    NSDictionary* deepNow = [SCBlockUtilities deepBlockRecord];
+    NSDictionary* deepClock = deepNow[@"clockState"];
     if ([deepClock isKindOfClass:[NSDictionary class]] && deepClock.count > 0) {
-        NSMutableDictionary* updated = [deep mutableCopy];
+        NSMutableDictionary* updated = [deepNow mutableCopy];
         updated[@"clockState"] = [SCTrustedClock checkpointState:deepClock reading:[SCTrustedClock currentReading]];
         [settings setValue:updated forKey:@"DeepBlock"];
     }

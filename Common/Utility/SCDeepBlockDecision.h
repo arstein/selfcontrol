@@ -63,6 +63,19 @@ typedef NS_ENUM(NSInteger, SCDeepAction) {
                                          payload:(nullable NSDictionary*)payload
                                      verifiedNow:(NSDate*)verifiedNow
                                       clockState:(NSDictionary*)clockState;
+/// Why a running deep block's list can't take additions: 328 when there's no usable
+/// record (none, or tampered/awaiting heal), 329 for an allowlist (adding would
+/// loosen it), else 0.
++ (NSInteger)addRefusalCodeForRecord:(nullable NSDictionary*)record;
+/// Ordered union: `current` order kept, new entries appended, no duplicates.
++ (NSArray<NSString*>*)blocklist:(NSArray<NSString*>*)current byAdding:(NSArray<NSString*>*)additions;
+/// YES when there's nothing to fix: no usable record, or the installed payload's
+/// blocklist contains every entry of the record's. NO when a usable record has an
+/// entry the payload lacks (including a nil or malformed payload).
++ (BOOL)installedPayload:(nullable NSDictionary*)payload coversRecord:(nullable NSDictionary*)record;
+/// YES when a usable record's list still needs applying: a failed add left applyPending set, or the
+/// installed payload doesn't cover the record. NO for no/unusable record.
++ (BOOL)deepListIsStaleForRecord:(nullable NSDictionary*)record installedPayload:(nullable NSDictionary*)payload;
 @end
 
 NS_ASSUME_NONNULL_END

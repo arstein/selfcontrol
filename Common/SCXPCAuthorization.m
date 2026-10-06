@@ -122,6 +122,7 @@ static NSDictionary* kAuthorizationRuleAuthenticateAsAdmin2MinTimeout;
             NSStringFromSelector(@selector(startBlockWithControllingUID:blocklist:isAllowlist:endDate:blockSettings:authorization:reply:)) : startBlockCommandInfo,
             NSStringFromSelector(@selector(startDeepBlockWithBlocklist:isAllowlist:durationSecs:blockSettings:authorization:reply:)) : startBlockCommandInfo,
             NSStringFromSelector(@selector(updateBlocklist:authorization:reply:)) : modifyBlockCommandInfo,
+            NSStringFromSelector(@selector(addToDeepBlocklist:authorization:reply:)) : modifyBlockCommandInfo,
             NSStringFromSelector(@selector(updateBlockEndDate:authorization:reply:)) : modifyBlockCommandInfo,
             NSStringFromSelector(@selector(startTediumChallengeWithAuthorization:reply:)) : modifyBlockCommandInfo,
             NSStringFromSelector(@selector(invokeOverrideWithAuthorization:reply:)) : invokeOverrideCommandInfo

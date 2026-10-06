@@ -138,4 +138,37 @@ static NSDictionary<NSString*, NSString*>* SCDeepTimingKeyMap(void) {
     return healed;
 }
 
++ (NSInteger)addRefusalCodeForRecord:(NSDictionary*)record {
+    if (![self recordListIsUsable:record]) return 328;
+    if ([record[@"isAllowlist"] boolValue]) return 329;
+    return 0;
+}
+
++ (NSArray<NSString*>*)blocklist:(NSArray<NSString*>*)current byAdding:(NSArray<NSString*>*)additions {
+    // `current` is kept exactly as stored (even with duplicates); only genuinely new entries are appended.
+    NSMutableArray* merged = [current mutableCopy];
+    NSMutableSet* seen = [NSMutableSet setWithArray: current];
+    for (NSString* entry in additions) {
+        if ([seen containsObject: entry]) continue;
+        [seen addObject: entry];
+        [merged addObject: entry];
+    }
+    return merged;
+}
+
++ (BOOL)deepListIsStaleForRecord:(NSDictionary*)record installedPayload:(NSDictionary*)payload {
+    if (![self recordListIsUsable:record]) return NO;
+    id pending = record[@"applyPending"];
+    return ([pending isKindOfClass:[NSNumber class]] && [pending boolValue]) || ![self installedPayload:payload coversRecord:record];
+}
+
++ (BOOL)installedPayload:(NSDictionary*)payload coversRecord:(NSDictionary*)record {
+    if (![self recordListIsUsable:record]) return YES;
+    NSArray* installed = [payload isKindOfClass:[NSDictionary class]] ? payload[@"blocklist"] : nil;
+    if (![installed isKindOfClass:[NSArray class]]) return NO;
+    NSSet* installedSet = [NSSet setWithArray: installed];
+    for (NSString* entry in record[@"blocklist"]) if (![installedSet containsObject: entry]) return NO;
+    return YES;
+}
+
 @end
