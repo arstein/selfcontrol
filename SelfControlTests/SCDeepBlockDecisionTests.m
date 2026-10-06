@@ -207,4 +207,28 @@ static NSMutableDictionary* CompleteRecord(void) {
     XCTAssertFalse([SCDeepBlockDecision recordListIsUsable:(@{@"blocklist": @[@"a.com"], @"isAllowlist": @[]})]);
 }
 
+- (void)testAddRefusalCode {
+    XCTAssertEqual([SCDeepBlockDecision addRefusalCodeForRecord:nil], 328);
+    XCTAssertEqual([SCDeepBlockDecision addRefusalCodeForRecord:(@{@"blocklist": @"x"})], 328);
+    XCTAssertEqual([SCDeepBlockDecision addRefusalCodeForRecord:(@{@"blocklist": @[@"a.com"], @"isAllowlist": @YES})], 329);
+    XCTAssertEqual([SCDeepBlockDecision addRefusalCodeForRecord:(@{@"blocklist": @[@"a.com"], @"isAllowlist": @NO})], 0);
+}
+
+- (void)testBlocklistByAdding {
+    NSArray* merged = [SCDeepBlockDecision blocklist:@[@"a.com", @"b.com"] byAdding:@[@"c.com", @"a.com", @"c.com", @"d.com"]];
+    XCTAssertEqualObjects(merged, (@[@"a.com", @"b.com", @"c.com", @"d.com"]));
+    XCTAssertEqualObjects([SCDeepBlockDecision blocklist:@[@"a.com"] byAdding:@[]], @[@"a.com"]);
+    XCTAssertEqualObjects([SCDeepBlockDecision blocklist:@[] byAdding:@[@"x.com"]], @[@"x.com"]);
+}
+
+- (void)testInstalledPayloadCoversRecord {
+    NSDictionary* rec = @{@"blocklist": @[@"a.com", @"b.com"], @"isAllowlist": @NO};
+    XCTAssertTrue([SCDeepBlockDecision installedPayload:(@{@"blocklist": @[@"b.com", @"a.com", @"z.com"]}) coversRecord:rec]);
+    XCTAssertFalse([SCDeepBlockDecision installedPayload:(@{@"blocklist": @[@"a.com"]}) coversRecord:rec]);
+    XCTAssertFalse([SCDeepBlockDecision installedPayload:nil coversRecord:rec]);
+    XCTAssertFalse([SCDeepBlockDecision installedPayload:(@{@"blocklist": @"a.com"}) coversRecord:rec]);
+    XCTAssertTrue([SCDeepBlockDecision installedPayload:nil coversRecord:nil]);
+    XCTAssertTrue([SCDeepBlockDecision installedPayload:nil coversRecord:(@{@"blocklist": @"x"})]);
+}
+
 @end

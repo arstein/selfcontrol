@@ -138,4 +138,25 @@ static NSDictionary<NSString*, NSString*>* SCDeepTimingKeyMap(void) {
     return healed;
 }
 
++ (NSInteger)addRefusalCodeForRecord:(NSDictionary*)record {
+    if (![self recordListIsUsable:record]) return 328;
+    if ([record[@"isAllowlist"] boolValue]) return 329;
+    return 0;
+}
+
++ (NSArray<NSString*>*)blocklist:(NSArray<NSString*>*)current byAdding:(NSArray<NSString*>*)additions {
+    NSMutableOrderedSet* merged = [NSMutableOrderedSet orderedSetWithArray: current];
+    [merged addObjectsFromArray: additions];
+    return merged.array;
+}
+
++ (BOOL)installedPayload:(NSDictionary*)payload coversRecord:(NSDictionary*)record {
+    if (![self recordListIsUsable:record]) return YES;
+    NSArray* installed = [payload isKindOfClass:[NSDictionary class]] ? payload[@"blocklist"] : nil;
+    if (![installed isKindOfClass:[NSArray class]]) return NO;
+    NSSet* installedSet = [NSSet setWithArray: installed];
+    for (NSString* entry in record[@"blocklist"]) if (![installedSet containsObject: entry]) return NO;
+    return YES;
+}
+
 @end

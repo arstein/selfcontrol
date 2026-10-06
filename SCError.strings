@@ -41,12 +41,15 @@
 "325" = "A deep block is already running.";
 "326" = "A deep block can be 5 minutes to 4 hours long.";
 "327" = "Couldn't start the deep block. Try again.";
+"328" = "There's no deep block running.";
+"329" = "Sites can't be added to an allowlist deep block.";
 "330" = "There's nothing to override right now.";
 "331" = "An override is already running.";
 "332" = "Overrides aren't available during a deep block.";
 "333" = "This block doesn't allow overrides.";
 "334" = "Overrides need an internet connection to check the time.";
 "335" = "No overrides left today. They reset at midnight.";
+"336" = "Couldn't add the site yet. SelfControl will keep trying.";
 
 // 400-499 = errors generated in the killer
 "400" = "Couldn't clear the block — the helper tool failed to run.";
