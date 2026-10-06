@@ -712,6 +712,56 @@
     }];
 }
 
+- (void)addEntriesToRunningDeepBlock:(NSString*)rawInput completion:(void (^)(NSError* _Nullable error))completion {
+    NSAssert([NSThread isMainThread], @"addEntriesToRunningDeepBlock must be called on the main thread");
+    void (^finish)(NSError*) = ^(NSError* err) {
+        dispatch_async(dispatch_get_main_queue(), ^{ completion(err); });
+    };
+    // Used only once modifyingBlock has been claimed by this call.
+    void (^finishAndRelease)(NSError*) = ^(NSError* err) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.modifyingBlock = NO;
+            completion(err);
+        });
+    };
+
+    // Mirror the daemon's refusals so the user gets them without a round trip.
+    NSInteger refusal = [SCDeepBlockDecision addRefusalCodeForRecord: [SCBlockUtilities deepBlockRecord]];
+    if (refusal != 0) { finish([SCErr errorWithCode: refusal]); return; }
+
+    NSArray<NSString*>* cleanedEntries = [SCMiscUtilities cleanBlocklistEntry: rawInput];
+    if (cleanedEntries.count == 0) {
+        finish([self uiErrorWithDescription: NSLocalizedString(@"That doesn't look like a site address.", @"add-site error for unusable input")]);
+        return;
+    }
+    if ([defaults_ boolForKey: @"VerifyInternetConnection"] && ![SCUIUtilities networkConnectionIsAvailable]) {
+        finish([self uiErrorWithDescription: NSLocalizedString(@"You're offline — connect to add a site.", @"add-site error when offline")]);
+        return;
+    }
+    if (self.modifyingBlock) {
+        finish([self uiErrorWithDescription: NSLocalizedString(@"Still saving your last change — try again in a moment.", @"busy modifying block")]);
+        return;
+    }
+    self.modifyingBlock = YES;
+
+    // Save the new sites for the next deep block too: append the missing ones, keep the rest.
+    NSArray* saved = [defaults_ arrayForKey: @"DeepBlocklist"] ?: @[];
+    [defaults_ setValue: [SCDeepBlockDecision blocklist: saved byAdding: cleanedEntries] forKey: @"DeepBlocklist"];
+
+    // we're about to launch a helper tool which will read settings, so make sure the ones on disk are valid
+    [settings_ synchronizeSettings];
+    [defaults_ synchronize];
+
+    [self.xpc refreshConnectionAndRun:^{
+        [self.xpc addToDeepBlocklist: cleanedEntries reply:^(NSError * _Nonnull error) {
+            if (error == nil) {
+                [SCSentry addBreadcrumb: @"Deep blocklist updated successfully" category:@"app"];
+            }
+            finishAndRelease(error);
+        }];
+    }];
+}
+
 - (void)extendRunningBlockByMinutes:(NSInteger)minutes completion:(void (^)(NSError* _Nullable error))completion {
     NSAssert([NSThread isMainThread], @"extendRunningBlockByMinutes must be called on the main thread");
     void (^finish)(NSError*) = ^(NSError* err) {

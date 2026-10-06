@@ -103,6 +103,11 @@
 // no network, busy, or the daemon's error).
 - (void)addEntriesToRunningBlock:(NSString*)rawInput completion:(void (^)(NSError* _Nullable error))completion;
 
+// Adds cleaned entries to the RUNNING deep block via the daemon's addToDeepBlocklist (additions only, blocklist
+// deep blocks only) and unions them into the saved DeepBlocklist. Errors: no usable deep record 328, allowlist 329,
+// invalid input, no network, busy, or the daemon's error.
+- (void)addEntriesToRunningDeepBlock:(NSString*)rawInput completion:(void (^)(NSError* _Nullable error))completion;
+
 // Starts a deep block from the DeepBlocklist/DeepBlockAsWhitelist/DeepBlockDuration
 // defaults after a confirmation dialog. Completion on the main queue; error nil on
 // success, or an auth-cancel / NSError otherwise. Not called at all if the user cancels the dialog.

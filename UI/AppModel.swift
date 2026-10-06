@@ -74,6 +74,8 @@ final class AppModel: ObservableObject {
     @Published var deepTimeState: TimeState = .countdown(seconds: 0)
     @Published var deepActiveEntries: [String] = []
     @Published var isDeepActiveAllowlist = false
+    /// True when the running deep block has a list the daemon can add to (a tampered record is not).
+    @Published var deepRecordUsable = false
     @Published var deepEntries: [String] = []
     @Published var isDeepAllowlist = false
     @Published var deepDurationMinutes = 45
@@ -150,6 +152,7 @@ final class AppModel: ObservableObject {
     }
     var overrideRunning: Bool { override.active && (override.activeRemainingSecs ?? 0) > 0 }
     var canAddDuringBlock: Bool { isModernBlock && !isActiveAllowlist }
+    var canAddDuringDeep: Bool { deepRunning && !isDeepActiveAllowlist && deepRecordUsable }
     var deepRemainingSeconds: Int? { if case .countdown(let s) = deepTimeState, s > 0 { return s } else { return nil } }
     var deepEndDate: Date? { deepRemainingSeconds.map { now.addingTimeInterval(TimeInterval($0)) } }
     var canStartDeep: Bool { !deepRunning && !isAddingDeepBlock && (!deepEntries.isEmpty || isDeepAllowlist) }
@@ -213,6 +216,7 @@ final class AppModel: ObservableObject {
         assign(\.isAddingDeepBlock, appController?.addingDeepBlock ?? false)
         assign(\.deepActiveEntries, deep?["blocklist"] as? [String] ?? [])
         assign(\.isDeepActiveAllowlist, (deep?["isAllowlist"] as? NSNumber)?.boolValue ?? false)
+        assign(\.deepRecordUsable, SCDeepBlockDecision.recordListIsUsable(deep))
         if deep != nil {
             // Same fail-closed shape as the regular block: at/below zero waits for verified time.
             let remaining = SCBlockUtilities.trustedRemainingDeepBlockSecs()?.doubleValue ?? 0
@@ -618,6 +622,17 @@ final class AppModel: ObservableObject {
         guard live, let ac = appController else { completion(.cancelled); return }
         // AppController guarantees completion on the main queue.
         ac.addEntries(toRunningBlock: raw) { [weak self] error in
+            MainActor.assumeIsolated {
+                self?.reload()
+                completion(AppModel.result(for: error))
+            }
+        }
+    }
+
+    func addToRunningDeepBlock(_ raw: String, completion: @escaping (ActionResult) -> Void) {
+        guard live, let ac = appController else { completion(.cancelled); return }
+        // AppController guarantees completion on the main queue.
+        ac.addEntries(toRunningDeepBlock: raw) { [weak self] error in
             MainActor.assumeIsolated {
                 self?.reload()
                 completion(AppModel.result(for: error))

@@ -15,6 +15,7 @@
 #import "SCTrustedClock.h"
 #import "SCTediumChallenge.h"
 #import "SCTediumConfig.h"
+#import "SCDeepBlockDecision.h"
 #import "SCOverrideConfig.h"
 #import "SCXPCClient.h"
 #import "SCUIUtilities.h"

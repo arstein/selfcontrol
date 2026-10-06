@@ -98,12 +98,14 @@ struct RestrictionsView: View {
         .padding(.top, 4)
     }
 
-    private var addAllowed: Bool { list == .main ? (!blocking || model.canAddDuringBlock) : !blocking }
+    private var addAllowed: Bool { list == .main ? (!blocking || model.canAddDuringBlock) : (!blocking || model.canAddDuringDeep) }
 
     private var caption: String {
         if list == .deep {
-            return blocking ? NSLocalizedString("Changes apply to your next deep block.", comment: "")
-                            : NSLocalizedString("The deep list is separate from your Restrictions.", comment: "")
+            if !blocking { return NSLocalizedString("The deep list is separate from your Restrictions.", comment: "") }
+            if model.isDeepActiveAllowlist { return NSLocalizedString("Sites can’t be added to an allowlist deep block.", comment: "") }
+            if !model.deepRecordUsable { return NSLocalizedString("This deep block can’t be changed from here.", comment: "") }
+            return NSLocalizedString("Sites can be added during a deep block, never removed. New sites are also saved for your next one.", comment: "")
         }
         if !blocking { return NSLocalizedString("Entries cover their common subdomains (www. etc.) when that setting is on.", comment: "") }
         if model.isLegacyBlock { return NSLocalizedString("This block was started by an older version of SelfControl, so sites can’t be added to it.", comment: "") }
@@ -185,7 +187,8 @@ struct RestrictionsView: View {
             return
         }
         busy = true
-        model.addToRunningBlock(text) { result in
+        let addToRunning = list == .deep ? model.addToRunningDeepBlock : model.addToRunningBlock
+        addToRunning(text) { result in
             busy = false
             switch result {
             case .ok: input = ""
