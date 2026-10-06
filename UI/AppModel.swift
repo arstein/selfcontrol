@@ -421,8 +421,10 @@ final class AppModel: ObservableObject {
 
     func startBlock() {
         guard live, let ac = appController else { return }
-        ac.addBlock(nil)   // all guards, alerts, auth + SMAppService flow live there
-        reload()
+        Dialog.afterCurrentAction { [weak self] in
+            ac.addBlock(nil)   // all guards, alerts, auth + SMAppService flow live there
+            self?.reload()
+        }
     }
 
     func setDeepDuration(_ minutes: Int) {
@@ -433,15 +435,17 @@ final class AppModel: ObservableObject {
 
     func startDeepBlock(completion: @escaping (ActionResult) -> Void = { _ in }) {
         guard live, let ac = appController else { completion(.cancelled); return }
-        // AppController guarantees completion on the main queue.
-        ac.startDeepBlock { [weak self] error in
-            MainActor.assumeIsolated {
-                self?.reload()
-                let result = AppModel.result(for: error)
-                if case .failed(let msg) = result {
-                    SCUIUtilities.presentError(NSError(domain: kSelfControlErrorDomain, code: 0, userInfo: [NSLocalizedDescriptionKey: msg]))
+        // The confirmation dialog is modal. AppController guarantees completion on the main queue.
+        Dialog.afterCurrentAction {
+            ac.startDeepBlock { [weak self] error in
+                MainActor.assumeIsolated {
+                    self?.reload()
+                    let result = AppModel.result(for: error)
+                    if case .failed(let msg) = result {
+                        SCUIUtilities.presentError(NSError(domain: kSelfControlErrorDomain, code: 0, userInfo: [NSLocalizedDescriptionKey: msg]))
+                    }
+                    completion(result)
                 }
-                completion(result)
             }
         }
     }
@@ -558,15 +562,19 @@ final class AppModel: ObservableObject {
     }
 
     func exportList(_ list: ListKind) {
-        guard live else { return }
-        appController?.exportList(forKey: list == .main ? "Blocklist" : "DeepBlocklist",
-                                  allowlistKey: list == .main ? "BlockAsWhitelist" : "DeepBlockAsWhitelist")
+        guard live, let ac = appController else { return }
+        Dialog.afterCurrentAction {
+            ac.exportList(forKey: list == .main ? "Blocklist" : "DeepBlocklist",
+                          allowlistKey: list == .main ? "BlockAsWhitelist" : "DeepBlockAsWhitelist")
+        }
     }
 
     func importListFromFile(_ list: ListKind) {
-        guard live else { return }
-        appController?.importList(forKey: list == .main ? "Blocklist" : "DeepBlocklist",
-                                  allowlistKey: list == .main ? "BlockAsWhitelist" : "DeepBlockAsWhitelist")
+        guard live, let ac = appController else { return }
+        Dialog.afterCurrentAction {
+            ac.importList(forKey: list == .main ? "Blocklist" : "DeepBlocklist",
+                          allowlistKey: list == .main ? "BlockAsWhitelist" : "DeepBlockAsWhitelist")
+        }
     }
 
     private func saveDeep(_ list: [String]) {
@@ -580,13 +588,15 @@ final class AppModel: ObservableObject {
         // Port of DomainListWindowController.m -showAllowlistWarning.
         let ud = defaults
         guard !ud.bool(forKey: "WhitelistAlertSuppress") else { return }
-        let result = Dialog.run(title: NSLocalizedString("Block everything except your list?", comment: "Allowlist block confirmation prompt"),
-                                message: NSLocalizedString("Only the sites you list will work — that includes email, chat and other apps that use the internet. Sites that load images or scripts from elsewhere may break.", comment: "allowlist block explanation"),
-                                buttons: [NSLocalizedString("OK", comment: "OK button")],
-                                primaryIndex: 0, cancelIndex: 0, defaultIndex: 0,
-                                suppressionTitle: NSLocalizedString("Don't show this again", comment: "allowlist warning suppression checkbox"))
-        if result.suppressionChecked {
-            ud.set(true, forKey: "WhitelistAlertSuppress")
+        Dialog.afterCurrentAction {
+            let result = Dialog.run(title: NSLocalizedString("Block everything except your list?", comment: "Allowlist block confirmation prompt"),
+                                    message: NSLocalizedString("Only the sites you list will work — that includes email, chat and other apps that use the internet. Sites that load images or scripts from elsewhere may break.", comment: "allowlist block explanation"),
+                                    buttons: [NSLocalizedString("OK", comment: "OK button")],
+                                    primaryIndex: 0, cancelIndex: 0, defaultIndex: 0,
+                                    suppressionTitle: NSLocalizedString("Don't show this again", comment: "allowlist warning suppression checkbox"))
+            if result.suppressionChecked {
+                ud.set(true, forKey: "WhitelistAlertSuppress")
+            }
         }
     }
 
@@ -641,8 +651,8 @@ final class AppModel: ObservableObject {
     }
 
     func stopBlockManually() {
-        guard live else { return }
-        appController?.stopBlockManually()
+        guard live, let ac = appController else { return }
+        Dialog.afterCurrentAction { ac.stopBlockManually() }   // can end in an error dialog
     }
 
     // MARK: - Emergency unlock (port of SCTediumWindowController)

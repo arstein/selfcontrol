@@ -24,6 +24,7 @@ final class Dialog: NSObject {
 
     /// buttons: left-to-right order as displayed. primaryIndex: the accent-colored button (or -1 for none).
     /// cancelIndex: button triggered by Esc / closing (or -1). defaultIndex: button triggered by Return (or -1).
+    /// From a SwiftUI action, call this via `afterCurrentAction`.
     @MainActor @objc static func run(title: String, message: String?, buttons: [String],
                                      primaryIndex: Int, cancelIndex: Int, defaultIndex: Int,
                                      suppressionTitle: String?) -> DialogResult {
@@ -65,6 +66,15 @@ final class Dialog: NSObject {
         NSApp.runModal(for: panel)
         panel.orderOut(nil)
         return DialogResult(buttonIndex: pressed, suppressionChecked: suppressed)
+    }
+
+    /// Runs `body` on the next main-queue turn. Anything that can open a modal (`run`,
+    /// `SCUIUtilities.presentError`, a save/open panel) must go through this when called
+    /// from a SwiftUI action: SwiftUI holds every later action — including the modal's own
+    /// buttons and Esc — until the current one returns, so a modal opened inside it can
+    /// never be answered.
+    static func afterCurrentAction(_ body: @escaping @MainActor () -> Void) {
+        DispatchQueue.main.async { MainActor.assumeIsolated(body) }
     }
 
     /// Convenience: single "OK" button (primary, default, cancel).
