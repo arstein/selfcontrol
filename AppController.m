@@ -526,6 +526,12 @@
     }
 }
 
+// Exported lists (including ones from upstream SelfControl) can repeat entries.
++ (id)listWithoutDuplicates:(id)list {
+    if (![list isKindOfClass: [NSArray class]]) return list;
+    return [[NSOrderedSet orderedSetWithArray: list] array];
+}
+
 - (void)importListForKey:(NSString*)listKey allowlistKey:(NSString*)allowlistKey {
 	NSOpenPanel* oPanel = [NSOpenPanel openPanel];
 	oPanel.allowedFileTypes = @[@"selfcontrol"];
@@ -533,7 +539,7 @@
 	if ([oPanel runModal] != NSModalResponseOK || oPanel.URLs.count == 0) return;
     NSDictionary* fromFile = [SCBlockFileReaderWriter readBlocklistFromFile: oPanel.URLs[0]];
     if (fromFile == nil) { NSLog(@"WARNING: Could not read a valid blocklist from file - ignoring."); return; }
-    [defaults_ setObject: fromFile[@"Blocklist"] forKey: listKey];
+    [defaults_ setObject: [AppController listWithoutDuplicates: fromFile[@"Blocklist"]] forKey: listKey];
     [defaults_ setObject: fromFile[@"BlockAsWhitelist"] forKey: allowlistKey];
     [[NSNotificationCenter defaultCenter] postNotificationName: @"SCConfigurationChangedNotification" object: self];
     [self refreshUserInterface];
@@ -543,7 +549,7 @@
     NSDictionary* settingsFromFile = [SCBlockFileReaderWriter readBlocklistFromFile: fileURL];
     
     if (settingsFromFile != nil) {
-        [defaults_ setObject: settingsFromFile[@"Blocklist"] forKey: @"Blocklist"];
+        [defaults_ setObject: [AppController listWithoutDuplicates: settingsFromFile[@"Blocklist"]] forKey: @"Blocklist"];
         [defaults_ setObject: settingsFromFile[@"BlockAsWhitelist"] forKey: @"BlockAsWhitelist"];
         [SCSentry addBreadcrumb: @"Opened blocklist from file" category:@"app"];
     } else {

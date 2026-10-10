@@ -168,7 +168,10 @@ final class AppModel: ObservableObject {
         return RestrictionsSummary.subtitle(entries: deepEntries, isAllowlist: isDeepAllowlist)
     }
 
-    func entries(_ list: ListKind) -> [String] { list == .main ? shownEntries : (deepRunning ? deepActiveEntries : deepEntries) }
+    /// Without duplicates (see `ListEntries`); removing an entry removes every copy.
+    func entries(_ list: ListKind) -> [String] {
+        ListEntries.unique(list == .main ? shownEntries : (deepRunning ? deepActiveEntries : deepEntries))
+    }
     func allowlist(_ list: ListKind) -> Bool { list == .main ? shownAllowlist : (deepRunning ? isDeepActiveAllowlist : isDeepAllowlist) }
     func listLocked(_ list: ListKind) -> Bool { list == .main ? isBlockRunning : deepRunning }
     var durationScale: DurationScale { DurationScale(maxMinutes: maxBlockLengthMinutes) }

@@ -133,6 +133,15 @@ struct DurationScale {
 
 // MARK: - Restrictions summary (spec §9)
 
+/// The list view identifies rows by their text, so repeated entries break its rows.
+enum ListEntries {
+    /// Duplicates dropped, first one kept, order otherwise unchanged.
+    static func unique(_ entries: [String]) -> [String] {
+        var seen = Set<String>()
+        return entries.filter { seen.insert($0).inserted }
+    }
+}
+
 enum RestrictionsSummary {
     static func subtitle(entries: [String], isAllowlist: Bool, maxHosts: Int = 2) -> String {
         if entries.isEmpty {
