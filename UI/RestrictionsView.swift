@@ -107,7 +107,10 @@ struct RestrictionsView: View {
             if !model.deepRecordUsable { return NSLocalizedString("This deep block can’t be changed from here.", comment: "") }
             return NSLocalizedString("Sites can be added during a deep block, never removed. New sites are also saved for your next one.", comment: "")
         }
-        if !blocking { return NSLocalizedString("Entries cover their common subdomains (www. etc.) when that setting is on.", comment: "") }
+        if !blocking {
+            if model.allowlist(list) { return NSLocalizedString("Entries cover their common subdomains (www. etc.) when that setting is on.", comment: "") }
+            return NSLocalizedString("reddit.com blocks the whole site. A full address like old.reddit.com blocks only that address.", comment: "")
+        }
         if model.isLegacyBlock { return NSLocalizedString("This block was started by an older version of SelfControl, so sites can’t be added to it.", comment: "") }
         if !model.isModernBlock { return NSLocalizedString("This block can’t be changed from here.", comment: "") }
         if model.isActiveAllowlist { return NSLocalizedString("Sites can’t be added to an allowlist block.", comment: "") }
