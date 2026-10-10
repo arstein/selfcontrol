@@ -16,6 +16,7 @@
 #import "SCTediumChallenge.h"
 #import "SCTediumConfig.h"
 #import "SCDeepBlockDecision.h"
+#import "SCDomainScope.h"
 #import "SCOverrideConfig.h"
 #import "SCXPCClient.h"
 #import "SCUIUtilities.h"
