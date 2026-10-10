@@ -217,14 +217,23 @@ BOOL appendMode = NO;
     return hostsOK;
 }
 
+// Only used for related entries (www. twin, site extras, linked domains). They
+// extend an entry that already blocks broadly, so they are never address-only.
 - (void)enqueueBlockEntry:(SCBlockEntry*)entry {
 	NSBlockOperation* op = [NSBlockOperation blockOperationWithBlock:^{
-        [self addBlockEntry: entry];
+        [self addBlockEntry: entry addressOnly: NO];
 	}];
 	[opQueue addOperation: op];
 }
 
 - (void)addBlockEntry:(SCBlockEntry*)entry {
+    // Design spec section 7: an address-only blocklist entry (e.g. www.nytimes.com)
+    // is hosts-only, with no IP/pf rules, since its IPs often serve the whole site.
+    // Accepted trade-off: DNS-over-HTTPS can bypass a hosts-only entry.
+    [self addBlockEntry: entry addressOnly: !isAllowlist && [SCDomainScope isAddressOnlyBlockEntry: entry]];
+}
+
+- (void)addBlockEntry:(SCBlockEntry*)entry addressOnly:(BOOL)addressOnly {
     // nil entries = something didn't parse right
     if (entry == nil) return;
 
@@ -247,11 +256,6 @@ BOOL appendMode = NO;
     }
 
 	BOOL isIP = [entry.hostname isValidIPAddress];
-
-    // Design spec section 7: address-only blocklist entries (e.g. www.nytimes.com)
-    // are hosts-only, with no IP/pf rules, since an IP would block the whole site.
-    // Accepted trade-off: DNS-over-HTTPS can bypass a hosts-only entry.
-    BOOL addressOnly = !isAllowlist && [SCDomainScope isAddressOnlyBlockEntry: entry];
 
 	if (addressOnly) {
 		// hosts entry only; handled below
