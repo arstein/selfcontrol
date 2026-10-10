@@ -23,6 +23,7 @@
 		30F48D88C3698773586040F6 /* UIFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B56A0E3F6EE8E81181C8BE /* UIFormatting.swift */; };
 		366DEB8F625314B5483C99A7 /* EmergencyUnlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E40DB90D392659CD8444EFC /* EmergencyUnlockView.swift */; };
 		379BC7EFAD2E04E8EA73824D /* SCDeepBlockDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = C1A9B19987CDA0FF001D78E7 /* SCDeepBlockDecision.m */; };
+		391774DC925AB07A522A872E /* NSString+IPAddress.m in Sources */ = {isa = PBXBuildFile; fileRef = CB25806516C237F10059C99A /* NSString+IPAddress.m */; };
 		3919D4424655243AEB8401CB /* SCBlockEndVerifierTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3A97FA0F4A3962A08CFEBC17 /* SCBlockEndVerifierTests.m */; };
 		3FEF27295AD733D6F2D925F4 /* SCRuleCompiler.m in Sources */ = {isa = PBXBuildFile; fileRef = 144B92A7649620408C3274CA /* SCRuleCompiler.m */; };
 		4053EE283E702AA169E1963F /* SCOverrideDecisionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = DCEA07FD085A8419CC837CD7 /* SCOverrideDecisionTests.m */; };
@@ -48,6 +49,7 @@
 		852E43B3F649D630AA026647 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		86EF8AB37951183C3963D3A2 /* SCAllowlistRegressionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 536F52DBF0D6D44BBCA6B720 /* SCAllowlistRegressionTests.m */; };
 		87A35CA1E461AF70A4D7B1BB /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
+		8B0128055A8EF61EA3D3302E /* SCDomainScope.m in Sources */ = {isa = PBXBuildFile; fileRef = 7646C6589CE246D4117D4A6C /* SCDomainScope.m */; };
 		8D11072D0486CEB800E47090 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 29B97316FDCFA39411CA2CEA /* main.m */; settings = {ATTRIBUTES = (); }; };
 		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
 		8E08C2790832EE667C1E5AC2 /* SCDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9988E4646DE67C808EAAEB2C /* SCDialog.swift */; };
@@ -55,6 +57,7 @@
 		8FCE76A275EF0E41D798B362 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		959FF31ED90D48B5701E9F7B /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
 		9B15BF4E00EECEB86DBF2FC5 /* SCSNTPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 753FA509E7CA7437599F493B /* SCSNTPClient.m */; };
+		9BF6C591BA629D7FB58C5D28 /* SCDomainScope.m in Sources */ = {isa = PBXBuildFile; fileRef = 7646C6589CE246D4117D4A6C /* SCDomainScope.m */; };
 		A13A7863D1143B206C8C25F1 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		A3B447F125E29CD23431B170 /* SCTrustedClock.m in Sources */ = {isa = PBXBuildFile; fileRef = 174D6F8397D738597F061C4B /* SCTrustedClock.m */; };
 		A3B89EC02E9A644AAA9C581F /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
@@ -66,6 +69,7 @@
 		BC46BB551807FC1DC7EABD25 /* org.eyebeam.selfcontrold.plist in Copy Daemon Launchd Plist */ = {isa = PBXBuildFile; fileRef = CB8086D524837734004B88BD /* org.eyebeam.selfcontrold.plist */; };
 		C102630601BADA289A300BB0 /* SCRuleCompilerTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 1B22BEDC3BCF60A63859EBA5 /* SCRuleCompilerTests.m */; };
 		C1F9E8521B6469F0A1D11C6F /* SCDeepBlockDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = C1A9B19987CDA0FF001D78E7 /* SCDeepBlockDecision.m */; };
+		C579A246A644C618E1E7047A /* SCDomainScope.m in Sources */ = {isa = PBXBuildFile; fileRef = 7646C6589CE246D4117D4A6C /* SCDomainScope.m */; };
 		C6B948CDCEF9B80CA1D8FA30 /* SCDeepBlockDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = C1A9B19987CDA0FF001D78E7 /* SCDeepBlockDecision.m */; };
 		C6FBB989ECD3EAFF5046741D /* SCEnforcementDecisionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3BC40DCB86D4ECF8D096D80B /* SCEnforcementDecisionTests.m */; };
 		CB066F6C2652037E0076964D /* HostFileBlocker.m in Sources */ = {isa = PBXBuildFile; fileRef = CBB0AE290FA74566006229B3 /* HostFileBlocker.m */; };
@@ -256,6 +260,8 @@
 		CC08565F008428EAD5C3104B /* Sheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69A871EF1511ACFE38C668EE /* Sheets.swift */; };
 		CD3869C3948F3BB09B72C5DE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFC721367A641277356D798 /* SettingsView.swift */; };
 		CF3F309ED00220E6467F6729 /* UIFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C9867E1F58D960865388A88 /* UIFormattingTests.swift */; };
+		D2F46D142327D668200E2C45 /* SCDomainScope.m in Sources */ = {isa = PBXBuildFile; fileRef = 7646C6589CE246D4117D4A6C /* SCDomainScope.m */; };
+		D78BC34DB0300B0B46A674F3 /* SCSubdomainScopingTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 5F601B0A32C8E7006B8ACF7B /* SCSubdomainScopingTests.m */; };
 		D98418C988816F0EF6D32A60 /* SCOverrideDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = E25AED702A43C0333219553C /* SCOverrideDecision.m */; };
 		DBCFF19180FC5BDFC625F9C3 /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
 		E208D5E51B5B922B227EE41F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7390D2155D9E8B35951C20 /* RootView.swift */; };
@@ -264,7 +270,9 @@
 		E90953D469A41C45DB3BF93C /* SCRuleCompiler.m in Sources */ = {isa = PBXBuildFile; fileRef = 144B92A7649620408C3274CA /* SCRuleCompiler.m */; };
 		F5B8CBEE19EE21C30026F3A5 /* SCTimeIntervalFormatter.m in Sources */ = {isa = PBXBuildFile; fileRef = F5B8CBED19EE21C30026F3A5 /* SCTimeIntervalFormatter.m */; };
 		F8731D3D3C341D85079D588B /* SCEnforcementDecision.m in Sources */ = {isa = PBXBuildFile; fileRef = 78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */; };
+		F8B2FE769BBFDAC0D24F423A /* SCDomainScopeTests.m in Sources */ = {isa = PBXBuildFile; fileRef = E22C2CEBFD82359A5652C82E /* SCDomainScopeTests.m */; };
 		F9A853372382AE4650D7EA33 /* SCRuleCompiler.m in Sources */ = {isa = PBXBuildFile; fileRef = 144B92A7649620408C3274CA /* SCRuleCompiler.m */; };
+		FF65F86F1735AEDD95F092CB /* SCDomainScope.m in Sources */ = {isa = PBXBuildFile; fileRef = 7646C6589CE246D4117D4A6C /* SCDomainScope.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -597,6 +605,7 @@
 		174D6F8397D738597F061C4B /* SCTrustedClock.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTrustedClock.m; sourceTree = "<group>"; };
 		1A6B721D82C89E70F4BBAE29 /* SCTediumChallenge.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCTediumChallenge.h; sourceTree = "<group>"; };
 		1B22BEDC3BCF60A63859EBA5 /* SCRuleCompilerTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCRuleCompilerTests.m; sourceTree = "<group>"; };
+		1F60E92A049E761B97699A2D /* SCDomainScope.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCDomainScope.h; sourceTree = "<group>"; };
 		22D9F1DE631F3AD0CAFAFD03 /* Pods-SelfControl.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SelfControl.debug.xcconfig"; path = "Pods/Target Support Files/Pods-SelfControl/Pods-SelfControl.debug.xcconfig"; sourceTree = "<group>"; };
 		2384F381B90DE174C0E08A23 /* OverridesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OverridesView.swift; sourceTree = "<group>"; };
 		24BCCBD83CF1A852BA8F875B /* MainWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainWindowController.swift; sourceTree = "<group>"; };
@@ -616,6 +625,7 @@
 		456D6495D72237672F8B902C /* SCDeepBlockDecisionTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCDeepBlockDecisionTests.m; sourceTree = "<group>"; };
 		536F52DBF0D6D44BBCA6B720 /* SCAllowlistRegressionTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCAllowlistRegressionTests.m; sourceTree = "<group>"; };
 		5A2163A50B558592F6D1AFCF /* SCRuleCompiler.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCRuleCompiler.h; sourceTree = "<group>"; };
+		5F601B0A32C8E7006B8ACF7B /* SCSubdomainScopingTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCSubdomainScopingTests.m; sourceTree = "<group>"; };
 		6101B237ACEA2EE24946BE6F /* RestrictionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RestrictionsView.swift; sourceTree = "<group>"; };
 		61ABD3209F87AF240A040533 /* SCOverrideDecision.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCOverrideDecision.h; sourceTree = "<group>"; };
 		62887AC7410BE0E6D575764D /* SCDeepBlockConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCDeepBlockConfig.h; sourceTree = "<group>"; };
@@ -626,6 +636,7 @@
 		677AFCACBB571EC535202ABD /* SCEnforcementConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCEnforcementConfig.h; sourceTree = "<group>"; };
 		69A871EF1511ACFE38C668EE /* Sheets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Sheets.swift; sourceTree = "<group>"; };
 		753FA509E7CA7437599F493B /* SCSNTPClient.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCSNTPClient.m; sourceTree = "<group>"; };
+		7646C6589CE246D4117D4A6C /* SCDomainScope.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCDomainScope.m; sourceTree = "<group>"; };
 		78FD47DAA8455C78B0F470A3 /* SCEnforcementDecision.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCEnforcementDecision.m; sourceTree = "<group>"; };
 		79957742827112D9CEEDAC30 /* SCTediumChallenge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCTediumChallenge.m; sourceTree = "<group>"; };
 		7C9867E1F58D960865388A88 /* UIFormattingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UIFormattingTests.swift; sourceTree = "<group>"; };
@@ -1508,6 +1519,7 @@
 		DCEA07FD085A8419CC837CD7 /* SCOverrideDecisionTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCOverrideDecisionTests.m; sourceTree = "<group>"; };
 		DE940A49BEB89B14CE248C70 /* SCSNTPClient.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCSNTPClient.h; sourceTree = "<group>"; };
 		E1F7BCA713EE399F88364AED /* SCOverrideConfig.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SCOverrideConfig.h; sourceTree = "<group>"; };
+		E22C2CEBFD82359A5652C82E /* SCDomainScopeTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCDomainScopeTests.m; sourceTree = "<group>"; };
 		E25AED702A43C0333219553C /* SCOverrideDecision.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCOverrideDecision.m; sourceTree = "<group>"; };
 		EC7390D2155D9E8B35951C20 /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		EF40A558EA4A4D4E9BD3D7E6 /* SCSNTPClientTests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SCSNTPClientTests.m; sourceTree = "<group>"; };
@@ -1734,6 +1746,8 @@
 				456D6495D72237672F8B902C /* SCDeepBlockDecisionTests.m */,
 				1B22BEDC3BCF60A63859EBA5 /* SCRuleCompilerTests.m */,
 				84E1269A0F7592BF80439B63 /* SCDeepBlockUtilitiesTests.m */,
+				E22C2CEBFD82359A5652C82E /* SCDomainScopeTests.m */,
+				5F601B0A32C8E7006B8ACF7B /* SCSubdomainScopingTests.m */,
 			);
 			path = SelfControlTests;
 			sourceTree = "<group>";
@@ -1842,6 +1856,8 @@
 				C1A9B19987CDA0FF001D78E7 /* SCDeepBlockDecision.m */,
 				5A2163A50B558592F6D1AFCF /* SCRuleCompiler.h */,
 				144B92A7649620408C3274CA /* SCRuleCompiler.m */,
+				1F60E92A049E761B97699A2D /* SCDomainScope.h */,
+				7646C6589CE246D4117D4A6C /* SCDomainScope.m */,
 			);
 			path = Utility;
 			sourceTree = "<group>";
@@ -3823,6 +3839,7 @@
 				74D12E81A81C616878E26EBF /* SCDeepBlockDecision.m in Sources */,
 				2FD1E2F18DE487DBD0B0E4E3 /* SCRuleCompiler.m in Sources */,
 				73DD63F5054D8641A7A07E1C /* DeepBlockView.swift in Sources */,
+				8B0128055A8EF61EA3D3302E /* SCDomainScope.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3869,6 +3886,10 @@
 				3FEF27295AD733D6F2D925F4 /* SCRuleCompiler.m in Sources */,
 				C102630601BADA289A300BB0 /* SCRuleCompilerTests.m in Sources */,
 				7FD212FF1635C607DC0B8470 /* SCDeepBlockUtilitiesTests.m in Sources */,
+				C579A246A644C618E1E7047A /* SCDomainScope.m in Sources */,
+				F8B2FE769BBFDAC0D24F423A /* SCDomainScopeTests.m in Sources */,
+				391774DC925AB07A522A872E /* NSString+IPAddress.m in Sources */,
+				D78BC34DB0300B0B46A674F3 /* SCSubdomainScopingTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3910,6 +3931,7 @@
 				87A35CA1E461AF70A4D7B1BB /* SCOverrideDecision.m in Sources */,
 				AB4B4A052FB34C92A319AD6B /* SCDeepBlockDecision.m in Sources */,
 				0549C9D707BD2CFA5FB778BD /* SCRuleCompiler.m in Sources */,
+				D2F46D142327D668200E2C45 /* SCDomainScope.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3969,6 +3991,7 @@
 				D98418C988816F0EF6D32A60 /* SCOverrideDecision.m in Sources */,
 				19E326742835D3B0F1E2D932 /* SCDeepBlockDecision.m in Sources */,
 				E90953D469A41C45DB3BF93C /* SCRuleCompiler.m in Sources */,
+				9BF6C591BA629D7FB58C5D28 /* SCDomainScope.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4017,6 +4040,7 @@
 				2F9989BADDC99A606C164352 /* SCOverrideDecision.m in Sources */,
 				379BC7EFAD2E04E8EA73824D /* SCDeepBlockDecision.m in Sources */,
 				F9A853372382AE4650D7EA33 /* SCRuleCompiler.m in Sources */,
+				FF65F86F1735AEDD95F092CB /* SCDomainScope.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

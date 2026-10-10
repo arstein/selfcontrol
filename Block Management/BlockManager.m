@@ -21,6 +21,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #import "BlockManager.h"
+#import "SCDomainScope.h"
 #import "AllowlistScraper.h"
 #import "SCBlockEntry.h"
 #include <sys/socket.h>
@@ -247,7 +248,14 @@ BOOL appendMode = NO;
 
 	BOOL isIP = [entry.hostname isValidIPAddress];
 
-	if([entry.hostname isEqualToString: @"*"]) {
+    // Design spec section 7: address-only blocklist entries (e.g. www.nytimes.com)
+    // are hosts-only, with no IP/pf rules, since an IP would block the whole site.
+    // Accepted trade-off: DNS-over-HTTPS can bypass a hosts-only entry.
+    BOOL addressOnly = !isAllowlist && [SCDomainScope isAddressOnlyBlockEntry: entry];
+
+	if (addressOnly) {
+		// hosts entry only; handled below
+	} else if([entry.hostname isEqualToString: @"*"]) {
 		[self emitIP: nil port: entry.port maskLen: 0];
 	} else if(isIP) { // IPv4 or IPv6 literal; the rule compiler validates the address
 		[self emitIP: entry.hostname port: entry.port maskLen: entry.maskLen];
@@ -522,6 +530,10 @@ BOOL appendMode = NO;
     // nil means that we don't have anything valid to block in this entry, therefore no related entries either
     if (entry == nil) return @[];
     
+    // Design spec section 7: an address-only blocklist entry stands alone
+    // (no www./apex flip, no site-specific extras).
+    if (!isAllowlist && [SCDomainScope isAddressOnlyBlockEntry: entry]) return @[];
+
     NSMutableArray<SCBlockEntry*>* relatedEntries = [NSMutableArray array];
 
     if (isAllowlist && includeLinkedDomains && ![entry.hostname isValidIPAddress]) {
