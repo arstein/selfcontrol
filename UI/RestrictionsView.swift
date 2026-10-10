@@ -122,6 +122,10 @@ struct RestrictionsView: View {
                 .help(invalid ? NSLocalizedString("This doesn’t look like a valid host or IP address.", comment: "") : "")
             Spacer()
             if entry.contains("/") { Text(NSLocalizedString("IP range", comment: "")).font(.system(size: 11)).foregroundColor(Theme.sub) }
+            if !model.allowlist(list) && SCDomainScope.isAddressOnlyEntry(entry) {
+                Text(NSLocalizedString("This address only", comment: "")).font(.system(size: 11)).foregroundColor(Theme.sub)
+                    .help(NSLocalizedString("Blocks only this exact address, not the rest of the site.", comment: ""))
+            }
             if !blocking {
                 // Always reserve the button's 22pt slot so rows don't change height on hover.
                 Button { model.removeEntry(entry, from: list) } label: {

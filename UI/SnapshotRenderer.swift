@@ -112,6 +112,9 @@ final class SnapshotRenderer: NSObject {
             ("36-deep-list-addable", AppModel.preview { m in
                 m.path = [.deepList]; m.deepRunning = true; m.deepRecordUsable = true; m.deepTimeState = .countdown(seconds: 1932)
                 m.deepActiveEntries = ["reddit.com", "youtube.com"]; m.isDeepActiveAllowlist = false }),
+            ("37-list-address-only", AppModel.preview { m in
+                m.path = [.restrictions]; m.isAllowlist = false
+                m.editableEntries = ["nytimes.com", "www.nytimes.com", "danieldrezner.substack.com", "10.0.0.0/8"] }),
         ]
     }
 
