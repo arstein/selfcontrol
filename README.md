@@ -16,7 +16,6 @@ Therefore, I want a baseline long-term block that cuts off most of my distractio
 
 Details below.
 
----
 # New features
 ## No more easy defeat
 The main version of SelfControl uses the system clock to determine when a block should end. You can trick it by rolling the clock forward. 
@@ -67,13 +66,17 @@ Also, you can turn off the emergency unlock option if you don't trust yourself w
 ## Respect for subdomains
 I sometimes want to block one subdomain but not another. The app now better respects subdomain-specific entries in the blocklist. Use the bare domain if you want to block all traffic from a domain:
 
-> google.com
-> substack.com
+```text
+google.com
+substack.com
+```
 
 This block list will cut off all traffic to Google and Substack, including Google search, Gmail, Maps, etc. If you want to be more focused in your block, you can do this instead:
 
-> news.google.com
-> someblog.substack.com
+```text
+news.google.com
+someblog.substack.com
+```
 
 This will just restrict access to the listed subdomains.
 ## UI refresh
@@ -85,14 +88,18 @@ One nice convenience feature: you can now edit the maximum block duration direct
 ## Possible future features
 Originally I had planned to allow for scheduled blocks that would restrict the internet at certain times of day or days of week. This seemed like a useful elaboration for the way that I use SelfControl to manage my general workweek. But once I made all the changes above, the schedule option feels considerably less urgent. 
 
----
 # Installing
 
 There's no prebuilt download. You build it yourself, signed with your own (free) Apple ID. You need a Mac on macOS 13 or later.
 ## Ask AI to do it
 If you use [Claude Code](https://claude.com/claude-code) or [OpenAI Codex](https://openai.com/codex/), you can paste this request into it:
 
-> Please build and install the SelfControl fork from https://github.com/arstein/selfcontrol on this Mac. Follow the "Build it yourself" steps in its README. Sign it with my own Apple ID's Personal Team, and ask me before doing anything that needs my password or admin rights.
+```text
+Please build and install the SelfControl fork from https://github.com/arstein/selfcontrol
+on this Mac. Follow the "Build it yourself" steps in its README. Sign it with my own
+Apple ID's Personal Team, and ask me before doing anything that needs my password or
+admin rights.
+```
 
 ## Build it yourself
 
@@ -133,7 +140,6 @@ xattr -dr com.apple.quarantine /Applications/SelfControl.app
 
 This is needed because the app isn't notarized by Apple. Then open it and allow the helper as in step 7. Free signing certificates last about a year, so rebuild after that.
 
----
 # About
 SelfControl is a free and open-source application for macOS that lets you block access to distracting websites, your mail servers, or anything else on the Internet. Just set a period of time to block for, add sites to your blocklist, and click "Start Block". Until that timer expires, you will be unable to access those sites—even if you restart your computer or delete the application.
 ## Credits
