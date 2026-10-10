@@ -319,4 +319,12 @@ final class UIFormattingTests: XCTestCase {
         XCTAssertEqual(DeepBlockLimits.clamp(500), 240)
         XCTAssertEqual(DeepBlockLimits.scale.maxMinutes, 240)
     }
+
+    // MARK: list entries
+
+    func testListEntriesDropDuplicatesKeepingFirst() {
+        XCTAssertEqual(ListEntries.unique(["vox.com", "bbc.com", "vox.com", "archive.ph", "bbc.com"]),
+                       ["vox.com", "bbc.com", "archive.ph"])
+        XCTAssertEqual(ListEntries.unique([]), [])
+    }
 }
