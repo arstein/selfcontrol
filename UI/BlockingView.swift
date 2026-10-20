@@ -104,16 +104,16 @@ struct BlockingView: View {
         return Card(padding: 16) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline) {
-                    Eyebrow(text: NSLocalizedString("Sites open", comment: "eyebrow during override"), color: Theme.green)
+                    Eyebrow(text: NSLocalizedString("Sites open", comment: "eyebrow during override"), color: Theme.overrideActive)
                     Spacer()
                     Text(String(format: NSLocalizedString("blocking resumes %@", comment: ""), EndTimePhrase.phrase(for: resumes, now: model.now)))
                         .font(.system(size: 12)).foregroundColor(Theme.sub)
                 }
                 Text(CountdownText.minutesSeconds(secs)).font(.system(size: 46, weight: .light).monospacedDigit())
-                ProgressBar(fraction: Double(secs) / total, tint: Theme.green, track: Theme.greenTrack)
+                ProgressBar(fraction: Double(secs) / total, tint: Theme.overrideActive, track: Theme.overrideTrack)
             }
         }
-        .overlay(RoundedRectangle(cornerRadius: Theme.cardRadius).strokeBorder(Color(hex: 0x2F5A44), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: Theme.cardRadius).strokeBorder(Theme.overrideBorder, lineWidth: 1))
     }
 
     private var underlyingBlockRow: some View {
