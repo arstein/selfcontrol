@@ -79,6 +79,12 @@ someblog.substack.com
 ```
 
 This will just restrict access to the listed subdomains.
+
+One caveat: a subdomain entry is easier to slip past than a whole-domain entry. When you block a bare domain, the app blocks it twice: by name, and at the firewall by the addresses of the site's servers. A subdomain entry is blocked by name only, because subdomains often share servers with the rest of the site, and blocking those addresses would also cut off the subdomains you wanted to keep.
+
+That gap matters for sites that save themselves in your browser so they can work offline. The New York Times is one. Blocking `www.nytimes.com` (to keep `cooking.nytimes.com` open) doesn't work in Chrome. On your first visit, the site installs a background script in the browser, and that script redraws the front page from a saved copy, never looking up the blocked name. Fresh articles then load from other NYT servers that aren't blocked. News sites, social media, and anything that behaves like an app (works offline, can be installed, sends notifications) are the most likely to get through this way.
+
+For those sites, block the whole domain (`nytimes.com`). If you really need a subdomain-only block, remove the site's saved script before the block starts: in Chrome, go to `chrome://serviceworker-internals` and unregister the site. It comes back the next time you visit, so you'd need to repeat this before each block.
 ## UI refresh
 The main version of SelfControl has a functional, simple user interface. It gets the job done. My version maintains the overall simplicity, but unifies the controls in a single window and puts a bit of gloss on them.
 
