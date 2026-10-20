@@ -120,8 +120,8 @@ struct PillsView: View {
         case .using(let fraction):
             var inner = ctx
             inner.clip(to: shape)
-            inner.fill(Path(rect), with: .color(Theme.greenTrack))
-            inner.fill(Capsule().path(in: CGRect(x: rect.minX, y: rect.minY, width: rect.width * fraction, height: rect.height)), with: .color(Theme.green))
+            inner.fill(Path(rect), with: .color(Theme.overrideTrack))
+            inner.fill(Capsule().path(in: CGRect(x: rect.minX, y: rect.minY, width: rect.width * fraction, height: rect.height)), with: .color(Theme.overrideActive))
         case .pending:
             ctx.stroke(Capsule().path(in: rect.insetBy(dx: 0.75, dy: 0.75)), with: .color(Theme.green), lineWidth: 1.5)
         }
@@ -134,8 +134,8 @@ struct PillsView: View {
         case .used:
             ctx.fill(Path(rect), with: .color(Theme.track))
         case .using(let fraction):
-            ctx.fill(Path(rect), with: .color(Theme.greenTrack))
-            ctx.fill(Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width * fraction, height: rect.height)), with: .color(Theme.green))
+            ctx.fill(Path(rect), with: .color(Theme.overrideTrack))
+            ctx.fill(Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width * fraction, height: rect.height)), with: .color(Theme.overrideActive))
         case .pending:
             ctx.stroke(Path(rect.insetBy(dx: 0.5, dy: 0.5)), with: .color(Theme.green), lineWidth: 1)
         }

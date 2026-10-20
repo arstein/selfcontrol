@@ -19,9 +19,12 @@ enum Theme {
     static let accent = Color(hex: 0xD4460C)
     static let accentText = Color(hex: 0xF0A37F)
     static let green = Color(hex: 0x3FBF7F)
-    static let greenTrack = Color(hex: 0x2F4A3C)
     static let track = Color(hex: 0x45454C)
     static let warning = Color(hex: 0xE0B07A)
+    // A running override: its pill and countdown bar share this color so they read as one.
+    static let overrideActive = Color(hex: 0xE6C34A)
+    static let overrideTrack = Color(hex: 0x4A4128)
+    static let overrideBorder = Color(hex: 0x5A4F2C)
     static let danger = Color(hex: 0xFF6B5E)
     static let idleDot = Color(hex: 0x6E6E76)
 
