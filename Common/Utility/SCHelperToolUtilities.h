@@ -46,6 +46,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 // Plays the user's block-end sound, if they asked for one.
 + (void)playBlockEndSound;
++ (void)playOverrideEndSound;
 
 // YES while the deep layer must be enforced: its record exists OR its rules are
 // installed (a tampered-away record never relaxes enforcement).

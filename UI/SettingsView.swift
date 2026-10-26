@@ -12,6 +12,8 @@ struct SettingsView: View {
     @AppStorage("TimerWindowFloats") private var keepOnTop = false
     @AppStorage("BlockSoundShouldPlay") private var soundOn = false
     @AppStorage("BlockSound") private var soundIndex = 5
+    @AppStorage("OverrideSoundShouldPlay") private var overrideSoundOn = true
+    @AppStorage("OverrideSound") private var overrideSoundIndex = 12   // Submarine
     @AppStorage("EmergencyUnlockEnabled") private var emergencyUnlock = true
     @State private var showCustomMax = false
     @State private var customMaxText = ""
@@ -48,7 +50,14 @@ struct SettingsView: View {
                     HStack {
                         Text(NSLocalizedString("Sound when a block ends", comment: ""))
                         Spacer()
-                        soundMenu
+                        soundMenu(on: $soundOn, index: $soundIndex)
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+                    RowDivider()
+                    HStack {
+                        Text(NSLocalizedString("Sound when an override ends", comment: ""))
+                        Spacer()
+                        soundMenu(on: $overrideSoundOn, index: $overrideSoundIndex)
                     }
                     .padding(.horizontal, 14).padding(.vertical, 9)
                     RowDivider()
@@ -121,16 +130,16 @@ struct SettingsView: View {
         showCustomMax = false
     }
 
-    private var soundMenu: some View {
+    private func soundMenu(on: Binding<Bool>, index: Binding<Int>) -> some View {
         let names = SCConstants.systemSoundNames
         return Menu {
-            Button(NSLocalizedString("Off", comment: "no sound")) { soundOn = false }
+            Button(NSLocalizedString("Off", comment: "no sound")) { on.wrappedValue = false }
             Divider()
-            ForEach(Array(names.enumerated()), id: \.offset) { index, name in
-                Button(name) { selectSound(index: index, names: names) }
+            ForEach(Array(names.enumerated()), id: \.offset) { i, name in
+                Button(name) { selectSound(index: i, names: names, on: on, selected: index) }
             }
         } label: {
-            Text(soundOn && soundIndex < names.count ? names[soundIndex] : NSLocalizedString("Off", comment: "no sound"))
+            Text(on.wrappedValue && index.wrappedValue < names.count ? names[index.wrappedValue] : NSLocalizedString("Off", comment: "no sound"))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -138,7 +147,7 @@ struct SettingsView: View {
     }
 
     /// Port of PreferencesGeneralViewController -soundSelectionChanged: (preview + errors 310/311).
-    private func selectSound(index: Int, names: [String]) {
+    private func selectSound(index: Int, names: [String], on: Binding<Bool>, selected: Binding<Int>) {
         guard index >= 0 && index < names.count else {
             NSLog("WARNING: User selected unknown alert sound index %ld.", index)
             let err = SCErr.error(withCode: 310)
@@ -146,8 +155,8 @@ struct SettingsView: View {
             Dialog.afterCurrentAction { SCUIUtilities.presentError(err) }
             return
         }
-        soundIndex = index
-        soundOn = true
+        selected.wrappedValue = index
+        on.wrappedValue = true
         if let sound = NSSound(named: NSSound.Name(names[index])) {
             sound.play()
         } else {

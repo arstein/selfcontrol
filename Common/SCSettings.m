@@ -104,6 +104,8 @@ NSString* const SETTINGS_FILE_DIR = @"/usr/local/etc/";
         @"IncludeLinkedDomains": @YES,
         @"BlockSoundShouldPlay": @NO,
         @"BlockSound": @5,
+        @"OverrideSoundShouldPlay": @YES,
+        @"OverrideSound": @12, // Submarine (SCConstants.systemSoundNames)
         @"ClearCaches": @YES,
         @"AllowLocalNetworks": @YES,
 

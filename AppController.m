@@ -424,6 +424,8 @@
                                                                 @"IncludeLinkedDomains": [self->defaults_ valueForKey: @"IncludeLinkedDomains"],
                                                                 @"BlockSoundShouldPlay": [self->defaults_ valueForKey: @"BlockSoundShouldPlay"],
                                                                 @"BlockSound": [self->defaults_ valueForKey: @"BlockSound"],
+                                                                @"OverrideSoundShouldPlay": [self->defaults_ valueForKey: @"OverrideSoundShouldPlay"],
+                                                                @"OverrideSound": [self->defaults_ valueForKey: @"OverrideSound"],
                                                                 @"EnableErrorReporting": [self->defaults_ valueForKey: @"EnableErrorReporting"],
                                                                 @"EmergencyUnlockEnabled": [self->defaults_ valueForKey: @"EmergencyUnlockEnabled"],
                                                                 @"OverridePerDay": [self->defaults_ valueForKey: @"OverridePerDay"],

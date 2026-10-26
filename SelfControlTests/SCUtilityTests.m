@@ -12,6 +12,7 @@
 #import "SCSettings.h"
 #import "SCTrustedClock.h"
 #import "SCBlockUtilities.h"
+#import "SCConstants.h"
 
 @interface SCUtilityTests : XCTestCase
 
@@ -362,6 +363,13 @@ static NSDictionary* SCTTSnapshot(NSDictionary* clockState, NSTimeInterval start
     XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedForSettingsValue: @YES]);
     XCTAssertFalse([SCBlockUtilities emergencyUnlockAllowedForSettingsValue: @NO]);
     XCTAssertTrue([SCBlockUtilities emergencyUnlockAllowedForSettingsValue: @"NO"]);
+}
+
+- (void)testOverrideSoundDefaultsToSubmarine {
+    // The defaults store an index into systemSoundNames; keep it pointing at Submarine.
+    NSUInteger index = [SCConstants.defaultUserDefaults[@"OverrideSound"] unsignedIntegerValue];
+    XCTAssertEqualObjects(SCConstants.systemSoundNames[index], @"Submarine");
+    XCTAssertEqualObjects(SCConstants.defaultUserDefaults[@"OverrideSoundShouldPlay"], @YES);
 }
 
 @end

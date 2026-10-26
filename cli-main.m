@@ -136,6 +136,8 @@ int main(int argc, char* argv[]) {
                 @"IncludeLinkedDomains": defaultsDict[@"IncludeLinkedDomains"],
                 @"BlockSoundShouldPlay": defaultsDict[@"BlockSoundShouldPlay"],
                 @"BlockSound": defaultsDict[@"BlockSound"],
+                @"OverrideSoundShouldPlay": defaultsDict[@"OverrideSoundShouldPlay"],
+                @"OverrideSound": defaultsDict[@"OverrideSound"],
                 @"EnableErrorReporting": defaultsDict[@"EnableErrorReporting"],
                 @"EmergencyUnlockEnabled": defaultsDict[@"EmergencyUnlockEnabled"],
                 @"OverridePerDay": defaultsDict[@"OverridePerDay"],

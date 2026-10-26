@@ -226,6 +226,8 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     [settings setValue: blockSettings[@"IncludeLinkedDomains"] forKey: @"IncludeLinkedDomains"];
     [settings setValue: blockSettings[@"BlockSoundShouldPlay"] forKey: @"BlockSoundShouldPlay"];
     [settings setValue: blockSettings[@"BlockSound"] forKey: @"BlockSound"];
+    [settings setValue: blockSettings[@"OverrideSoundShouldPlay"] forKey: @"OverrideSoundShouldPlay"];
+    [settings setValue: blockSettings[@"OverrideSound"] forKey: @"OverrideSound"];
     [settings setValue: blockSettings[@"EnableErrorReporting"] forKey: @"EnableErrorReporting"];
 
     // --- Override policy + initial state (Phase 4) ---
@@ -704,6 +706,18 @@ static NSTimeInterval sInstallBackoffSecs = 0;
     NSDictionary* deep = [SCBlockUtilities deepBlockRecord];
     BOOL deepEnforced = deep != nil || [installedLayers containsObject:SCLayerDeep];
     BOOL baseLifted = overrideActive && !deepEnforced;
+
+    // Checkups run every second, so this catches an override the moment it runs out.
+    static BOOL overrideWasActive = NO;
+    if ([SCOverrideDecision overrideRanOutWithWasActive:overrideWasActive
+                                               isActive:overrideActive
+                                             trustedNow:trustedNow
+                                        overrideEndDate:[SCDaemonBlockMethods overrideEndDateFromSettings:settings outStateOut:NULL]
+                                      blockStillRunning:modernRunning && !expired]) {
+        NSLog(@"INFO: Override ran out; blocking resumes.");
+        [SCHelperToolUtilities playOverrideEndSound];
+    }
+    overrideWasActive = overrideActive;
 
     // Midnight reset must be driven by VERIFIED time (master spec §4). trustedNow advances
     // monotonically offline, so it may only DETECT that a reset is due; the reset itself is

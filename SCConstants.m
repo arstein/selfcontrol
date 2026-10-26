@@ -62,6 +62,8 @@ OSStatus const AUTH_CANCELLED_STATUS = -60006;
             @"IncludeLinkedDomains": @YES,
             @"BlockSoundShouldPlay": @NO,
             @"BlockSound": @5,
+            @"OverrideSoundShouldPlay": @YES,
+            @"OverrideSound": @12, // Submarine (SCConstants.systemSoundNames)
             @"ClearCaches": @YES,
             @"AllowLocalNetworks": @YES,
             // if the user has checked the box to "send crash reports to third-party developers", we'll default Sentry on

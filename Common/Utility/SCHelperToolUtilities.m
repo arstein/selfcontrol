@@ -240,16 +240,24 @@ static BOOL SCDeepOption(NSDictionary* deep, NSString* key, BOOL failClosedDefau
 }
 
 + (void)playBlockEndSound {
+    [self playSoundIfOnKey: @"BlockSoundShouldPlay" indexKey: @"BlockSound"];
+}
+
++ (void)playOverrideEndSound {
+    [self playSoundIfOnKey: @"OverrideSoundShouldPlay" indexKey: @"OverrideSound"];
+}
+
++ (void)playSoundIfOnKey:(NSString*)onKey indexKey:(NSString*)indexKey {
     SCSettings* settings = [SCSettings sharedSettings];
-    if([settings boolForKey: @"BlockSoundShouldPlay"]) {
-        // Map the tags used in interface builder to the sound
-        NSArray* systemSoundNames = SCConstants.systemSoundNames;
-        NSSound* alertSound = [NSSound soundNamed: systemSoundNames[(NSUInteger)[[settings valueForKey: @"BlockSound"] intValue]]];
-        if(!alertSound)
-            NSLog(@"WARNING: Alert sound not found.");
-        else {
-            [alertSound play];
-        }
+    if(![settings boolForKey: onKey]) return;
+    // Map the tags used in interface builder to the sound
+    NSArray* systemSoundNames = SCConstants.systemSoundNames;
+    NSUInteger index = (NSUInteger)[[settings valueForKey: indexKey] intValue];
+    NSSound* alertSound = index < systemSoundNames.count ? [NSSound soundNamed: systemSoundNames[index]] : nil;
+    if(!alertSound)
+        NSLog(@"WARNING: Alert sound not found.");
+    else {
+        [alertSound play];
     }
 }
 
