@@ -73,6 +73,16 @@ enum DurationText {
     }
 }
 
+// MARK: - Extend limit
+
+enum ExtendLimit {
+    /// Most a running block can be extended, in whole minutes: its end may reach
+    /// now + Longest block allowed, never further. 0 when it's already there.
+    static func maxMinutes(maxBlockLengthMinutes: Int, remainingSeconds: Int) -> Int {
+        max(0, (maxBlockLengthMinutes * 60 - max(0, remainingSeconds)) / 60)
+    }
+}
+
 // MARK: - Duration slider scale (spec §8)
 
 /// Piecewise slider scale: 1–60 min (5-min steps), 1–24 h (15-min steps),

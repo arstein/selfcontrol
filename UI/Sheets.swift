@@ -96,32 +96,30 @@ struct ExtendSheet: View {
 
     init(initialMinutes: Int) { _minutes = State(initialValue: initialMinutes) }
 
-    private var cap: Int { min(1440, model.maxBlockLengthMinutes) }   // daemon rejects > 24h per call (309)
+    private var cap: Int {
+        ExtendLimit.maxMinutes(maxBlockLengthMinutes: model.maxBlockLengthMinutes, remainingSeconds: model.remainingSeconds ?? 0)
+    }
     private var scale: DurationScale { DurationScale(maxMinutes: cap) }
+    private var atCap: Bool { cap < 1 }
 
     var body: some View {
         BottomSheet(title: NSLocalizedString("Extend this block?", comment: "")) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("+" + DurationText.short(minutes: minutes))
-                    .font(.system(size: 24, weight: .light).monospacedDigit())
-                    .lineLimit(1).minimumScaleFactor(0.7)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if let end = model.blockEndDate {
-                    Text(String(format: NSLocalizedString("New end: %@", comment: ""),
-                                EndTimePhrase.phrase(for: end.addingTimeInterval(TimeInterval(minutes * 60)), now: model.now)))
-                        .font(.system(size: 12)).foregroundColor(Theme.sub)
-                        .lineLimit(1).minimumScaleFactor(0.8)
+            if atCap {
+                Text(NSLocalizedString("This block already runs as long as your longest block allowed.", comment: ""))
+                    .font(.system(size: 12)).foregroundColor(Theme.sub).fixedSize(horizontal: false, vertical: true)
+            } else {
+                amountHeader
+                DurationSlider(minutes: $minutes, scale: scale)
+                HStack(spacing: 2) {
+                    ForEach([15, 60, 240, 1440, 10080].filter { $0 <= cap }, id: \.self) { m in
+                        Button("+" + DurationText.short(minutes: m)) { minutes = m }
+                            .buttonStyle(ChipButtonStyle(selected: m == minutes))
+                    }
                 }
+                .padding(.horizontal, -6)
+                Text(String(format: NSLocalizedString("Up to %@ more. Extending can’t be undone.", comment: "extend sheet caption"), DurationText.short(minutes: cap)))
+                    .font(.system(size: 12)).foregroundColor(Theme.sub).fixedSize(horizontal: false, vertical: true)
             }
-            DurationSlider(minutes: $minutes, scale: scale)
-            HStack(spacing: 2) {
-                ForEach([15, 60, 240, 480, 1440].filter { $0 <= cap }, id: \.self) { m in
-                    Button("+" + DurationText.short(minutes: m)) { minutes = m }
-                        .buttonStyle(ChipButtonStyle(selected: m == minutes))
-                }
-            }
-            .padding(.horizontal, -6)
-            Text(NSLocalizedString("Extending can’t be undone.", comment: "")).font(.system(size: 12)).foregroundColor(Theme.sub)
             if let error {
                 Text(error).font(.system(size: 12)).foregroundColor(Theme.danger).fixedSize(horizontal: false, vertical: true)
             }
@@ -149,11 +147,26 @@ struct ExtendSheet: View {
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .frame(height: 40)
-                .disabled(busy)
+                .disabled(busy || atCap)
             }
         }
         .onChange(of: busy) { model.sheetBusy = $0 }
         .onDisappear { model.sheetBusy = false }
         .onAppear { minutes = scale.snap(minutes) }
+    }
+
+    private var amountHeader: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("+" + DurationText.short(minutes: minutes))
+                .font(.system(size: 24, weight: .light).monospacedDigit())
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let end = model.blockEndDate {
+                Text(String(format: NSLocalizedString("New end: %@", comment: ""),
+                            EndTimePhrase.phrase(for: end.addingTimeInterval(TimeInterval(minutes * 60)), now: model.now)))
+                    .font(.system(size: 12)).foregroundColor(Theme.sub)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+            }
+        }
     }
 }

@@ -327,4 +327,19 @@ final class UIFormattingTests: XCTestCase {
                        ["vox.com", "bbc.com", "archive.ph"])
         XCTAssertEqual(ListEntries.unique([]), [])
     }
+
+    // MARK: extend limit
+
+    func testExtendLimitFillsUpToLongestBlock() {
+        // 30-day max, 2 days left: up to 28 days more.
+        XCTAssertEqual(ExtendLimit.maxMinutes(maxBlockLengthMinutes: 43200, remainingSeconds: 2 * 86400), 28 * 1440)
+        // Partial minutes left round the cap down, never past the max.
+        XCTAssertEqual(ExtendLimit.maxMinutes(maxBlockLengthMinutes: 1440, remainingSeconds: 3600 + 30), 1440 - 61)
+    }
+
+    func testExtendLimitIsZeroAtOrPastLongestBlock() {
+        XCTAssertEqual(ExtendLimit.maxMinutes(maxBlockLengthMinutes: 1440, remainingSeconds: 86400), 0)
+        // Max lowered below what's left: nothing more, never negative.
+        XCTAssertEqual(ExtendLimit.maxMinutes(maxBlockLengthMinutes: 60, remainingSeconds: 7200), 0)
+    }
 }

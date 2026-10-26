@@ -117,8 +117,8 @@
 - (void)exportListForKey:(NSString*)listKey allowlistKey:(NSString*)allowlistKey;
 - (void)importListForKey:(NSString*)listKey allowlistKey:(NSString*)allowlistKey;
 
-// Extends the RUNNING block (clamped to
-// MaxBlockLength; daemon still enforces its 24h-per-call cap, error 309).
+// Extends the RUNNING block, capped so its end is at most now + MaxBlockLength.
+// Sent to the daemon in steps of at most 24h (its per-call cap, error 309).
 - (void)extendRunningBlockByMinutes:(NSInteger)minutes completion:(void (^)(NSError* _Nullable error))completion;
 
 // The manual "Stuck? Stop block manually" flow (SCKillerHelper). Main thread only; shows its own alerts.

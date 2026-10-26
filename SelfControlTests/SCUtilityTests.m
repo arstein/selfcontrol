@@ -372,4 +372,20 @@ static NSDictionary* SCTTSnapshot(NSDictionary* clockState, NSTimeInterval start
     XCTAssertEqualObjects(SCConstants.defaultUserDefaults[@"OverrideSoundShouldPlay"], @YES);
 }
 
+- (void)testExtensionStepsSplitIntoDayLongSteps {
+    NSDate* from = [NSDate dateWithTimeIntervalSince1970: 1000000];
+    NSDate* to = [from dateByAddingTimeInterval: 2.5 * 86400];
+    NSArray<NSDate*>* steps = [SCBlockUtilities extensionStepsFromEndDate: from toEndDate: to maxStepSecs: 86400];
+    NSArray<NSDate*>* expected = @[[from dateByAddingTimeInterval: 86400], [from dateByAddingTimeInterval: 2 * 86400], to];
+    XCTAssertEqualObjects(steps, expected);
+}
+
+- (void)testExtensionStepsShortOrEmpty {
+    NSDate* from = [NSDate dateWithTimeIntervalSince1970: 1000000];
+    NSDate* hourLater = [from dateByAddingTimeInterval: 3600];
+    XCTAssertEqualObjects([SCBlockUtilities extensionStepsFromEndDate: from toEndDate: hourLater maxStepSecs: 86400], @[hourLater]);
+    XCTAssertEqualObjects([SCBlockUtilities extensionStepsFromEndDate: from toEndDate: from maxStepSecs: 86400], @[]);
+    XCTAssertEqualObjects([SCBlockUtilities extensionStepsFromEndDate: hourLater toEndDate: from maxStepSecs: 86400], @[]);
+}
+
 @end
