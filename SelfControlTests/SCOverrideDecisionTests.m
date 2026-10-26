@@ -26,6 +26,31 @@
     XCTAssertFalse([SCOverrideDecision overrideActiveWithTrustedNow:now overrideEndDate:[now dateByAddingTimeInterval:-1]]);
 }
 
+#pragma mark override ran out (end sound)
+
+- (void)testRanOutWhenActiveOverrideReachesItsEnd {
+    NSDate* end = [NSDate date];
+    XCTAssertTrue([SCOverrideDecision overrideRanOutWithWasActive:YES isActive:NO trustedNow:end overrideEndDate:end blockStillRunning:YES]);
+    XCTAssertTrue([SCOverrideDecision overrideRanOutWithWasActive:YES isActive:NO trustedNow:[end dateByAddingTimeInterval:2] overrideEndDate:end blockStillRunning:YES]);
+}
+- (void)testNotRanOutWithoutTransition {
+    NSDate* end = [NSDate date];
+    XCTAssertFalse([SCOverrideDecision overrideRanOutWithWasActive:NO isActive:NO trustedNow:end overrideEndDate:end blockStillRunning:YES]);
+    XCTAssertFalse([SCOverrideDecision overrideRanOutWithWasActive:YES isActive:YES trustedNow:end overrideEndDate:end blockStillRunning:YES]);
+}
+- (void)testNotRanOutWhenEndedEarly {
+    // A deep block start clears the end date; a lost clock anchor goes inactive before the end.
+    NSDate* now = [NSDate date];
+    XCTAssertFalse([SCOverrideDecision overrideRanOutWithWasActive:YES isActive:NO trustedNow:now overrideEndDate:nil blockStillRunning:YES]);
+    XCTAssertFalse([SCOverrideDecision overrideRanOutWithWasActive:YES isActive:NO trustedNow:now overrideEndDate:[now dateByAddingTimeInterval:60] blockStillRunning:YES]);
+    XCTAssertFalse([SCOverrideDecision overrideRanOutWithWasActive:YES isActive:NO trustedNow:nil overrideEndDate:now blockStillRunning:YES]);
+}
+- (void)testNotRanOutWhenBlockIsEnding {
+    // The block's own end sound covers it.
+    NSDate* end = [NSDate date];
+    XCTAssertFalse([SCOverrideDecision overrideRanOutWithWasActive:YES isActive:NO trustedNow:end overrideEndDate:end blockStillRunning:NO]);
+}
+
 #pragma mark midnight reset
 
 - (void)testResetSameDayNoReset {

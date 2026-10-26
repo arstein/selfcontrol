@@ -44,6 +44,16 @@ typedef NS_ENUM(NSInteger, SCOverrideInvokeResult) {
                                      clockAnchored:(BOOL)clockAnchored
                                        maxLiftSecs:(NSTimeInterval)maxLiftSecs;
 
+/// YES when an override that was active has just run out on its own: it reached
+/// its end date while the block it lifted is still running. Not for an override
+/// cut short (end date cleared, or the clock lost its anchor before the end) or
+/// one ending with its block, which plays the block's own sound.
++ (BOOL)overrideRanOutWithWasActive:(BOOL)wasActive
+                           isActive:(BOOL)isActive
+                         trustedNow:(nullable NSDate*)trustedNow
+                    overrideEndDate:(nullable NSDate*)overrideEndDate
+                  blockStillRunning:(BOOL)blockStillRunning;
+
 @end
 
 NS_ASSUME_NONNULL_END

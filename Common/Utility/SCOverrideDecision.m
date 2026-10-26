@@ -46,6 +46,16 @@
     return remaining;
 }
 
++ (BOOL)overrideRanOutWithWasActive:(BOOL)wasActive
+                           isActive:(BOOL)isActive
+                         trustedNow:(NSDate*)trustedNow
+                    overrideEndDate:(NSDate*)overrideEndDate
+                  blockStillRunning:(BOOL)blockStillRunning {
+    if (!wasActive || isActive || !blockStillRunning) return NO;
+    if (trustedNow == nil || overrideEndDate == nil) return NO;
+    return [trustedNow compare:overrideEndDate] != NSOrderedAscending;
+}
+
 + (NSString*)dayStringForDate:(NSDate*)date timeZone:(NSTimeZone*)tz {
     static NSDateFormatter* fmt;
     static dispatch_once_t once;
