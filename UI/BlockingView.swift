@@ -82,12 +82,9 @@ struct BlockingView: View {
                     Text(NSLocalizedString("This block was started by an older version of SelfControl, so it can’t be extended or added to.", comment: ""))
                         .font(.system(size: 12)).foregroundColor(Theme.sub).fixedSize(horizontal: false, vertical: true)
                 } else if model.isModernBlock, model.remainingSeconds != nil {
-                    HStack(spacing: 4) {
-                        Text(NSLocalizedString("Extend", comment: "")).font(.system(size: 12)).foregroundColor(Theme.sub)
+                    HStack {
                         Spacer()
-                        Button("+15m") { model.sheet = .extend(presetMinutes: 15) }.buttonStyle(ChipButtonStyle())
-                        Button("+1h") { model.sheet = .extend(presetMinutes: 60) }.buttonStyle(ChipButtonStyle())
-                        Button(NSLocalizedString("More…", comment: "")) { model.sheet = .extend(presetMinutes: 240) }.buttonStyle(ChipButtonStyle())
+                        Button(NSLocalizedString("Extend…", comment: "")) { model.sheet = .extend(presetMinutes: 60) }.buttonStyle(ChipButtonStyle())
                     }
                     .padding(.trailing, -6)
                 }

@@ -115,6 +115,10 @@ final class SnapshotRenderer: NSObject {
             ("37-list-address-only", AppModel.preview { m in
                 m.path = [.restrictions]; m.isAllowlist = false
                 m.editableEntries = ["nytimes.com", "www.nytimes.com", "danieldrezner.substack.com", "10.0.0.0/8"] }),
+            ("38-extend-at-cap", blocking(86400) { m in
+                m.maxBlockLengthMinutes = 1440
+                m.sheet = .extend(presetMinutes: 60)
+            }),
         ]
     }
 

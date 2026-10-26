@@ -785,7 +785,6 @@
 
     NSInteger maxBlockLength = [defaults_ integerForKey: @"MaxBlockLength"];
     if (minutes < 1) { finish(nil); return; }
-    if (minutes > maxBlockLength) minutes = maxBlockLength;
 
     if (![SCUIUtilities blockIsRunning]) { finish([SCErr errorWithCode: 103]); return; }
     if (![SCBlockUtilities modernBlockIsRunning]) { finish([SCErr errorWithCode: 306]); return; }
@@ -800,7 +799,15 @@
         finishAndRelease([self uiErrorWithDescription: NSLocalizedString(@"This block has already ended.", @"extend error when the block is over")]);
         return;
     }
-    NSDate* newBlockEndDate = [oldBlockEndDate dateByAddingTimeInterval: (minutes * 60)];
+    // The block's end may reach now + MaxBlockLength, never further.
+    NSDate* latestEndDate = [NSDate dateWithTimeIntervalSinceNow: maxBlockLength * 60];
+    NSDate* newBlockEndDate = [[oldBlockEndDate dateByAddingTimeInterval: (minutes * 60)] earlierDate: latestEndDate];
+    if ([newBlockEndDate timeIntervalSinceDate: oldBlockEndDate] < 60) {
+        finishAndRelease([self uiErrorWithDescription: NSLocalizedString(@"This block already runs as long as your longest block allowed.", @"extend error at the max block length")]);
+        return;
+    }
+    // The helper takes at most a day per extension, so longer ones go in steps.
+    NSArray<NSDate*>* steps = [SCBlockUtilities extensionStepsFromEndDate: oldBlockEndDate toEndDate: newBlockEndDate maxStepSecs: 86400];
 
     // we're about to launch a helper tool which will read settings, so make sure the ones on disk are valid
     [settings_ synchronizeSettings];
@@ -812,12 +819,21 @@
             finishAndRelease([self uiErrorWithDescription: NSLocalizedString(@"This block has already ended.", @"extend error when the block is over")]);
             return;
         }
-        [self.xpc updateBlockEndDate: newBlockEndDate reply:^(NSError * _Nonnull error) {
-            if (error == nil) {
-                [SCSentry addBreadcrumb: @"App extended block duration successfully" category:@"app"];
-            }
-            finishAndRelease(error);
-        }];
+        [self extendThroughSteps: steps index: 0 completion: finishAndRelease];
+    }];
+}
+
+// Sends each step in order; stops at the first error. Steps already sent stay
+// (extending is tighten-only), so a failure part way leaves a shorter extension.
+- (void)extendThroughSteps:(NSArray<NSDate*>*)steps index:(NSUInteger)index completion:(void (^)(NSError* _Nullable error))completion {
+    if (index >= steps.count) {
+        [SCSentry addBreadcrumb: @"App extended block duration successfully" category:@"app"];
+        completion(nil);
+        return;
+    }
+    [self.xpc updateBlockEndDate: steps[index] reply:^(NSError * _Nonnull error) {
+        if (error != nil) { completion(error); return; }
+        [self extendThroughSteps: steps index: index + 1 completion: completion];
     }];
 }
 

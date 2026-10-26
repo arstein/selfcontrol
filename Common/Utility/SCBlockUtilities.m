@@ -296,4 +296,16 @@ NSString* const SCKillerExpiryNotVerifiedMarker = @"SC_KILLER_REFUSED_EXPIRY_NOT
     [settings setValue: @NO forKey: @"TrustedClockNeedsVerification"];
 }
 
++ (NSArray<NSDate*>*)extensionStepsFromEndDate:(NSDate*)fromEnd toEndDate:(NSDate*)toEnd maxStepSecs:(NSTimeInterval)maxStepSecs {
+    NSMutableArray<NSDate*>* steps = [NSMutableArray array];
+    if (maxStepSecs <= 0) return steps;
+    NSDate* end = fromEnd;
+    while ([toEnd timeIntervalSinceDate: end] > maxStepSecs) {
+        end = [end dateByAddingTimeInterval: maxStepSecs];
+        [steps addObject: end];
+    }
+    if ([toEnd timeIntervalSinceDate: end] > 0) [steps addObject: toEnd];
+    return steps;
+}
+
 @end

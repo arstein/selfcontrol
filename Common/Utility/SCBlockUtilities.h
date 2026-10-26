@@ -102,6 +102,11 @@ FOUNDATION_EXPORT NSString* const SCKillerExpiryNotVerifiedMarker;
 
 + (void)removeBlockFromSettings;
 
+// The successive end dates for extending a block from `fromEnd` to `toEnd`, each
+// at most `maxStepSecs` after the previous one; the last is `toEnd`. Empty when
+// `toEnd` isn't later. (The helper accepts at most a day per extension.)
++ (NSArray<NSDate*>*)extensionStepsFromEndDate:(NSDate*)fromEnd toEndDate:(NSDate*)toEnd maxStepSecs:(NSTimeInterval)maxStepSecs;
+
 @end
 
 NS_ASSUME_NONNULL_END
